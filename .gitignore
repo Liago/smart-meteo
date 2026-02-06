@@ -1,0 +1,24 @@
+# General
+.DS_Store
+*.log
+node_modules/
+dist/
+.env
+.env.local
+.vercel
+.netlify
+
+# Swift / Xcode
+.build/
+.swiftpm/
+*.xcodeproj
+!*.xcodeproj
+*.xcworkspace
+!*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# Node
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
