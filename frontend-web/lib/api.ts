@@ -1,6 +1,8 @@
 import type { ForecastResponse, SourcesResponse, WeatherSource } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// In production (Netlify): empty string = same origin (API served via Netlify Functions)
+// In development: http://localhost:3000 (local Express server)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
