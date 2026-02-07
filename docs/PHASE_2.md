@@ -16,6 +16,7 @@ La Fase 1 e **sostanzialmente completata** per quanto riguarda lo sviluppo del c
 | Smart Engine V1 | Completato | Media pesata + voting per condizioni categoriche |
 | Endpoint API (`GET /api/forecast`) | Completato | Express server con health check |
 | Schema DB Supabase | Completato | `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles` |
+| Schema DB Supabase (migrations) | Completato | 11 script SQL in `supabase/migrations/` |
 | Configurazione Supabase (progetto) | **Da completare** | Creazione progetto e deploy tabelle |
 | Configurazione Netlify | **Da completare** | Link repo, environment variables, Functions |
 | Popolamento API Keys | **Da completare** | Inserimento chiavi in env vars / DB |
@@ -283,6 +284,97 @@ Il CORS del backend permette gia `localhost:3000` e `localhost:3001`.
 
 ---
 
+## Database Supabase - Migration Scripts
+
+Gli script SQL si trovano in `supabase/migrations/` e vanno eseguiti **in ordine numerico**.
+
+### Schema delle tabelle
+
+```
+sources ─────────────┐
+  (text PK)          │
+                     ├──→ raw_forecasts
+locations ───────────┤      (dati grezzi per fonte)
+  (uuid PK)          │
+                     ├──→ smart_forecasts
+                     │      (risultato aggregato Smart Engine)
+                     │
+auth.users ──────────┤
+                     └──→ profiles
+                            (preferenze utente)
+```
+
+### Lista migration
+
+| # | File | Descrizione |
+|---|------|-------------|
+| 001 | `001_extensions.sql` | Estensioni PostgreSQL (`uuid-ossp`, `pg_trgm`) |
+| 002 | `002_sources.sql` | Tabella `sources` - fonti meteo con peso e stato |
+| 003 | `003_locations.sql` | Tabella `locations` - localita cercate |
+| 004 | `004_raw_forecasts.sql` | Tabella `raw_forecasts` - dati grezzi per audit/AI |
+| 005 | `005_smart_forecasts.sql` | Tabella `smart_forecasts` - risultato aggregato |
+| 006 | `006_profiles.sql` | Tabella `profiles` + trigger auto-creazione su signup |
+| 007 | `007_rls_policies.sql` | Row Level Security per tutte le tabelle |
+| 008 | `008_indexes.sql` | Indici per performance query |
+| 009 | `009_updated_at_trigger.sql` | Trigger automatico `updated_at` |
+| 010 | `010_seed_sources.sql` | Seed data: 5 fonti meteo con pesi |
+| 011 | `011_utility_functions.sql` | Funzioni RPC: `upsert_location`, `cleanup_old_forecasts`, `get_sources_stats` |
+
+### Differenze rispetto al vecchio schema (`supabase_schema.sql`)
+
+Il vecchio file `backend/supabase_schema.sql` era una bozza iniziale. Le migration lo sostituiscono con queste correzioni:
+
+| Area | Vecchio schema | Migration nuove |
+|------|---------------|----------------|
+| `sources.id` | `uuid` (auto-generato) | `text` (es: `'tomorrow.io'`) - allineato al backend |
+| `sources.api_key` | Salvato nel DB | **Rimosso** - le chiavi sono in env vars (sicurezza) |
+| `sources.description` | Assente | Aggiunto - usato dalla pagina /sources |
+| `sources.last_error` | Assente | Aggiunto - tracking salute fonte |
+| `sources.last_response_ms` | Assente | Aggiunto - latenza ultimo fetch |
+| `raw_forecasts` | Solo `raw_data` jsonb | Aggiunto campi normalizzati (`temp`, `humidity`, ecc.) |
+| `smart_forecasts` | Molti campi inutilizzati | Allineato all'output reale di `getSmartForecast()` |
+| `profiles.favorite_locations` | Assente | Aggiunto array UUID |
+| RLS policies | Generiche | Specifiche per ruolo (service_role, authenticated, public) |
+| Indici | Nessuno | 8 indici per query frequenti |
+| Trigger | Nessuno | `updated_at` automatico + creazione profilo su signup |
+| Funzioni | Nessuna | `upsert_location`, `cleanup_old_forecasts`, `get_sources_stats` |
+
+### Guida al deploy delle migration su Supabase
+
+#### Opzione A: Dashboard SQL Editor (rapida)
+
+1. Accedere al progetto Supabase → **SQL Editor**
+2. Eseguire ogni file in ordine, da `001_extensions.sql` a `011_utility_functions.sql`
+3. Verificare: **Table Editor** → devono comparire 5 tabelle con dati seed
+
+#### Opzione B: Supabase CLI (consigliata per CI/CD)
+
+```bash
+# Installare Supabase CLI
+npm install -g supabase
+
+# Login e link al progetto
+supabase login
+supabase link --project-ref <project-id>
+
+# Eseguire tutte le migration
+supabase db push
+```
+
+#### Verifica post-migration
+
+Dopo l'esecuzione, controllare:
+
+- [ ] Tabella `sources` contiene 5 righe (le 5 fonti meteo)
+- [ ] Tabella `locations` esiste ed e vuota
+- [ ] Tabella `raw_forecasts` esiste con FK verso `sources` e `locations`
+- [ ] Tabella `smart_forecasts` esiste con FK verso `locations`
+- [ ] RLS abilitato su tutte le tabelle
+- [ ] Funzione `upsert_location` esiste (verificare in Database → Functions)
+- [ ] Trigger `on_auth_user_created` esiste su `auth.users`
+
+---
+
 ## Nuovi Endpoint Backend
 
 | Endpoint | Metodo | Descrizione | Stato |
@@ -319,6 +411,7 @@ La Fase 2 si considera completata quando:
 - [x] I test passano e la build non ha errori
 - [x] Configurazione deploy Vercel + Netlify pronta
 - [x] CORS configurato per comunicazione cross-origin sicura
+- [x] Migration SQL Supabase pronte (11 script, seed data, RLS, indici, funzioni)
 - [ ] Le performance sono accettabili (Lighthouse score > 80) - *da verificare con deploy*
 
 ---
