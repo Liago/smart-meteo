@@ -1,9 +1,10 @@
-# Smart Meteo - Netlify Configuration
-# Deploy automatico su push a main
+# Smart Meteo - Netlify Configuration (SOLO Backend API)
+# Il frontend e deployato su Vercel separatamente.
+# Questo deploy gestisce solo le Netlify Functions (API backend).
 
 [build]
-  command = "npm run build"
-  publish = "frontend-web/out"
+  command = "cd backend && npm install"
+  publish = "backend/public"
   functions = "netlify/functions"
 
 [build.environment]
@@ -12,20 +13,38 @@
 [functions]
   node_bundler = "esbuild"
 
+# Root -> info page
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/api/"
+  status = 200
+
 # Backend API -> Netlify Function (Express wrapped with serverless-http)
-# La funzione riceve il path /api/* e lo passa ad Express
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/api/:splat"
   status = 200
   force = true
 
+# CORS preflight: Netlify gestisce anche le OPTIONS request
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Max-Age = "86400"
+
 # Variabili d'ambiente richieste (da configurare nella dashboard Netlify):
+#
+# API Keys meteo:
 # - TOMORROW_API_KEY
 # - METEOMATICS_USER
 # - METEOMATICS_PASSWORD
 # - OPENWEATHER_API_KEY
 # - WEATHERAPI_KEY
 # - ACCUWEATHER_API_KEY
-# - SUPABASE_URL (futuro)
-# - SUPABASE_KEY (futuro)
+#
+# CORS (OBBLIGATORIO in produzione):
+# - FRONTEND_URL = https://<tuo-progetto>.vercel.app
+#
+# Futuro:
+# - SUPABASE_URL
+# - SUPABASE_KEY

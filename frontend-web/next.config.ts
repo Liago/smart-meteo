@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export",
+  // Vercel gestisce SSR/ISR nativamente, nessun export statico necessario
 };
 
 export default nextConfig;

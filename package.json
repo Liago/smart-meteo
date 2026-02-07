@@ -4,7 +4,6 @@
   "private": true,
   "description": "Smart Meteo - Previsioni aggregate da 5 fonti meteo",
   "scripts": {
-    "build": "cd backend && npm install && cd ../frontend-web && npm install && npm run build",
     "dev:backend": "cd backend && npx ts-node server.ts",
     "dev:frontend": "cd frontend-web && npm run dev",
     "test": "cd frontend-web && npm test",

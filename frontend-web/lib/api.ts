@@ -1,8 +1,8 @@
 import type { ForecastResponse, SourcesResponse, WeatherSource } from './types';
 
-// In production (Netlify): empty string = same origin (API served via Netlify Functions)
-// In development: http://localhost:3000 (local Express server)
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// In produzione: NEXT_PUBLIC_API_URL = URL del backend Netlify (es: https://smart-meteo-api.netlify.app)
+// In sviluppo: http://localhost:3000 (Express server locale)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
