@@ -5,6 +5,7 @@ import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
 import { UnifiedForecast } from '../utils/formatter';
 import { WeatherConditionWeights } from '../types';
+import { sources } from '../routes/sources';
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -12,6 +13,14 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'openweathermap': 1.0,
 	'weatherapi': 1.0,
 	'accuweather': 1.1
+};
+
+const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
+	'tomorrow.io': fetchFromTomorrow,
+	'meteomatics': fetchFromMeteomatics,
+	'openweathermap': fetchFromOpenWeather,
+	'weatherapi': fetchFromWeatherAPI,
+	'accuweather': fetchFromAccuWeather
 };
 
 interface AggregationData {
@@ -26,13 +35,23 @@ interface AggregationData {
 export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	console.log(`Starting Smart Engine for ${lat}, ${lon}...`);
 
-	const results = await Promise.allSettled([
-		fetchFromTomorrow(lat, lon),
-		fetchFromMeteomatics(lat, lon),
-		fetchFromOpenWeather(lat, lon),
-		fetchFromWeatherAPI(lat, lon),
-		fetchFromAccuWeather(lat, lon)
-	]);
+	const activeSources = sources.filter(s => s.active);
+	const fetchPromises = activeSources.map(s => {
+		const fetcher = SOURCE_FETCHERS[s.id];
+		if (!fetcher) return Promise.resolve(null);
+		const start = Date.now();
+		return fetcher(lat, lon).then(result => {
+			s.lastResponseMs = Date.now() - start;
+			s.lastError = null;
+			return result;
+		}).catch(err => {
+			s.lastResponseMs = Date.now() - start;
+			s.lastError = err.message || 'Unknown error';
+			return null;
+		});
+	});
+
+	const results = await Promise.allSettled(fetchPromises);
 
 	const validForecasts = results
 		.filter((r): r is PromiseFulfilledResult<UnifiedForecast> => r.status === 'fulfilled' && r.value !== null)
