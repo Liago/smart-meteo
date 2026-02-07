@@ -145,19 +145,145 @@ aggregate dello Smart Engine.
 
 ---
 
-## Prerequisiti da Fase 1 (da completare)
+## Architettura di Deploy
 
-Prima dell'integrazione completa, assicurarsi che:
+Il progetto e un monorepo con deploy separato per frontend e backend:
 
-1. **Supabase** sia configurato con le tabelle dello schema (`supabase_schema.sql`)
-2. **Backend** sia deployato (Netlify Functions o server di staging)
-3. **API Keys** siano configurate nelle environment variables
+```
+                    +--------------------------+
+                    |       GitHub Repo        |
+                    |     (branch: main)       |
+                    +-----+----------+---------+
+                          |          |
+                   push   |          |  push
+                          v          v
+              +-----------+--+  +----+-----------+
+              |   Vercel     |  |   Netlify      |
+              |  (Frontend)  |  |  (Backend API) |
+              +-----------+--+  +----+-----------+
+              | Next.js 16   |  | Express ->     |
+              | SSR nativo   |  | Netlify Func.  |
+              | TailwindCSS  |  | serverless-http|
+              +-----------+--+  +----+-----------+
+                          |          |
+                          |  HTTPS   |
+                 browser  +--CORS--->+
+                          |  fetch   |
+                          +----------+
+```
+
+| Componente | Piattaforma | Directory repo | Config file |
+|-----------|-------------|---------------|-------------|
+| Frontend (Next.js) | **Vercel** | `/frontend-web` | `frontend-web/vercel.json` |
+| Backend API (Express) | **Netlify** | root (`/backend` + `/netlify`) | `netlify.toml` |
 
 ---
 
-## Nuovi Endpoint Backend Necessari
+## Guida Completa al Deploy
 
-La Fase 2 richiede l'aggiunta di alcuni endpoint al backend esistente:
+### Passo 1: Deploy Backend su Netlify
+
+1. Accedere a [app.netlify.com](https://app.netlify.com) → **Add new site** → **Import an existing project**
+2. Collegare il repository GitHub `Liago/smart-meteo`
+3. Configurazione build (dovrebbe auto-rilevare da `netlify.toml`):
+   - **Base directory**: *(lasciare vuoto = root)*
+   - **Build command**: `cd backend && npm install`
+   - **Publish directory**: `backend/public`
+   - **Functions directory**: `netlify/functions`
+4. **Deploy branch**: `main`
+
+#### Variabili d'ambiente Netlify (Site settings → Environment variables)
+
+| Variabile | Valore | Note |
+|-----------|--------|------|
+| `FRONTEND_URL` | `https://<nome-sito>.vercel.app` | **OBBLIGATORIO** - CORS, impostare dopo il deploy Vercel |
+| `TOMORROW_API_KEY` | `<chiave>` | [tomorrow.io/weather-api](https://www.tomorrow.io/weather-api/) |
+| `METEOMATICS_USER` | `<utente>` | [meteomatics.com](https://www.meteomatics.com/en/weather-api/) |
+| `METEOMATICS_PASSWORD` | `<password>` | Stessa registrazione Meteomatics |
+| `OPENWEATHER_API_KEY` | `<chiave>` | [openweathermap.org/api](https://openweathermap.org/api) |
+| `WEATHERAPI_KEY` | `<chiave>` | [weatherapi.com](https://www.weatherapi.com/) |
+| `ACCUWEATHER_API_KEY` | `<chiave>` | [developer.accuweather.com](https://developer.accuweather.com/) |
+| `SUPABASE_URL` | `<url>` | *Futuro* - quando Supabase sara attivo |
+| `SUPABASE_KEY` | `<chiave>` | *Futuro* - quando Supabase sara attivo |
+
+#### Verifica backend
+
+Dopo il deploy, visitare:
+- `https://<nome-sito>.netlify.app/` → pagina info API
+- `https://<nome-sito>.netlify.app/api/health` → `{"status":"ok","timestamp":"..."}`
+
+---
+
+### Passo 2: Deploy Frontend su Vercel
+
+1. Accedere a [vercel.com](https://vercel.com) → **Add New Project** → Importare `Liago/smart-meteo`
+2. Configurazione:
+   - **Framework Preset**: Next.js (auto-rilevato)
+   - **Root Directory**: `frontend-web` (cliccare **Edit** e selezionare)
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `.next` (default)
+
+#### Variabili d'ambiente Vercel (Settings → Environment Variables)
+
+| Variabile | Valore | Note |
+|-----------|--------|------|
+| `NEXT_PUBLIC_API_URL` | `https://<nome-sito>.netlify.app` | URL del backend Netlify (senza `/` finale) |
+
+#### Verifica frontend
+
+Dopo il deploy, visitare `https://<nome-sito>.vercel.app` → interfaccia Smart Meteo.
+
+---
+
+### Passo 3: Collegare CORS (post-deploy)
+
+Dopo aver ottenuto l'URL Vercel definitivo:
+
+1. Tornare su **Netlify** → Site settings → Environment variables
+2. Aggiornare `FRONTEND_URL` con l'URL Vercel esatto (es. `https://smart-meteo.vercel.app`)
+3. Fare un **re-deploy** su Netlify (Deploys → Trigger deploy → Deploy site)
+
+> **Attenzione**: Senza `FRONTEND_URL` configurato correttamente, le chiamate API dal frontend
+> verranno bloccate dal CORS. Il backend accetta solo origini esplicitamente autorizzate.
+
+---
+
+### Configurazione CORS (dettaglio tecnico)
+
+Il file `backend/app.ts` gestisce il CORS con questa logica:
+
+| Origin | Permesso | Contesto |
+|--------|----------|----------|
+| `http://localhost:3000` | Si | Sviluppo locale frontend |
+| `http://localhost:3001` | Si | Sviluppo locale (porta alternativa) |
+| Valore di `FRONTEND_URL` | Si | Produzione (dominio Vercel) |
+| Nessun origin (curl, Postman) | Si | Debug e test API |
+| Qualsiasi altro dominio | **No** | Bloccato |
+
+Metodi permessi: `GET`, `PATCH`, `OPTIONS` (preflight)
+Header permessi: `Content-Type`
+Preflight cache: 24 ore (`maxAge: 86400`)
+
+---
+
+### Sviluppo Locale
+
+Per lavorare in locale con entrambi i servizi:
+
+```bash
+# Terminale 1: Backend (porta 3000)
+cd backend && npx ts-node server.ts
+
+# Terminale 2: Frontend (porta 3001)
+cd frontend-web && npm run dev
+```
+
+Il file `frontend-web/.env.local` punta gia a `http://localhost:3000`.
+Il CORS del backend permette gia `localhost:3000` e `localhost:3001`.
+
+---
+
+## Nuovi Endpoint Backend
 
 | Endpoint | Metodo | Descrizione | Stato |
 |----------|--------|-------------|-------|
@@ -171,12 +297,13 @@ La Fase 2 richiede l'aggiunta di alcuni endpoint al backend esistente:
 
 | Tecnologia | Ruolo | Versione |
 |-----------|-------|---------|
-| Next.js 16 | Framework React con App Router | 16.1.6 |
+| Next.js 16 | Framework React con App Router (SSR su Vercel) | 16.1.6 |
 | TypeScript | Type safety | 5.x |
 | TailwindCSS | Utility-first CSS | 4.x |
 | Framer Motion | Animazioni fluide | 12.x |
 | SWR | Data fetching & caching | 2.x |
 | Jest + RTL | Unit testing | 30.x / 16.x |
+| serverless-http | Wrapper Express per Netlify Functions | 3.x |
 
 ---
 
@@ -190,6 +317,8 @@ La Fase 2 si considera completata quando:
 - [x] La pagina e responsive e funziona su mobile, tablet e desktop
 - [x] La pagina gestione fonti permette di vedere e toggleare le fonti
 - [x] I test passano e la build non ha errori
+- [x] Configurazione deploy Vercel + Netlify pronta
+- [x] CORS configurato per comunicazione cross-origin sicura
 - [ ] Le performance sono accettabili (Lighthouse score > 80) - *da verificare con deploy*
 
 ---
@@ -204,3 +333,6 @@ La Fase 2 si considera completata quando:
 
 - **Problema**: ESLint `react-hooks/purity` segnala `Math.random()` in componenti
   **Soluzione**: Utilizzata funzione deterministica `seedRandom()` per generare dati di animazione pre-calcolati a livello di modulo
+
+- **Problema**: Frontend (Vercel) e Backend (Netlify) su domini diversi → CORS bloccante
+  **Soluzione**: CORS restrittivo in `backend/app.ts` con whitelist origini. `FRONTEND_URL` env var su Netlify per autorizzare il dominio Vercel in produzione
