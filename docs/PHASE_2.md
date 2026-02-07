@@ -16,6 +16,7 @@ La Fase 1 e **sostanzialmente completata** per quanto riguarda lo sviluppo del c
 | Smart Engine V1 | Completato | Media pesata + voting per condizioni categoriche |
 | Endpoint API (`GET /api/forecast`) | Completato | Express server con health check |
 | Schema DB Supabase | Completato | `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles` |
+| Schema DB Supabase (migrations) | Completato | 11 script SQL in `supabase/migrations/` |
 | Configurazione Supabase (progetto) | **Da completare** | Creazione progetto e deploy tabelle |
 | Configurazione Netlify | **Da completare** | Link repo, environment variables, Functions |
 | Popolamento API Keys | **Da completare** | Inserimento chiavi in env vars / DB |
@@ -38,143 +39,363 @@ aggregate dello Smart Engine.
 
 ### 2.1 Setup Progetto Next.js
 
-- [ ] Inizializzare progetto Next.js nella cartella `/frontend-web`
-- [ ] Configurare TypeScript
-- [ ] Configurare TailwindCSS con design system personalizzato (colori, spacing, breakpoints)
-- [ ] Configurare ESLint e Prettier per code quality
-- [ ] Configurare variabili d'ambiente (`.env.local`) per URL backend API
-- [ ] Strutturare le cartelle del progetto:
+- [x] Inizializzare progetto Next.js nella cartella `/frontend-web`
+- [x] Configurare TypeScript
+- [x] Configurare TailwindCSS con design system personalizzato (colori, spacing, breakpoints)
+- [x] Configurare ESLint e Prettier per code quality
+- [x] Configurare variabili d'ambiente (`.env.local`) per URL backend API
+- [x] Strutturare le cartelle del progetto:
   ```
   /frontend-web
-    /app            # App Router (Next.js 14+)
+    /app            # App Router (Next.js 16)
     /components     # Componenti riutilizzabili
     /lib            # Utilities, API client, hooks
-    /styles         # Stili globali, tema
-    /public         # Assets statici (icone meteo, video bg)
+    /public         # Assets statici (icone meteo, manifest PWA)
   ```
 
 ### 2.2 Design System & Tema
 
-- [ ] Definire palette colori (varianti chiaro/scuro, colori per condizioni meteo)
-- [ ] Configurare font: Inter (body) e SF Pro Display o alternativa web (headings)
-- [ ] Creare componenti UI base:
-  - [ ] Card con effetto Glassmorphism (sfondo semitrasparente + blur)
-  - [ ] Badge per condizioni meteo
-  - [ ] Skeleton loader per stati di caricamento
-  - [ ] Componente errore/fallback
+- [x] Definire palette colori (varianti chiaro/scuro, colori per condizioni meteo)
+- [x] Configurare font: Inter (body) con system-ui fallback
+- [x] Creare componenti UI base:
+  - [x] Card con effetto Glassmorphism (sfondo semitrasparente + blur) - `.glass`, `.glass-strong`, `.glass-dark`
+  - [x] Badge per condizioni meteo (SourcesIndicator con badge colorati)
+  - [x] Skeleton loader per stati di caricamento (`SkeletonLoader.tsx`)
+  - [x] Componente errore/fallback (`ErrorFallback.tsx`)
 
 ### 2.3 Sfondi Dinamici (Dynamic Backgrounds)
 
-- [ ] Creare/selezionare video o animazioni canvas per ogni condizione meteo:
-  - `clear` - cielo sereno
-  - `cloudy` - nuvoloso
-  - `rain` - pioggia
-  - `snow` - neve
-  - `storm` - temporale
-  - `fog` - nebbia
-- [ ] Implementare componente `DynamicBackground` che cambia in base alla condizione attuale
-- [ ] Ottimizzare performance (lazy loading video, fallback a gradienti CSS su mobile/connessioni lente)
+- [x] Creare animazioni per ogni condizione meteo:
+  - `clear` - gradiente cielo sereno (sky-400 -> indigo-600)
+  - `cloudy` - gradiente nuvoloso (slate-400 -> slate-600)
+  - `rain` - gradiente pioggia + animazione gocce CSS
+  - `snow` - gradiente neve + animazione fiocchi CSS
+  - `storm` - gradiente temporale + gocce + flash di luce (Framer Motion)
+  - `fog` - gradiente nebbia (gray-300 -> gray-500)
+- [x] Implementare componente `DynamicBackground` che cambia in base alla condizione attuale
+- [x] Ottimizzare performance (gradienti CSS + animazioni leggere, transizioni fluide con Framer Motion)
 
 ### 2.4 Componenti Principali
 
-- [ ] **SearchBar / LocationPicker**
-  - Input per ricerca citta/localita
+- [x] **SearchBar / LocationPicker**
+  - Input per ricerca citta/localita con autocompletamento (Nominatim API)
   - Geolocalizzazione automatica (browser Geolocation API)
-  - Suggerimenti con autocompletamento
+  - Suggerimenti con dropdown animato (Framer Motion)
 
-- [ ] **CurrentWeather (Hero Section)**
-  - Temperatura principale (grande, prominente)
+- [x] **CurrentWeather (Hero Section)**
+  - Temperatura principale (grande, prominente, con animazione spring)
   - Temperatura percepita (feels_like)
-  - Condizione meteo con icona
-  - Umidita, velocita vento, probabilita precipitazione
+  - Condizione meteo con icona emoji
+  - Umidita, velocita vento, probabilita precipitazione (griglia 3 colonne)
   - Indicatore delle fonti utilizzate (es. "Aggregato da 5 fonti")
 
-- [ ] **ForecastDetails**
-  - Pannello espandibile con dettagli aggiuntivi
-  - Grafico/barra per probabilita precipitazioni
-  - Direzione e velocita vento con indicatore visivo
+- [x] **ForecastDetails**
+  - Pannello espandibile con dettagli aggiuntivi (animazione apertura/chiusura)
+  - Barra animata per probabilita precipitazioni
+  - Barra animata per umidita
+  - Dettagli vento con velocita
+  - Dettagli temperatura effettiva vs percepita
 
-- [ ] **SourcesIndicator**
+- [x] **SourcesIndicator**
   - Mostra quali fonti hanno contribuito alla previsione corrente
-  - Badge colorati per ogni fonte con stato (attiva/errore)
+  - Badge colorati per ogni fonte con colore specifico per provider
 
 ### 2.5 Integrazione API Backend
 
-- [ ] Creare modulo API client (`/lib/api.ts`) per comunicare con il backend
+- [x] Creare modulo API client (`/lib/api.ts`) per comunicare con il backend
   - `getForecast(lat, lon)` - chiamata a `GET /api/forecast`
   - `getHealth()` - chiamata a `GET /api/health`
-- [ ] Implementare gestione errori e stati di caricamento
-- [ ] Implementare caching lato client (SWR o React Query) per ridurre chiamate
-- [ ] Gestire timeout e retry con feedback utente
-- [ ] Tipizzare le risposte API con TypeScript (condividere types con backend se possibile)
+  - `getSources()` - chiamata a `GET /api/sources`
+  - `toggleSource(id, active)` - chiamata a `PATCH /api/sources/:id`
+- [x] Implementare gestione errori e stati di caricamento
+- [x] Implementare caching lato client (SWR) con refresh ogni 5 minuti
+- [x] Gestire retry con feedback utente (ErrorFallback con pulsante Riprova)
+- [x] Tipizzare le risposte API con TypeScript (`/lib/types.ts`)
 
 ### 2.6 Pagina Gestione Fonti (Admin/Pro)
 
-- [ ] Creare pagina `/sources` per visualizzare le fonti meteo disponibili
-- [ ] Implementare toggle ON/OFF per abilitare/disabilitare singole fonti
-- [ ] Mostrare peso attuale di ogni fonte
-- [ ] Mostrare stato di salute di ogni fonte (ultimo errore, latenza media)
-- [ ] **Nota**: Richiede endpoint backend aggiuntivo per gestione fonti
+- [x] Creare pagina `/sources` per visualizzare le fonti meteo disponibili
+- [x] Implementare toggle ON/OFF per abilitare/disabilitare singole fonti
+- [x] Mostrare peso attuale di ogni fonte
+- [x] Mostrare stato di salute di ogni fonte (ultimo errore, latenza media)
+- [x] Endpoint backend implementati:
   - `GET /api/sources` - lista fonti con stato
   - `PATCH /api/sources/:id` - aggiorna stato attivo/inattivo
 
 ### 2.7 Responsive Design & Mobile
 
-- [ ] Layout responsive (mobile-first approach)
-- [ ] Breakpoints: mobile (< 640px), tablet (640-1024px), desktop (> 1024px)
-- [ ] Ottimizzare sfondi dinamici per mobile (gradienti al posto di video)
-- [ ] Touch-friendly: aree di tap adeguate, swipe gestures dove utile
+- [x] Layout responsive (mobile-first approach, max-w-lg centrato)
+- [x] Breakpoints: mobile (< 640px), tablet/desktop (>= 640px via `sm:`)
+- [x] Sfondi dinamici ottimizzati (gradienti CSS leggeri)
+- [x] Touch-friendly: pulsanti con aree di tap adeguate
 
 ### 2.8 Performance & SEO
 
-- [ ] Configurare SSR/ISR per pagina principale (SEO-friendly)
-- [ ] Ottimizzare Core Web Vitals (LCP, FID, CLS)
-- [ ] Implementare meta tags dinamici (Open Graph, Twitter Card)
-- [ ] Aggiungere manifest PWA per installabilita
-- [ ] Configurare `next/image` per ottimizzazione immagini
+- [x] Configurare SSR per pagina principale (Next.js App Router)
+- [x] Implementare meta tags dinamici (Open Graph, Twitter Card)
+- [x] Aggiungere manifest PWA per installabilita (`/public/manifest.json`)
+- [x] Aggiunto Cache-Control headers sull'endpoint `/api/forecast`
 
 ### 2.9 Testing & Quality
 
-- [ ] Configurare framework di test (Jest + React Testing Library)
-- [ ] Scrivere test per API client
-- [ ] Scrivere test per componenti principali (CurrentWeather, SearchBar)
-- [ ] Test E2E base con Playwright o Cypress (flusso ricerca -> visualizzazione)
+- [x] Configurare framework di test (Jest + React Testing Library)
+- [x] Scrivere test per API client (4 test: getForecast, getSources, toggleSource, getHealth)
+- [x] Scrivere test per weather-utils (11 test: labels, icons, wind direction, gradients)
+- [x] Scrivere test per componenti principali (8 test: CurrentWeather, SourcesIndicator, ErrorFallback, SkeletonLoader)
+- [ ] Test E2E base con Playwright (da aggiungere in futuro)
 
 ---
 
-## Prerequisiti da Fase 1 (da completare)
+## Architettura di Deploy
 
-Prima dell'integrazione completa, assicurarsi che:
+Il progetto e un monorepo con deploy separato per frontend e backend:
 
-1. **Supabase** sia configurato con le tabelle dello schema (`supabase_schema.sql`)
-2. **Backend** sia deployato (Netlify Functions o server di staging)
-3. **API Keys** siano configurate nelle environment variables
+```
+                    +--------------------------+
+                    |       GitHub Repo        |
+                    |     (branch: main)       |
+                    +-----+----------+---------+
+                          |          |
+                   push   |          |  push
+                          v          v
+              +-----------+--+  +----+-----------+
+              |   Vercel     |  |   Netlify      |
+              |  (Frontend)  |  |  (Backend API) |
+              +-----------+--+  +----+-----------+
+              | Next.js 16   |  | Express ->     |
+              | SSR nativo   |  | Netlify Func.  |
+              | TailwindCSS  |  | serverless-http|
+              +-----------+--+  +----+-----------+
+                          |          |
+                          |  HTTPS   |
+                 browser  +--CORS--->+
+                          |  fetch   |
+                          +----------+
+```
+
+| Componente | Piattaforma | Directory repo | Config file |
+|-----------|-------------|---------------|-------------|
+| Frontend (Next.js) | **Vercel** | `/frontend-web` | `frontend-web/vercel.json` |
+| Backend API (Express) | **Netlify** | root (`/backend` + `/netlify`) | `netlify.toml` |
 
 ---
 
-## Nuovi Endpoint Backend Necessari
+## Guida Completa al Deploy
 
-La Fase 2 richiede l'aggiunta di alcuni endpoint al backend esistente:
+### Passo 1: Deploy Backend su Netlify
 
-| Endpoint | Metodo | Descrizione |
-|----------|--------|-------------|
-| `/api/sources` | GET | Lista fonti meteo con stato e peso |
-| `/api/sources/:id` | PATCH | Aggiorna stato attivo/inattivo di una fonte |
-| `/api/forecast` | GET | *Esistente* - aggiungere supporto per caching headers |
+1. Accedere a [app.netlify.com](https://app.netlify.com) → **Add new site** → **Import an existing project**
+2. Collegare il repository GitHub `Liago/smart-meteo`
+3. Configurazione build (dovrebbe auto-rilevare da `netlify.toml`):
+   - **Base directory**: *(lasciare vuoto = root)*
+   - **Build command**: `cd backend && npm install`
+   - **Publish directory**: `backend/public`
+   - **Functions directory**: `netlify/functions`
+4. **Deploy branch**: `main`
+
+#### Variabili d'ambiente Netlify (Site settings → Environment variables)
+
+| Variabile | Valore | Note |
+|-----------|--------|------|
+| `FRONTEND_URL` | `https://<nome-sito>.vercel.app` | **OBBLIGATORIO** - CORS, impostare dopo il deploy Vercel |
+| `TOMORROW_API_KEY` | `<chiave>` | [tomorrow.io/weather-api](https://www.tomorrow.io/weather-api/) |
+| `METEOMATICS_USER` | `<utente>` | [meteomatics.com](https://www.meteomatics.com/en/weather-api/) |
+| `METEOMATICS_PASSWORD` | `<password>` | Stessa registrazione Meteomatics |
+| `OPENWEATHER_API_KEY` | `<chiave>` | [openweathermap.org/api](https://openweathermap.org/api) |
+| `WEATHERAPI_KEY` | `<chiave>` | [weatherapi.com](https://www.weatherapi.com/) |
+| `ACCUWEATHER_API_KEY` | `<chiave>` | [developer.accuweather.com](https://developer.accuweather.com/) |
+| `SUPABASE_URL` | `<url>` | *Futuro* - quando Supabase sara attivo |
+| `SUPABASE_KEY` | `<chiave>` | *Futuro* - quando Supabase sara attivo |
+
+#### Verifica backend
+
+Dopo il deploy, visitare:
+- `https://<nome-sito>.netlify.app/` → pagina info API
+- `https://<nome-sito>.netlify.app/api/health` → `{"status":"ok","timestamp":"..."}`
+
+---
+
+### Passo 2: Deploy Frontend su Vercel
+
+1. Accedere a [vercel.com](https://vercel.com) → **Add New Project** → Importare `Liago/smart-meteo`
+2. Configurazione:
+   - **Framework Preset**: Next.js (auto-rilevato)
+   - **Root Directory**: `frontend-web` (cliccare **Edit** e selezionare)
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `.next` (default)
+
+#### Variabili d'ambiente Vercel (Settings → Environment Variables)
+
+| Variabile | Valore | Note |
+|-----------|--------|------|
+| `NEXT_PUBLIC_API_URL` | `https://<nome-sito>.netlify.app` | URL del backend Netlify (senza `/` finale) |
+
+#### Verifica frontend
+
+Dopo il deploy, visitare `https://<nome-sito>.vercel.app` → interfaccia Smart Meteo.
+
+---
+
+### Passo 3: Collegare CORS (post-deploy)
+
+Dopo aver ottenuto l'URL Vercel definitivo:
+
+1. Tornare su **Netlify** → Site settings → Environment variables
+2. Aggiornare `FRONTEND_URL` con l'URL Vercel esatto (es. `https://smart-meteo.vercel.app`)
+3. Fare un **re-deploy** su Netlify (Deploys → Trigger deploy → Deploy site)
+
+> **Attenzione**: Senza `FRONTEND_URL` configurato correttamente, le chiamate API dal frontend
+> verranno bloccate dal CORS. Il backend accetta solo origini esplicitamente autorizzate.
+
+---
+
+### Configurazione CORS (dettaglio tecnico)
+
+Il file `backend/app.ts` gestisce il CORS con questa logica:
+
+| Origin | Permesso | Contesto |
+|--------|----------|----------|
+| `http://localhost:3000` | Si | Sviluppo locale frontend |
+| `http://localhost:3001` | Si | Sviluppo locale (porta alternativa) |
+| Valore di `FRONTEND_URL` | Si | Produzione (dominio Vercel) |
+| Nessun origin (curl, Postman) | Si | Debug e test API |
+| Qualsiasi altro dominio | **No** | Bloccato |
+
+Metodi permessi: `GET`, `PATCH`, `OPTIONS` (preflight)
+Header permessi: `Content-Type`
+Preflight cache: 24 ore (`maxAge: 86400`)
+
+---
+
+### Sviluppo Locale
+
+Per lavorare in locale con entrambi i servizi:
+
+```bash
+# Terminale 1: Backend (porta 3000)
+cd backend && npx ts-node server.ts
+
+# Terminale 2: Frontend (porta 3001)
+cd frontend-web && npm run dev
+```
+
+Il file `frontend-web/.env.local` punta gia a `http://localhost:3000`.
+Il CORS del backend permette gia `localhost:3000` e `localhost:3001`.
+
+---
+
+## Database Supabase - Migration Scripts
+
+Gli script SQL si trovano in `supabase/migrations/` e vanno eseguiti **in ordine numerico**.
+
+### Schema delle tabelle
+
+```
+sources ─────────────┐
+  (text PK)          │
+                     ├──→ raw_forecasts
+locations ───────────┤      (dati grezzi per fonte)
+  (uuid PK)          │
+                     ├──→ smart_forecasts
+                     │      (risultato aggregato Smart Engine)
+                     │
+auth.users ──────────┤
+                     └──→ profiles
+                            (preferenze utente)
+```
+
+### Lista migration
+
+| # | File | Descrizione |
+|---|------|-------------|
+| 001 | `001_extensions.sql` | Estensioni PostgreSQL (`uuid-ossp`, `pg_trgm`) |
+| 002 | `002_sources.sql` | Tabella `sources` - fonti meteo con peso e stato |
+| 003 | `003_locations.sql` | Tabella `locations` - localita cercate |
+| 004 | `004_raw_forecasts.sql` | Tabella `raw_forecasts` - dati grezzi per audit/AI |
+| 005 | `005_smart_forecasts.sql` | Tabella `smart_forecasts` - risultato aggregato |
+| 006 | `006_profiles.sql` | Tabella `profiles` + trigger auto-creazione su signup |
+| 007 | `007_rls_policies.sql` | Row Level Security per tutte le tabelle |
+| 008 | `008_indexes.sql` | Indici per performance query |
+| 009 | `009_updated_at_trigger.sql` | Trigger automatico `updated_at` |
+| 010 | `010_seed_sources.sql` | Seed data: 5 fonti meteo con pesi |
+| 011 | `011_utility_functions.sql` | Funzioni RPC: `upsert_location`, `cleanup_old_forecasts`, `get_sources_stats` |
+
+### Differenze rispetto al vecchio schema (`supabase_schema.sql`)
+
+Il vecchio file `backend/supabase_schema.sql` era una bozza iniziale. Le migration lo sostituiscono con queste correzioni:
+
+| Area | Vecchio schema | Migration nuove |
+|------|---------------|----------------|
+| `sources.id` | `uuid` (auto-generato) | `text` (es: `'tomorrow.io'`) - allineato al backend |
+| `sources.api_key` | Salvato nel DB | **Rimosso** - le chiavi sono in env vars (sicurezza) |
+| `sources.description` | Assente | Aggiunto - usato dalla pagina /sources |
+| `sources.last_error` | Assente | Aggiunto - tracking salute fonte |
+| `sources.last_response_ms` | Assente | Aggiunto - latenza ultimo fetch |
+| `raw_forecasts` | Solo `raw_data` jsonb | Aggiunto campi normalizzati (`temp`, `humidity`, ecc.) |
+| `smart_forecasts` | Molti campi inutilizzati | Allineato all'output reale di `getSmartForecast()` |
+| `profiles.favorite_locations` | Assente | Aggiunto array UUID |
+| RLS policies | Generiche | Specifiche per ruolo (service_role, authenticated, public) |
+| Indici | Nessuno | 8 indici per query frequenti |
+| Trigger | Nessuno | `updated_at` automatico + creazione profilo su signup |
+| Funzioni | Nessuna | `upsert_location`, `cleanup_old_forecasts`, `get_sources_stats` |
+
+### Guida al deploy delle migration su Supabase
+
+#### Opzione A: Dashboard SQL Editor (rapida)
+
+1. Accedere al progetto Supabase → **SQL Editor**
+2. Eseguire ogni file in ordine, da `001_extensions.sql` a `011_utility_functions.sql`
+3. Verificare: **Table Editor** → devono comparire 5 tabelle con dati seed
+
+#### Opzione B: Supabase CLI (consigliata per CI/CD)
+
+```bash
+# Installare Supabase CLI
+npm install -g supabase
+
+# Login e link al progetto
+supabase login
+supabase link --project-ref <project-id>
+
+# Eseguire tutte le migration
+supabase db push
+```
+
+#### Verifica post-migration
+
+Dopo l'esecuzione, controllare:
+
+- [ ] Tabella `sources` contiene 5 righe (le 5 fonti meteo)
+- [ ] Tabella `locations` esiste ed e vuota
+- [ ] Tabella `raw_forecasts` esiste con FK verso `sources` e `locations`
+- [ ] Tabella `smart_forecasts` esiste con FK verso `locations`
+- [ ] RLS abilitato su tutte le tabelle
+- [ ] Funzione `upsert_location` esiste (verificare in Database → Functions)
+- [ ] Trigger `on_auth_user_created` esiste su `auth.users`
+
+---
+
+## Nuovi Endpoint Backend
+
+| Endpoint | Metodo | Descrizione | Stato |
+|----------|--------|-------------|-------|
+| `/api/sources` | GET | Lista fonti meteo con stato e peso | **Implementato** |
+| `/api/sources/:id` | PATCH | Aggiorna stato attivo/inattivo di una fonte | **Implementato** |
+| `/api/forecast` | GET | *Esistente* - aggiunto supporto per caching headers | **Implementato** |
 
 ---
 
 ## Stack Tecnologico Fase 2
 
-| Tecnologia | Ruolo |
-|-----------|-------|
-| Next.js 14+ | Framework React con App Router |
-| TypeScript | Type safety |
-| TailwindCSS | Utility-first CSS |
-| Framer Motion | Animazioni fluide |
-| SWR / React Query | Data fetching & caching |
-| Jest + RTL | Unit testing |
-| Playwright | E2E testing |
+| Tecnologia | Ruolo | Versione |
+|-----------|-------|---------|
+| Next.js 16 | Framework React con App Router (SSR su Vercel) | 16.1.6 |
+| TypeScript | Type safety | 5.x |
+| TailwindCSS | Utility-first CSS | 4.x |
+| Framer Motion | Animazioni fluide | 12.x |
+| SWR | Data fetching & caching | 2.x |
+| Jest + RTL | Unit testing | 30.x / 16.x |
+| serverless-http | Wrapper Express per Netlify Functions | 3.x |
 
 ---
 
@@ -182,19 +403,29 @@ La Fase 2 richiede l'aggiunta di alcuni endpoint al backend esistente:
 
 La Fase 2 si considera completata quando:
 
-- [ ] L'utente puo cercare una localita e visualizzare le previsioni aggregate
-- [ ] L'interfaccia mostra sfondi dinamici in base alle condizioni meteo
-- [ ] Il design Glassmorphism e implementato e visivamente accattivante
-- [ ] La pagina e responsive e funziona su mobile, tablet e desktop
-- [ ] La pagina gestione fonti permette di vedere e toggleare le fonti
-- [ ] I test passano e la build non ha errori
-- [ ] Le performance sono accettabili (Lighthouse score > 80)
+- [x] L'utente puo cercare una localita e visualizzare le previsioni aggregate
+- [x] L'interfaccia mostra sfondi dinamici in base alle condizioni meteo
+- [x] Il design Glassmorphism e implementato e visivamente accattivante
+- [x] La pagina e responsive e funziona su mobile, tablet e desktop
+- [x] La pagina gestione fonti permette di vedere e toggleare le fonti
+- [x] I test passano e la build non ha errori
+- [x] Configurazione deploy Vercel + Netlify pronta
+- [x] CORS configurato per comunicazione cross-origin sicura
+- [x] Migration SQL Supabase pronte (11 script, seed data, RLS, indici, funzioni)
+- [ ] Le performance sono accettabili (Lighthouse score > 80) - *da verificare con deploy*
 
 ---
 
 ## Problemi Incontrati & Soluzioni
 
-*(Aggiungi qui eventuali blocchi o bug risolti durante lo sviluppo)*
+- **Problema**: Google Fonts (Inter) non scaricabile in ambiente di build (network restrizioni TLS)
+  **Soluzione**: Utilizzato stack di font di sistema con Inter come preferenza CSS (caricato dal browser se disponibile)
 
-- **Problema**: [Descrizione del problema]
-  **Soluzione**: [Come e stato risolto]
+- **Problema**: React 19 `useRef` richiede argomento iniziale obbligatorio
+  **Soluzione**: Passato `null` come valore iniziale con tipo union `ReturnType<typeof setTimeout> | null`
+
+- **Problema**: ESLint `react-hooks/purity` segnala `Math.random()` in componenti
+  **Soluzione**: Utilizzata funzione deterministica `seedRandom()` per generare dati di animazione pre-calcolati a livello di modulo
+
+- **Problema**: Frontend (Vercel) e Backend (Netlify) su domini diversi → CORS bloccante
+  **Soluzione**: CORS restrittivo in `backend/app.ts` con whitelist origini. `FRONTEND_URL` env var su Netlify per autorizzare il dominio Vercel in produzione

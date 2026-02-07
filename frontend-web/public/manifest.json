@@ -1,0 +1,17 @@
+{
+  "name": "Smart Meteo",
+  "short_name": "SmartMeteo",
+  "description": "Previsioni meteo aggregate da 5 fonti professionali",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

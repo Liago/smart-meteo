@@ -1,0 +1,15 @@
+{
+  "name": "smart-meteo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Meteo - Previsioni aggregate da 5 fonti meteo",
+  "scripts": {
+    "dev:backend": "cd backend && npx ts-node server.ts",
+    "dev:frontend": "cd frontend-web && npm run dev",
+    "test": "cd frontend-web && npm test",
+    "install:all": "cd backend && npm install && cd ../frontend-web && npm install"
+  },
+  "dependencies": {
+    "serverless-http": "^3.2.0"
+  }
+}
