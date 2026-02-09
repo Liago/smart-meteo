@@ -15,6 +15,8 @@ const app = express();
 const allowedOrigins: string[] = [
 	'http://localhost:3000',
 	'http://localhost:3001',
+	'https://smart-meteo.vercel.app', // Hardcoded production frontend
+	'https://smart-meteo-git-main-liagos-projects.vercel.app', // Vercel preview/branch URLs fallback
 ];
 
 if (process.env.FRONTEND_URL) {
