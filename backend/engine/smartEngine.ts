@@ -1,5 +1,5 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
-import { fetchFromMeteomatics } from '../connectors/meteomatics';
+import { fetchFromOpenMeteo } from '../connectors/openmeteo';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -9,7 +9,7 @@ import { sources } from '../routes/sources';
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
-	'meteomatics': 1.2,
+	'open-meteo': 1.1, // High weight for scientific data
 	'openweathermap': 1.0,
 	'weatherapi': 1.0,
 	'accuweather': 1.1
@@ -17,7 +17,7 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 
 const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
 	'tomorrow.io': fetchFromTomorrow,
-	'meteomatics': fetchFromMeteomatics,
+	'open-meteo': fetchFromOpenMeteo,
 	'openweathermap': fetchFromOpenWeather,
 	'weatherapi': fetchFromWeatherAPI,
 	'accuweather': fetchFromAccuWeather

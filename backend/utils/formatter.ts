@@ -32,6 +32,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	condition_text: string | null;
 	condition_code: string;
 	precipitation_prob: number | null;
+	precipitation_intensity: number | null;
 
 	constructor(data: Partial<UnifiedForecastData> & { source: string; lat: number; lon: number; time: string }) {
 		this.source = data.source;
@@ -46,5 +47,6 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.condition_text = data.condition_text ?? null;
 		this.condition_code = normalizeCondition(data.condition_text);
 		this.precipitation_prob = data.precipitation_prob ?? null;
+		this.precipitation_intensity = data.precipitation_intensity ?? null;
 	}
 }

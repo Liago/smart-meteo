@@ -22,11 +22,11 @@ const sources: WeatherSource[] = [
 		lastResponseMs: null
 	},
 	{
-		id: 'meteomatics',
-		name: 'Meteomatics',
-		weight: 1.2,
+		id: 'open-meteo',
+		name: 'Open-Meteo',
+		weight: 1.1,
 		active: true,
-		description: 'Professional scientific data with high-resolution models',
+		description: 'High-resolution scientific data from national weather services',
 		lastError: null,
 		lastResponseMs: null
 	},

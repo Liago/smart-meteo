@@ -11,10 +11,10 @@ insert into sources (id, name, description, weight, active) values
     true
   ),
   (
-    'meteomatics',
-    'Meteomatics',
-    'Professional scientific data with high-resolution models',
-    1.2,
+    'open-meteo',
+    'Open-Meteo',
+    'High-resolution scientific data from national weather services',
+    1.1,
     true
   ),
   (

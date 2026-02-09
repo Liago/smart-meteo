@@ -11,6 +11,7 @@ export interface UnifiedForecastData {
 	condition_text: string | null;
 	condition_code: string;
 	precipitation_prob: number | null;
+	precipitation_intensity?: number | null;
 }
 
 export interface WeatherConditionWeights {
