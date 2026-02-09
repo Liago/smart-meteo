@@ -31,7 +31,7 @@ app.use(cors({
 		return callback(new Error(`Origin ${origin} not allowed by CORS`));
 	},
 	methods: ['GET', 'PATCH', 'OPTIONS'],
-	allowedHeaders: ['Content-Type'],
+	allowedHeaders: ['Content-Type', 'Authorization'],
 	credentials: true,
 	maxAge: 86400,
 }));
