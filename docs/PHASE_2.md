@@ -12,7 +12,7 @@ La Fase 1 e **sostanzialmente completata** per quanto riguarda lo sviluppo del c
 | Area | Stato | Note |
 |------|-------|------|
 | Repository Git & struttura cartelle | Completato | Monorepo con `/backend`, `/frontend-web`, `/frontend-ios` |
-| 5 Connectors meteo | Completato | Tomorrow.io, Meteomatics, OpenWeatherMap, WeatherAPI, AccuWeather |
+| 5 Connectors meteo | Completato | Tomorrow.io, Open-Meteo, OpenWeatherMap, WeatherAPI, AccuWeather |
 | Smart Engine V1 | Completato | Media pesata + voting per condizioni categoriche |
 | Endpoint API (`GET /api/forecast`) | Completato | Express server con health check |
 | Schema DB Supabase | Completato | `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles` |
@@ -199,13 +199,11 @@ Il progetto e un monorepo con deploy separato per frontend e backend:
 |-----------|--------|------|
 | `FRONTEND_URL` | `https://<nome-sito>.vercel.app` | **OBBLIGATORIO** - CORS, impostare dopo il deploy Vercel |
 | `TOMORROW_API_KEY` | `<chiave>` | [tomorrow.io/weather-api](https://www.tomorrow.io/weather-api/) |
-| `METEOMATICS_USER` | `<utente>` | [meteomatics.com](https://www.meteomatics.com/en/weather-api/) |
-| `METEOMATICS_PASSWORD` | `<password>` | Stessa registrazione Meteomatics |
 | `OPENWEATHER_API_KEY` | `<chiave>` | [openweathermap.org/api](https://openweathermap.org/api) |
 | `WEATHERAPI_KEY` | `<chiave>` | [weatherapi.com](https://www.weatherapi.com/) |
 | `ACCUWEATHER_API_KEY` | `<chiave>` | [developer.accuweather.com](https://developer.accuweather.com/) |
-| `SUPABASE_URL` | `<url>` | *Futuro* - quando Supabase sara attivo |
-| `SUPABASE_KEY` | `<chiave>` | *Futuro* - quando Supabase sara attivo |
+| `SUPABASE_URL` | `<url>` | URL del progetto Supabase |
+| `SUPABASE_KEY` | `<chiave>` | Anon Key (o Service Role per admin tasks) |
 
 #### Verifica backend
 
@@ -229,6 +227,8 @@ Dopo il deploy, visitare:
 | Variabile | Valore | Note |
 |-----------|--------|------|
 | `NEXT_PUBLIC_API_URL` | `https://<nome-sito>.netlify.app` | URL del backend Netlify (senza `/` finale) |
+| `NEXT_PUBLIC_SUPABASE_URL` | `<url>` | URL del progetto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<chiave>` | Chiave pubblica (Anon Key) di Supabase |
 
 #### Verifica frontend
 
