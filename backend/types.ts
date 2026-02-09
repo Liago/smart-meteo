@@ -7,6 +7,19 @@ export interface DailyForecast {
 	condition_text: string | null;
 }
 
+export interface HourlyForecast {
+	time: string;
+	temp: number;
+	precipitation_prob: number | null;
+	condition_code: string;
+	condition_text: string | null;
+}
+
+export interface AstronomyData {
+	sunrise: string;
+	sunset: string;
+}
+
 export interface UnifiedForecastData {
 	source: string;
 	lat: number;
@@ -22,6 +35,8 @@ export interface UnifiedForecastData {
 	precipitation_prob: number | null;
 	precipitation_intensity?: number | null;
 	daily?: DailyForecast[];
+	hourly?: HourlyForecast[];
+	astronomy?: AstronomyData;
 }
 
 export interface WeatherConditionWeights {

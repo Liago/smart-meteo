@@ -153,6 +153,11 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		};
 	});
 
+	// Extract Hourly and Astronomy data from the best available source (e.g., OpenMeteo)
+	// Priority: check if any source has hourly data
+	const sourceWithHourly = validForecasts.find(f => f.hourly && f.hourly.length > 0);
+	const sourceWithAstronomy = validForecasts.find(f => f.astronomy);
+
 	return {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
@@ -166,6 +171,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition: bestCondition,
 			condition_text: bestCondition.toUpperCase()
 		},
-		daily: aggregatedDaily
+		daily: aggregatedDaily,
+		hourly: sourceWithHourly?.hourly || [],
+		astronomy: sourceWithAstronomy?.astronomy
 	};
 }

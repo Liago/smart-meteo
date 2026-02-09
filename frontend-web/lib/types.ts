@@ -17,6 +17,19 @@ export interface DailyForecast {
 	condition_text: string | null;
 }
 
+export interface HourlyForecast {
+	time: string;
+	temp: number;
+	precipitation_prob: number | null;
+	condition_code: string;
+	condition_text: string | null;
+}
+
+export interface AstronomyData {
+	sunrise: string;
+	sunset: string;
+}
+
 export interface ForecastResponse {
 	location: {
 		lat: number;
@@ -26,6 +39,8 @@ export interface ForecastResponse {
 	sources_used: string[];
 	current: ForecastCurrent;
 	daily?: DailyForecast[];
+	hourly?: HourlyForecast[];
+	astronomy?: AstronomyData;
 }
 
 export interface WeatherSource {
