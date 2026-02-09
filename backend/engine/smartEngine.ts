@@ -3,6 +3,9 @@ import { fetchFromOpenMeteo } from '../connectors/openmeteo';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
+import { fetchFromWWO } from '../connectors/worldweatheronline';
+import { fetchFromWeatherstack } from '../connectors/weatherstack';
+import { fetchFromMeteostat } from '../connectors/meteostat';
 import { UnifiedForecast } from '../utils/formatter';
 import { WeatherConditionWeights } from '../types';
 import { sources } from '../routes/sources';
@@ -12,7 +15,10 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'open-meteo': 1.1, // High weight for scientific data
 	'openweathermap': 1.0,
 	'weatherapi': 1.0,
-	'accuweather': 1.1
+	'accuweather': 1.1,
+	'worldweatheronline': 1.0,
+	'weatherstack': 0.9,
+	'meteostat': 0.8 // Lower weight as it might be older data
 };
 
 const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
@@ -20,7 +26,10 @@ const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<Unif
 	'open-meteo': fetchFromOpenMeteo,
 	'openweathermap': fetchFromOpenWeather,
 	'weatherapi': fetchFromWeatherAPI,
-	'accuweather': fetchFromAccuWeather
+	'accuweather': fetchFromAccuWeather,
+	'worldweatheronline': fetchFromWWO,
+	'weatherstack': fetchFromWeatherstack,
+	'meteostat': fetchFromMeteostat
 };
 
 interface AggregationData {
