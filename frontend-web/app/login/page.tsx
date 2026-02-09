@@ -45,8 +45,9 @@ function LoginForm() {
 				router.push(redirectTo);
 				router.refresh();
 			}
-		} catch (err: any) {
-			setError(err.message || 'Si è verificato un errore');
+		} catch (err: unknown) {
+			const errorMessage = err instanceof Error ? err.message : 'Si è verificato un errore';
+			setError(errorMessage);
 		} finally {
 			setLoading(false);
 		}

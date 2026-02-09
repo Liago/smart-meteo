@@ -1,4 +1,4 @@
-import { UnifiedForecastData } from '../types';
+import { UnifiedForecastData, DailyForecast } from '../types';
 
 /**
  * Standardizes the weather condition codes across different providers.
@@ -33,6 +33,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity: number | null;
+	daily?: DailyForecast[];
 
 	constructor(data: Partial<UnifiedForecastData> & { source: string; lat: number; lon: number; time: string }) {
 		this.source = data.source;
@@ -48,5 +49,8 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.condition_code = normalizeCondition(data.condition_text);
 		this.precipitation_prob = data.precipitation_prob ?? null;
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
+		if (data.daily) {
+			this.daily = data.daily;
+		}
 	}
 }

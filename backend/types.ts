@@ -1,3 +1,12 @@
+export interface DailyForecast {
+	date: string;
+	temp_max: number | null;
+	temp_min: number | null;
+	precipitation_prob: number | null;
+	condition_code: string;
+	condition_text: string | null;
+}
+
 export interface UnifiedForecastData {
 	source: string;
 	lat: number;
@@ -12,6 +21,7 @@ export interface UnifiedForecastData {
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity?: number | null;
+	daily?: DailyForecast[];
 }
 
 export interface WeatherConditionWeights {

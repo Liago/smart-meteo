@@ -108,6 +108,51 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	});
 
+	// Aggregate Daily Forecasts
+	// We'll take the first 3 days (Today, Tomorrow, Day After)
+	const dailyMap = new Map<string, {
+		temp_max: number[];
+		temp_min: number[];
+		precip_prob: number[];
+		codes: string[];
+	}>();
+
+	validForecasts.forEach(f => {
+		if (f.daily && Array.isArray(f.daily)) {
+			f.daily.forEach(d => {
+				if (!dailyMap.has(d.date)) {
+					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [] });
+				}
+				const entry = dailyMap.get(d.date)!;
+				if (d.temp_max !== null) entry.temp_max.push(d.temp_max);
+				if (d.temp_min !== null) entry.temp_min.push(d.temp_min);
+				if (d.precipitation_prob !== null) entry.precip_prob.push(d.precipitation_prob);
+				entry.codes.push(d.condition_code);
+			});
+		}
+	});
+
+	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 3).map(date => {
+		const data = dailyMap.get(date)!;
+
+		// Simple average
+		const avg = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
+
+		// Mode for condition code
+		const codeCounts: Record<string, number> = {};
+		data.codes.forEach(c => codeCounts[c] = (codeCounts[c] || 0) + 1);
+		const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+
+		return {
+			date,
+			temp_max: avg(data.temp_max),
+			temp_min: avg(data.temp_min),
+			precipitation_prob: avg(data.precip_prob) || 0,
+			condition_code: bestCode,
+			condition_text: bestCode.toUpperCase()
+		};
+	});
+
 	return {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
@@ -120,6 +165,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
 			condition: bestCondition,
 			condition_text: bestCondition.toUpperCase()
-		}
+		},
+		daily: aggregatedDaily
 	};
 }

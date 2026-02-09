@@ -14,7 +14,7 @@ export default function AuthButton() {
 
 	useEffect(() => {
 		const getUser = async () => {
-			const { data: { user }, error } = await supabase.auth.getUser();
+			const { data: { user } } = await supabase.auth.getUser();
 			if (user) {
 				setUser(user);
 			}

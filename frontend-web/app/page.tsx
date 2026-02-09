@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DynamicBackground from '@/components/DynamicBackground';
 import SearchBar from '@/components/SearchBar';
@@ -11,6 +11,7 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
 import AuthButton from '@/components/AuthButton';
 import { useForecast } from '@/lib/hooks';
+import { useLocations } from '@/lib/useLocations';
 
 export default function Home() {
 	const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -20,9 +21,49 @@ export default function Home() {
 		coords?.lon ?? null
 	);
 
+	const {
+		homeLocation,
+		savedLocations,
+		saveHomeLocation,
+		removeHomeLocation,
+		addSavedLocation,
+		removeSavedLocation,
+		isSaved,
+		isHome,
+		isLoaded
+	} = useLocations();
+
+	// Auto-load home location on startup
+	useEffect(() => {
+		if (isLoaded && !coords && homeLocation) {
+			setCoords({ lat: homeLocation.lat, lon: homeLocation.lon });
+			setLocationName(homeLocation.name);
+		}
+	}, [isLoaded, homeLocation, coords]);
+
 	const handleLocationSelect = (lat: number, lon: number, name: string) => {
 		setCoords({ lat, lon });
 		setLocationName(name);
+	};
+
+	const handleToggleHome = () => {
+		if (!coords) return;
+		if (isHome(coords.lat, coords.lon)) {
+			removeHomeLocation();
+		} else {
+			saveHomeLocation({ id: `${coords.lat}-${coords.lon}`, name: locationName, lat: coords.lat, lon: coords.lon });
+		}
+	};
+
+	const handleToggleSave = () => {
+		if (!coords) return;
+		if (isSaved(coords.lat, coords.lon)) {
+			// Find id to remove
+			const loc = savedLocations.find(l => l.lat === coords.lat && l.lon === coords.lon);
+			if (loc) removeSavedLocation(loc.id);
+		} else {
+			addSavedLocation({ id: `${coords.lat}-${coords.lon}`, name: locationName, lat: coords.lat, lon: coords.lon });
+		}
 	};
 
 	const condition = data?.current?.condition || 'unknown';
@@ -54,7 +95,42 @@ export default function Home() {
 				</header>
 
 				{/* Search */}
-				<SearchBar onLocationSelect={handleLocationSelect} isLoading={isLoading} />
+				<SearchBar
+					onLocationSelect={handleLocationSelect}
+					isLoading={isLoading}
+					savedLocations={savedLocations}
+					homeLocation={homeLocation}
+				/>
+
+				{/* Location Actions Toolbar */}
+				{coords && (
+					<div className="flex justify-end gap-2 px-1">
+						<button
+							onClick={handleToggleHome}
+							className={`p-2 rounded-full transition-colors ${isHome(coords.lat, coords.lon)
+									? 'bg-white text-yellow-500 shadow-md'
+									: 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
+								}`}
+							title={isHome(coords.lat, coords.lon) ? "Rimuovi da Home" : "Imposta come Home"}
+						>
+							<svg className="w-5 h-5" fill={isHome(coords.lat, coords.lon) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+							</svg>
+						</button>
+						<button
+							onClick={handleToggleSave}
+							className={`p-2 rounded-full transition-colors ${isSaved(coords.lat, coords.lon)
+									? 'bg-white text-blue-500 shadow-md'
+									: 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
+								}`}
+							title={isSaved(coords.lat, coords.lon) ? "Rimuovi dai preferiti" : "Salva nei preferiti"}
+						>
+							<svg className="w-5 h-5" fill={isSaved(coords.lat, coords.lon) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+							</svg>
+						</button>
+					</div>
+				)}
 
 				{/* Content */}
 				{!coords && !data && (
@@ -83,7 +159,7 @@ export default function Home() {
 							locationName={locationName}
 							sourcesCount={data.sources_used.length}
 						/>
-						<ForecastDetails data={data.current} />
+						<ForecastDetails data={data.current} daily={data.daily} />
 						<SourcesIndicator sources={data.sources_used} />
 
 						{/* Timestamp */}
