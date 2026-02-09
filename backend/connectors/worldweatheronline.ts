@@ -11,7 +11,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			key: apiKey,
 			q: `${lat},${lon}`,
 			format: 'json',
-			num_of_days: 3,
+			num_of_days: 7,
 			fx: 'yes',
 			cc: 'yes',
 			mca: 'no',
@@ -59,7 +59,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 		}
 
 		// Map Astronomy
-		astronomy = undefined;
+		let astronomy: { sunrise: string; sunset: string } | undefined = undefined;
 		const astro = data.weather[0].astronomy[0];
 		const toISO = (timeStr: string) => {
 			if (!timeStr) return '';

@@ -55,27 +55,46 @@ export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
 							{/* Daily Forecast */}
 							{daily && daily.length > 0 && (
 								<div className="mb-6">
-									<h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">Prossimi Giorni</h3>
-									<div className="space-y-3">
-										{daily.map((day) => (
-											<div key={day.date} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-												<div className="w-16 font-medium">{formatDate(day.date)}</div>
-												<div className="flex-1 flex justify-center">
-													<span className="text-sm text-white/80">{day.condition_text}</span>
+									<h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">Prossimi 6 Giorni</h3>
+									<div className="space-y-2">
+										{/* Headers */}
+										<div className="flex items-center text-xs text-white/40 px-2 pb-1">
+											<div className="w-16">Giorno</div>
+											<div className="flex-1 text-center">Condizione</div>
+											<div className="w-16 text-center">Pioggia</div>
+											<div className="w-20 text-right">Temp</div>
+										</div>
+										{/* Filter out today if present (it's already detailed above), but user might want to see trend. 
+										    Usually "Next days" implies starting from tomorrow. 
+										    We'll skip index 0 if it is today, or just show all. 
+										    SmartEngine returns today as well usually. 
+										    Let's show starting from index 1 (Tomorrow).
+										    If we have 7 days total, skipping 1 leaves 6 days. Perfect.
+										*/}
+										{daily.slice(1).map((day) => (
+											<div key={day.date} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+												<div className="w-16 font-medium text-white/90">{formatDate(day.date)}</div>
+
+												<div className="flex-1 flex flex-col items-center">
+													<div className="text-sm text-white/90">{day.condition_text}</div>
 												</div>
-												<div className="flex items-center gap-3 w-1/3 justify-end">
-													{day.precipitation_prob !== null && day.precipitation_prob > 0 && (
-														<div className="flex items-center text-xs text-blue-300">
-															<svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+
+												<div className="w-16 flex justify-center">
+													{day.precipitation_prob !== null && day.precipitation_prob > 0 ? (
+														<div className="flex items-center text-sm text-blue-300 font-medium">
+															<svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
 															</svg>
 															{Math.round(day.precipitation_prob)}%
 														</div>
+													) : (
+														<span className="text-white/20 text-sm">-</span>
 													)}
-													<div className="text-right text-sm">
-														<span className="font-bold">{Math.round(day.temp_max ?? 0)}°</span>
-														<span className="text-white/40 ml-1">{Math.round(day.temp_min ?? 0)}°</span>
-													</div>
+												</div>
+
+												<div className="w-20 text-right flex items-center justify-end gap-2">
+													<span className="font-bold text-lg">{Math.round(day.temp_max ?? 0)}°</span>
+													<span className="text-white/40 text-sm">{Math.round(day.temp_min ?? 0)}°</span>
 												</div>
 											</div>
 										))}

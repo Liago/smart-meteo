@@ -141,7 +141,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	});
 
-	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 3).map(date => {
+	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 7).map(date => {
 		const data = dailyMap.get(date)!;
 
 		// Simple average

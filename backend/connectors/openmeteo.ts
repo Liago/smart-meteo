@@ -21,7 +21,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 		if (!current) return null;
 
 		// Map daily data
-		const dailyForecasts = daily.time.slice(0, 3).map((time: string, index: number) => ({
+		const dailyForecasts = daily.time.slice(0, 7).map((time: string, index: number) => ({
 			date: time,
 			temp_max: daily.temperature_2m_max[index],
 			temp_min: daily.temperature_2m_min[index],
