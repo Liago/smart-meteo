@@ -56,6 +56,33 @@ const sources: WeatherSource[] = [
 		description: 'Quality-focused with RealFeel temperature',
 		lastError: null,
 		lastResponseMs: null
+	},
+	{
+		id: 'worldweatheronline',
+		name: 'WorldWeatherOnline',
+		weight: 1.0,
+		active: true,
+		description: 'Premium global weather data',
+		lastError: null,
+		lastResponseMs: null
+	},
+	{
+		id: 'weatherstack',
+		name: 'Weatherstack',
+		weight: 0.9,
+		active: true,
+		description: 'Real-time weather data (Standard/Free tier)',
+		lastError: null,
+		lastResponseMs: null
+	},
+	{
+		id: 'meteostat',
+		name: 'Meteostat',
+		weight: 0.8,
+		active: true,
+		description: 'Historical and statistical weather data',
+		lastError: null,
+		lastResponseMs: null
 	}
 ];
 

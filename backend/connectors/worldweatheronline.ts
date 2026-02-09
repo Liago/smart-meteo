@@ -43,7 +43,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			// We need to construct full ISO string.
 			const dateStr = data.weather[0].date; // YYYY-MM-DD
 			hourly = data.weather[0].hourly.map((h: any) => {
-				const timeStr = h.time.padStart(4, '0'); // '200' -> '0200'
+				const timeStr = (h.time || '0').padStart(4, '0'); // '200' -> '0200'
 				const hours = timeStr.slice(0, 2);
 				const minutes = timeStr.slice(2);
 				const isoTime = `${dateStr}T${hours}:${minutes}:00`;
@@ -59,45 +59,57 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 		}
 
 		// Map Astronomy
-		let astronomy = undefined;
-		if (data.weather && data.weather[0] && data.weather[0].astronomy && data.weather[0].astronomy[0]) {
-			const astro = data.weather[0].astronomy[0];
-			// Convert "07:12 AM" to ISO date for today if possible, or just keep string? 
-			// Frontend expects string, but logic might expect ISO.
-			// Let's standardise on ISO if possible for the chart ordering.
-			const toISO = (timeStr: string) => {
-				// Format: "07:12 AM"
-				const [time, period] = timeStr.split(' ');
-				let [h, m] = time.split(':').map(Number);
-				if (period === 'PM' && h !== 12) h += 12;
-				if (period === 'AM' && h === 12) h = 0;
-				return `${data.weather[0].date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
-			};
+		astronomy = undefined;
+		const astro = data.weather[0].astronomy[0];
+		const toISO = (timeStr: string) => {
+			if (!timeStr) return '';
+			const parts = timeStr.split(' ');
+			if (parts.length < 2) return ''; // Unexpected format
 
-			astronomy = {
-				sunrise: toISO(astro.sunrise),
-				sunset: toISO(astro.sunset)
-			};
+			const time = parts[0];
+			const period = parts[1];
+			const timeParts = time.split(':');
+			if (timeParts.length < 2) return '';
+
+			let h = Number(timeParts[0]);
+			const m = Number(timeParts[1]);
+
+			if (period === 'PM' && h !== 12) h += 12;
+			if (period === 'AM' && h === 12) h = 0;
+			return `${data.weather[0].date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+		};
+
+		const sunrise = toISO(astro.sunrise);
+		const sunset = toISO(astro.sunset);
+
+		if (sunrise && sunset) {
+			astronomy = { sunrise, sunset };
 		}
 
-		return new UnifiedForecast({
+		// Prepare data object to avoid undefined issue with exactOptionalPropertyTypes
+		const forecastData: any = {
 			source: 'worldweatheronline',
 			lat: lat,
 			lon: lon,
-			time: new Date().toISOString(), // WWO current doesn't have a clear timestamp, assume now
+			time: new Date().toISOString(),
 			temp: Number(current.temp_C),
 			feels_like: Number(current.FeelsLikeC),
 			humidity: Number(current.humidity),
 			wind_speed: Number(current.windspeedKmph),
 			wind_direction: Number(current.winddirDegree),
 			condition_text: weatherDesc,
-			condition_code: String(current.weatherCode), // WWO weather codes
+			condition_code: String(current.weatherCode),
 			precipitation_prob: null,
 			precipitation_intensity: Number(current.precipMM),
 			daily: daily,
-			hourly: hourly,
-			astronomy: astronomy
-		});
+			hourly: hourly
+		};
+
+		if (astronomy) {
+			forecastData.astronomy = astronomy;
+		}
+
+		return new UnifiedForecast(forecastData);
 
 	} catch (error: any) {
 		console.error('Error fetching WorldWeatherOnline:', error.message);
