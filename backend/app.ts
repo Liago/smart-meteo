@@ -1,8 +1,9 @@
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getSmartForecast } from './engine/smartEngine';
 import sourcesRouter from './routes/sources';
+import { requireAuth } from './middleware/auth';
 
 dotenv.config();
 
@@ -54,7 +55,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 	res.json({ status: 'ok', timestamp: new Date() });
 });
 
-app.use('/api/sources', sourcesRouter);
+app.use('/api/sources', requireAuth, sourcesRouter);
 
 app.get('/api/forecast', async (req: Request, res: Response) => {
 	const lat = req.query.lat as string;

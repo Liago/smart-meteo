@@ -42,7 +42,7 @@ export async function fetchFromMeteomatics(lat: number, lon: number): Promise<Un
 
 		const getValue = (paramName: string): number | null => {
 			const param = data.data.find(p => p.parameter === paramName);
-			return param ? param.coordinates[0].dates[0].value : null;
+			return param?.coordinates?.[0]?.dates?.[0]?.value ?? null;
 		};
 
 		const temp = getValue('t_2m:C');
