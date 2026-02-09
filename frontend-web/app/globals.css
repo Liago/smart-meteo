@@ -13,13 +13,7 @@
   --color-weather-storm: #1e293b;
   --color-weather-fog: #94a3b8;
 
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-heading: "Inter", system-ui, -apple-system, sans-serif;
-}
-
-@font-face {
-  font-family: "Inter";
-  src: url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+  --font-sans: var(--font-sans), "Inter", system-ui, -apple-system, sans-serif;
 }
 
 *,

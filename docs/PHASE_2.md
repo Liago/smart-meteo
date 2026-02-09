@@ -17,9 +17,9 @@ La Fase 1 e **sostanzialmente completata** per quanto riguarda lo sviluppo del c
 | Endpoint API (`GET /api/forecast`) | Completato | Express server con health check |
 | Schema DB Supabase | Completato | `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles` |
 | Schema DB Supabase (migrations) | Completato | 11 script SQL in `supabase/migrations/` |
-| Configurazione Supabase (progetto) | **Da completare** | Creazione progetto e deploy tabelle |
-| Configurazione Netlify | **Da completare** | Link repo, environment variables, Functions |
-| Popolamento API Keys | **Da completare** | Inserimento chiavi in env vars / DB |
+| Configurazione Supabase (progetto) | **Completato** | Progetto creato, Auth attivo, RLS e Tabelle configurate |
+| Configurazione Netlify | **Completato** | Backend deployato, Env Vars settate, CORS fixato |
+| Popolamento API Keys | **Completato** | Chiavi in Environment Variables |
 
 > **Nota**: I 3 task infrastrutturali rimanenti (Supabase, Netlify, API Keys) sono prerequisiti
 > operativi. Possono essere completati in parallelo con l'inizio della Fase 2, ma devono essere

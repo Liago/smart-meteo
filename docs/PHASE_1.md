@@ -7,8 +7,8 @@ Questo documento traccia i progressi dettagliati della Fase 1.
 ### Setup Iniziale
 - [x] Inizializzare repository Git (Smart Meteo Monorepo)
 - [x] Creare struttura cartelle (`/backend`, `/frontend-web`, `/frontend-ios`)
-- [ ] Configurare Supabase (Creazione Progetto + Tabelle iniziali)
-- [ ] Configurare Netlify (Link al repo, Environment per Functions)
+- [x] Configurare Supabase (Creazione Progetto + Tabelle iniziali)
+- [x] Configurare Netlify (Link al repo, Environment per Functions)
 
 ### Sviluppo Backend (Node.js)
 - [x] Setup progetto Node.js in `/backend` (o `/functions` per Netlify)
@@ -23,7 +23,7 @@ Questo documento traccia i progressi dettagliati della Fase 1.
 ### Database
 - [x] Definire Schema Supabase `sources`
 - [x] Definire Schema Supabase `raw_forecasts`
-- [ ] Popolare DB con API Keys (encrypt o env vars)
+- [x] Popolare DB con API Keys (encrypt o env vars)
 
 ## Problemi Incontrati & Soluzioni
 *(Aggiungi qui eventuali blocchi o bug risolti durante lo sviluppo)*

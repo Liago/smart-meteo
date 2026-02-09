@@ -24,14 +24,7 @@ if (process.env.FRONTEND_URL) {
 }
 
 app.use(cors({
-	origin: (origin, callback) => {
-		// Permettere richieste senza origin (curl, Postman, server-to-server)
-		if (!origin) return callback(null, true);
-		if (allowedOrigins.includes(origin)) {
-			return callback(null, true);
-		}
-		return callback(new Error(`Origin ${origin} not allowed by CORS`));
-	},
+	origin: true, // Reflect request origin (or use '*' for public)
 	methods: ['GET', 'PATCH', 'OPTIONS'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
 	credentials: true,
