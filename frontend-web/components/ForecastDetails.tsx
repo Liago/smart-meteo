@@ -75,8 +75,18 @@ export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
 											<div key={day.date} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
 												<div className="w-16 font-medium text-white/90">{formatDate(day.date)}</div>
 
+												import {getWMOWeatherInfo} from '@/lib/weather-utils';
+												// ... (ForecastDetails component) ...
 												<div className="flex-1 flex flex-col items-center">
-													<div className="text-sm text-white/90">{day.condition_text}</div>
+													{(() => {
+														const info = getWMOWeatherInfo(day.condition_code);
+														return (
+															<div className="flex items-center gap-2">
+																<span className="text-xl" role="img" aria-label={info.label}>{info.icon}</span>
+																<span className="text-sm text-white/90">{info.label}</span>
+															</div>
+														);
+													})()}
 												</div>
 
 												<div className="w-16 flex justify-center">
