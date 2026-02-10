@@ -49,7 +49,9 @@ export default function HourlyForecast({ hourly, astronomy }: HourlyForecastProp
 
 		// 2. Prepare data for the chart
 		// Filter for next 12 hours approx
-		const start = hourly.length > 0 ? new Date(hourly[0].time).getTime() : Date.now();
+		const now = new Date();
+		now.setMinutes(0, 0, 0);
+		const start = now.getTime();
 		const end = start + 12 * 3600 * 1000; // 12 hours
 		const filtered = events.filter(e => e.time >= start && e.time <= end);
 
