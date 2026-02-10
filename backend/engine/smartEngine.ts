@@ -38,8 +38,31 @@ interface AggregationData {
 	feels_like: { val: number; weight: number }[];
 	humidity: { val: number; weight: number }[];
 	wind_speed: { val: number; weight: number }[];
+	wind_direction: { val: number; weight: number }[];
+	wind_gust: { val: number; weight: number }[];
 	precipitation_prob: { val: number; weight: number }[];
+	aqi: { val: number; weight: number }[];
 	conditions: { [key: string]: number };
+}
+
+/**
+ * Calculate dew point from temperature (°C) and relative humidity (%).
+ * Uses the Magnus formula approximation.
+ */
+function calculateDewPoint(temp: number, humidity: number): number {
+	const a = 17.625;
+	const b = 243.04;
+	const alpha = Math.log(humidity / 100) + (a * temp) / (b + temp);
+	return Number((b * alpha / (a - alpha)).toFixed(1));
+}
+
+/**
+ * Convert wind direction in degrees to a compass label (N, NE, E, etc.)
+ */
+function degreesToCompass(deg: number): string {
+	const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+	const index = Math.round(deg / 22.5) % 16;
+	return directions[index] ?? 'N';
 }
 
 async function upsertLocation(lat: number, lon: number): Promise<string | null> {
@@ -190,14 +213,16 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		feels_like: [],
 		humidity: [],
 		wind_speed: [],
+		wind_direction: [],
+		wind_gust: [],
 		precipitation_prob: [],
+		aqi: [],
 		conditions: {}
 	};
 
 	validForecasts.forEach(f => {
 		const weight = SOURCE_WEIGHTS[f.source] || 1.0;
-		// ... (Same push logic) ...
-		const pushValue = (key: keyof Omit<AggregationData, 'conditions'>, val: number | null) => {
+		const pushValue = (key: keyof Omit<AggregationData, 'conditions'>, val: number | null | undefined) => {
 			if (val !== null && val !== undefined) {
 				aggregation[key].push({ val, weight });
 			}
@@ -206,7 +231,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('feels_like', f.feels_like);
 		pushValue('humidity', f.humidity);
 		pushValue('wind_speed', f.wind_speed);
+		pushValue('wind_direction', f.wind_direction);
+		pushValue('wind_gust', f.wind_gust);
 		pushValue('precipitation_prob', f.precipitation_prob);
+		pushValue('aqi', f.aqi);
 
 		const code = f.condition_code || 'unknown';
 		if (!aggregation.conditions[code]) aggregation.conditions[code] = 0;
@@ -266,16 +294,25 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const sourceWithHourly = validForecasts.find(f => f.hourly && f.hourly.length > 0);
 	const sourceWithAstronomy = validForecasts.find(f => f.astronomy);
 
+	const aggTemp = avg(aggregation.temp);
+	const aggHumidity = avg(aggregation.humidity);
+	const aggWindDir = avg(aggregation.wind_direction);
+
 	const result = {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
 		sources_used: validForecasts.map(f => f.source),
 		current: {
-			temperature: avg(aggregation.temp),
+			temperature: aggTemp,
 			feels_like: avg(aggregation.feels_like),
-			humidity: avg(aggregation.humidity),
+			humidity: aggHumidity,
 			wind_speed: avg(aggregation.wind_speed),
+			wind_direction: aggWindDir,
+			wind_direction_label: aggWindDir !== null ? degreesToCompass(aggWindDir) : null,
+			wind_gust: avg(aggregation.wind_gust),
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
+			dew_point: (aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null,
+			aqi: avg(aggregation.aqi),
 			condition: bestCondition,
 			condition_text: bestCondition.toUpperCase()
 		},

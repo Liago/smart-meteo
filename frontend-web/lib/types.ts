@@ -3,7 +3,12 @@ export interface ForecastCurrent {
 	feels_like: number | null;
 	humidity: number | null;
 	wind_speed: number | null;
+	wind_direction: number | null;
+	wind_direction_label: string | null;
+	wind_gust: number | null;
 	precipitation_prob: number;
+	dew_point: number | null;
+	aqi: number | null;
 	condition: string;
 	condition_text: string;
 }

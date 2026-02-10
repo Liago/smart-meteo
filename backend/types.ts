@@ -30,10 +30,12 @@ export interface UnifiedForecastData {
 	humidity: number | null;
 	wind_speed: number | null;
 	wind_direction: number | null;
+	wind_gust: number | null;
 	condition_text: string | null;
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity?: number | null;
+	aqi: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

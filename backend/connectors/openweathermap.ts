@@ -32,6 +32,7 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 			humidity: data.main.humidity,
 			wind_speed: data.wind.speed,
 			wind_direction: data.wind.deg,
+			wind_gust: data.wind.gust ?? null,
 			condition_text: data.weather[0] ? data.weather[0].main : 'Unknown',
 			precipitation_prob: null
 		});

@@ -15,12 +15,15 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			params: {
 				key: apiKey,
 				q: `${lat},${lon}`,
-				aqi: 'no'
+				aqi: 'yes'
 			}
 		});
 
 		const data = response.data;
 		const current = data.current;
+
+		const aqiData = current.air_quality;
+		const aqiIndex = aqiData ? (aqiData['us-epa-index'] ?? null) : null;
 
 		return new UnifiedForecast({
 			source: 'weatherapi',
@@ -32,8 +35,10 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			humidity: current.humidity,
 			wind_speed: current.wind_kph / 3.6,
 			wind_direction: current.wind_degree,
+			wind_gust: current.gust_kph ? current.gust_kph / 3.6 : null,
 			condition_text: current.condition.text,
-			precipitation_prob: null
+			precipitation_prob: null,
+			aqi: aqiIndex
 		});
 
 	} catch (error: any) {

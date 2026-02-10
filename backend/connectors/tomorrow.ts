@@ -9,6 +9,7 @@ interface TomorrowValues {
 	humidity: number;
 	windSpeed: number;
 	windDirection: number;
+	windGust: number;
 	weatherCode: number;
 	precipitationProbability: number;
 }
@@ -49,6 +50,7 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 			humidity: values.humidity,
 			wind_speed: values.windSpeed,
 			wind_direction: values.windDirection,
+			wind_gust: values.windGust ?? null,
 			condition_text: 'Code: ' + values.weatherCode,
 			precipitation_prob: values.precipitationProbability
 		});

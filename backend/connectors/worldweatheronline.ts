@@ -98,6 +98,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			humidity: Number(current.humidity),
 			wind_speed: Number(current.windspeedKmph),
 			wind_direction: Number(current.winddirDegree),
+			wind_gust: current.WindGustKmph ? Number(current.WindGustKmph) / 3.6 : null,
 			condition_text: weatherDesc,
 			condition_code: String(current.weatherCode),
 			precipitation_prob: null,
