@@ -67,6 +67,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			if (parts.length < 2) return ''; // Unexpected format
 
 			const time = parts[0];
+			if (!time) return '';
 			const period = parts[1];
 			const timeParts = time.split(':');
 			if (timeParts.length < 2) return '';

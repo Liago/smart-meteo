@@ -33,6 +33,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity: number | null;
+	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
@@ -51,6 +52,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.condition_code = normalizeCondition(data.condition_text);
 		this.precipitation_prob = data.precipitation_prob ?? null;
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
+		this.raw_data = data.raw_data;
 		if (data.daily) {
 			this.daily = data.daily;
 		}

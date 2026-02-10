@@ -34,6 +34,7 @@ export interface UnifiedForecastData {
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity?: number | null;
+	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
