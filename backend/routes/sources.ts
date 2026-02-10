@@ -96,7 +96,16 @@ router.get('/', (req: Request, res: Response) => {
 // PATCH /api/sources/:id - Update source active status
 router.patch('/:id', (req: Request, res: Response) => {
 	const { id } = req.params;
-	const { active } = req.body;
+
+	// Defensive: in serverless environments (Netlify Functions + serverless-http),
+	// express.json() may fail to parse the body for PATCH requests with Express 5,
+	// leaving req.body undefined or as an unparsed string.
+	let body = req.body;
+	if (typeof body === 'string') {
+		try { body = JSON.parse(body); } catch { body = {}; }
+	}
+	body = body ?? {};
+	const { active } = body;
 
 	const source = sources.find(s => s.id === id);
 	if (!source) {

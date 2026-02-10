@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getSmartForecast } from './engine/smartEngine';
@@ -32,6 +32,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+// Fallback: capture body as text when express.json() fails (serverless compatibility)
+app.use(express.text({ type: 'application/json' }));
 
 app.get('/', (req: Request, res: Response) => {
 	res.json({
@@ -69,6 +71,12 @@ app.get('/api/forecast', async (req: Request, res: Response) => {
 		console.error(error);
 		res.status(500).json({ error: error.message });
 	}
+});
+
+// Global error handler - returns JSON errors instead of HTML
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+	console.error('Unhandled error:', err.message);
+	res.status(500).json({ error: 'Internal server error' });
 });
 
 export { app };
