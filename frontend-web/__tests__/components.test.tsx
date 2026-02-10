@@ -23,7 +23,12 @@ const mockForecastData: ForecastCurrent = {
   feels_like: 21.0,
   humidity: 55,
   wind_speed: 4.2,
+  wind_direction: 180,
+  wind_direction_label: 'S',
+  wind_gust: 7.5,
   precipitation_prob: 15,
+  dew_point: 12.8,
+  aqi: 2,
   condition: 'clear',
   condition_text: 'CLEAR',
 };

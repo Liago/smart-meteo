@@ -52,6 +52,7 @@ export async function fetchFromMeteostat(lat: number, lon: number): Promise<Unif
 			humidity: latest.rhum,
 			wind_speed: latest.wspd,
 			wind_direction: latest.wdir,
+			wind_gust: latest.wpgt ?? null,
 			condition_text: `Code ${latest.coco}`, // Meteostat condition codes
 			condition_code: String(latest.coco),
 			precipitation_prob: null,

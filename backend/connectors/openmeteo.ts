@@ -7,7 +7,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 		const params = {
 			latitude: lat,
 			longitude: lon,
-			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m',
+			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
 			hourly: 'temperature_2m,precipitation_probability,weather_code',
 			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset',
 			timezone: 'auto'
@@ -71,6 +71,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			humidity: current.relative_humidity_2m,
 			wind_speed: current.wind_speed_10m,
 			wind_direction: current.wind_direction_10m,
+			wind_gust: current.wind_gusts_10m != null ? current.wind_gusts_10m / 3.6 : null,
 			condition_text: `Code ${current.weather_code}`,
 			condition_code: String(current.weather_code),
 			precipitation_prob: null,

@@ -56,6 +56,7 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 			humidity: data.RelativeHumidity,
 			wind_speed: data.Wind.Speed.Metric.Value / 3.6,
 			wind_direction: data.Wind.Direction.Degrees,
+			wind_gust: data.WindGust?.Speed?.Metric?.Value ? data.WindGust.Speed.Metric.Value / 3.6 : null,
 			condition_text: data.WeatherText,
 			precipitation_prob: null
 		});

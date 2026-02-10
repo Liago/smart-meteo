@@ -29,10 +29,12 @@ export class UnifiedForecast implements UnifiedForecastData {
 	humidity: number | null;
 	wind_speed: number | null;
 	wind_direction: number | null;
+	wind_gust: number | null;
 	condition_text: string | null;
 	condition_code: string;
 	precipitation_prob: number | null;
 	precipitation_intensity: number | null;
+	aqi: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
@@ -48,10 +50,12 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.humidity = data.humidity ?? null;
 		this.wind_speed = data.wind_speed ?? null;
 		this.wind_direction = data.wind_direction ?? null;
+		this.wind_gust = typeof data.wind_gust === 'number' ? Number(data.wind_gust.toFixed(1)) : null;
 		this.condition_text = data.condition_text ?? null;
 		this.condition_code = normalizeCondition(data.condition_text);
 		this.precipitation_prob = data.precipitation_prob ?? null;
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
+		this.aqi = data.aqi ?? null;
 		this.raw_data = data.raw_data;
 		if (data.daily) {
 			this.daily = data.daily;
