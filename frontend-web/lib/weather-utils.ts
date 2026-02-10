@@ -35,7 +35,15 @@ export function windDegreesToDirection(deg: number | null): string {
 	return directions[index];
 }
 
-unknown: 'from-zinc-600 via-stone-700 to-neutral-800',
+// Dynamic background gradients per condition
+export const conditionGradients: Record<WeatherCondition, string> = {
+	clear: 'from-blue-400 via-indigo-500 to-purple-600',       // More vibrant, less generic blue
+	cloudy: 'from-blue-gray-400 via-slate-500 to-gray-600',    // Deeper contrast
+	rain: 'from-slate-700 via-blue-900 to-slate-900',          // Moody and dark
+	snow: 'from-sky-100 via-blue-200 to-indigo-200',           // Crisp and cold
+	storm: 'from-gray-900 via-purple-950 to-black',            // Dramatic
+	fog: 'from-zinc-300 via-slate-400 to-zinc-500',            // Authentic fog color
+	unknown: 'from-zinc-600 via-stone-700 to-neutral-800',
 };
 
 // WMO Weather Codes to text/icon mapping
