@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ForecastCurrent, DailyForecast } from '@/lib/types';
+import { getWMOWeatherInfo } from '@/lib/weather-utils';
 
 interface ForecastDetailsProps {
 	data: ForecastCurrent;
@@ -75,7 +76,7 @@ export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
 											<div key={day.date} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
 												<div className="w-16 font-medium text-white/90">{formatDate(day.date)}</div>
 
-												import {getWMOWeatherInfo} from '@/lib/weather-utils';
+
 												// ... (ForecastDetails component) ...
 												<div className="flex-1 flex flex-col items-center">
 													{(() => {
