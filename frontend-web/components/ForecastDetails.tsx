@@ -77,7 +77,7 @@ export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
 												<div className="w-16 font-medium text-white/90">{formatDate(day.date)}</div>
 
 
-												// ... (ForecastDetails component) ...
+
 												<div className="flex-1 flex flex-col items-center">
 													{(() => {
 														const info = getWMOWeatherInfo(day.condition_code);
