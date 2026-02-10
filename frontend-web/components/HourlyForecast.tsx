@@ -210,7 +210,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 												<span className="text-2xl drop-shadow-md leading-none mb-1">
 													{getWeatherIcon(p.data.condition_code)}
 												</span>
-												<span className="text-sm font-bold shadow-black drop-shadow-sm">
+												<span className="text-sm font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
 													{Math.round(p.temp)}°
 												</span>
 											</>
