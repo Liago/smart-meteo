@@ -163,7 +163,7 @@ export default function Home() {
 						{data.hourly && (
 							<HourlyForecast hourly={data.hourly} astronomy={data.astronomy} />
 						)}
-						<ForecastDetails data={data.current} daily={data.daily} />
+						<ForecastDetails data={data.current} daily={data.daily} hourly={data.hourly} />
 						<SourcesIndicator sources={data.sources_used} />
 
 						{/* Timestamp */}

@@ -2,16 +2,27 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ForecastCurrent, DailyForecast } from '@/lib/types';
+import type { ForecastCurrent, DailyForecast, HourlyForecast as HourlyForecastType } from '@/lib/types';
 import { getWMOWeatherInfo } from '@/lib/weather-utils';
+import HourlyForecast from './HourlyForecast';
 
 interface ForecastDetailsProps {
 	data: ForecastCurrent;
 	daily?: DailyForecast[];
+	hourly?: HourlyForecastType[];
 }
 
-export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
+export default function ForecastDetails({ data, daily, hourly }: ForecastDetailsProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const [expandedDate, setExpandedDate] = useState<string | null>(null);
+
+	const toggleDay = (date: string) => {
+		if (expandedDate === date) {
+			setExpandedDate(null);
+		} else {
+			setExpandedDate(date);
+		}
+	};
 
 	// Helper to format date
 	const formatDate = (dateStr: string) => {
@@ -73,40 +84,90 @@ export default function ForecastDetails({ data, daily }: ForecastDetailsProps) {
 										    If we have 7 days total, skipping 1 leaves 6 days. Perfect.
 										*/}
 										{daily.slice(1).map((day) => (
-											<div key={day.date} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-												<div className="w-16 font-medium text-white/90">{formatDate(day.date)}</div>
+											<div key={day.date} className="rounded-lg bg-white/5 overflow-hidden transition-colors hover:bg-white/10">
+												<button
+													onClick={() => toggleDay(day.date)}
+													className="w-full flex items-center justify-between p-3"
+												>
+													<div className="w-16 font-medium text-white/90 text-left">{formatDate(day.date)}</div>
 
+													<div className="flex-1 flex flex-col items-center">
+														{(() => {
+															const info = getWMOWeatherInfo(day.condition_code);
+															return (
+																<div className="flex items-center gap-2">
+																	<span className="text-xl" role="img" aria-label={info.label}>{info.icon}</span>
+																	<span className="text-sm text-white/90 hidden sm:inline">{info.label}</span>
+																</div>
+															);
+														})()}
+													</div>
 
-
-												<div className="flex-1 flex flex-col items-center">
-													{(() => {
-														const info = getWMOWeatherInfo(day.condition_code);
-														return (
-															<div className="flex items-center gap-2">
-																<span className="text-xl" role="img" aria-label={info.label}>{info.icon}</span>
-																<span className="text-sm text-white/90">{info.label}</span>
+													<div className="w-16 flex justify-center">
+														{day.precipitation_prob !== null && day.precipitation_prob > 0 ? (
+															<div className="flex items-center text-sm text-blue-300 font-medium">
+																<svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																	<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+																</svg>
+																{Math.round(day.precipitation_prob)}%
 															</div>
-														);
-													})()}
-												</div>
+														) : (
+															<span className="text-white/20 text-sm">-</span>
+														)}
+													</div>
 
-												<div className="w-16 flex justify-center">
-													{day.precipitation_prob !== null && day.precipitation_prob > 0 ? (
-														<div className="flex items-center text-sm text-blue-300 font-medium">
-															<svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-															</svg>
-															{Math.round(day.precipitation_prob)}%
-														</div>
-													) : (
-														<span className="text-white/20 text-sm">-</span>
+													<div className="w-20 text-right flex items-center justify-end gap-2">
+														<span className="font-bold text-lg">{Math.round(day.temp_max ?? 0)}°</span>
+														<span className="text-white/40 text-sm">{Math.round(day.temp_min ?? 0)}°</span>
+														<motion.svg
+															animate={{ rotate: expandedDate === day.date ? 180 : 0 }}
+															transition={{ duration: 0.3 }}
+															className="w-4 h-4 text-white/40 ml-1"
+															fill="none"
+															stroke="currentColor"
+															viewBox="0 0 24 24"
+														>
+															<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+														</motion.svg>
+													</div>
+												</button>
+
+												<AnimatePresence>
+													{expandedDate === day.date && (
+														<motion.div
+															initial={{ height: 0, opacity: 0 }}
+															animate={{ height: 'auto', opacity: 1 }}
+															exit={{ height: 0, opacity: 0 }}
+															transition={{ duration: 0.3 }}
+														>
+															<div className="p-2 border-t border-white/10">
+																{(() => {
+																	if (!hourly) return <div className="text-center text-white/40 py-4">Dati orari non disponibili</div>;
+
+																	const dayStart = new Date(day.date).setHours(0, 0, 0, 0);
+																	const dayEnd = new Date(day.date).setHours(23, 59, 59, 999);
+
+																	const dayHourly = hourly.filter(h => {
+																		const t = new Date(h.time).getTime();
+																		return t >= dayStart && t <= dayEnd;
+																	});
+
+																	if (dayHourly.length === 0) {
+																		return <div className="text-center text-white/40 py-4">Dati orari non disponibili per questa data</div>;
+																	}
+
+																	return (
+																		<HourlyForecast
+																			hourly={dayHourly}
+																			mode="exact"
+																			title=""
+																		/>
+																	);
+																})()}
+															</div>
+														</motion.div>
 													)}
-												</div>
-
-												<div className="w-20 text-right flex items-center justify-end gap-2">
-													<span className="font-bold text-lg">{Math.round(day.temp_max ?? 0)}°</span>
-													<span className="text-white/40 text-sm">{Math.round(day.temp_min ?? 0)}°</span>
-												</div>
+												</AnimatePresence>
 											</div>
 										))}
 									</div>

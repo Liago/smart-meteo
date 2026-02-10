@@ -7,6 +7,8 @@ import { useMemo } from 'react';
 interface HourlyForecastProps {
 	hourly: HourlyForecast[];
 	astronomy?: AstronomyData;
+	mode?: 'next-12' | 'exact';
+	title?: string;
 }
 
 // Discriminator type for the items in our timeline
@@ -14,7 +16,7 @@ type TimelineItem =
 	| { type: 'weather'; time: number; data: HourlyForecast }
 	| { type: 'sun'; time: number; data: { label: string; icon: string } };
 
-export default function HourlyForecast({ hourly, astronomy }: HourlyForecastProps) {
+export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore' }: HourlyForecastProps) {
 	const chartData = useMemo(() => {
 		// 1. Merge and sort events
 		const events: TimelineItem[] = hourly.map(h => ({
@@ -48,12 +50,24 @@ export default function HourlyForecast({ hourly, astronomy }: HourlyForecastProp
 		events.sort((a, b) => a.time - b.time);
 
 		// 2. Prepare data for the chart
-		// Filter for next 12 hours approx
-		const now = new Date();
-		now.setMinutes(0, 0, 0);
-		const start = now.getTime();
-		const end = start + 12 * 3600 * 1000; // 12 hours
-		const filtered = events.filter(e => e.time >= start && e.time <= end);
+		let filtered = events;
+
+		if (mode === 'next-12') {
+			// Filter for next 12 hours approx
+			const now = new Date();
+			now.setMinutes(0, 0, 0);
+			const start = now.getTime();
+			const end = start + 12 * 3600 * 1000; // 12 hours
+			filtered = events.filter(e => e.time >= start && e.time <= end);
+		} else {
+			// Exact mode: show all provided data within the start/end of the hourly array
+			// ensuring we respect the provided hourly range
+			if (hourly.length > 0) {
+				const start = new Date(hourly[0].time).getTime();
+				const end = new Date(hourly[hourly.length - 1].time).getTime();
+				filtered = events.filter(e => e.time >= start && e.time <= end);
+			}
+		}
 
 		// 3. Calculate Geometry
 		if (filtered.length < 2) return null;
@@ -148,7 +162,7 @@ export default function HourlyForecast({ hourly, astronomy }: HourlyForecastProp
 
 	return (
 		<div className="glass p-4 sm:p-6 mb-4 overflow-hidden">
-			<h3 className="text-sm font-medium text-white/50 mb-2 uppercase tracking-wider">Prossime 12 Ore</h3>
+			{title && <h3 className="text-sm font-medium text-white/50 mb-2 uppercase tracking-wider">{title}</h3>}
 
 			<div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
 				<div style={{ width: chartData.width, height: chartData.height + 60, position: 'relative' }}>
