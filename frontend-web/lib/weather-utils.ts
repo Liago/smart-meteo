@@ -37,13 +37,13 @@ export function windDegreesToDirection(deg: number | null): string {
 
 // Dynamic background gradients per condition
 export const conditionGradients: Record<WeatherCondition, string> = {
-	clear: 'from-orange-300 via-rose-300 to-indigo-400',          // Sunset/Sunrise vibes (Warm Pastel)
-	cloudy: 'from-indigo-200 via-purple-200 to-slate-400',        // Dreamy Cloudy (Soft Purple/Grey)
-	rain: 'from-teal-300 via-blue-400 to-indigo-500',             // Fresh Rain (Aqua/Blue)
-	snow: 'from-blue-100 via-indigo-100 to-violet-200',           // Icy White/Blue (Bright)
-	storm: 'from-slate-600 via-purple-700 to-indigo-900',         // Deep Storm (Vibrant Dark)
-	fog: 'from-pink-200 via-slate-300 to-zinc-400',               // Misty Pink/Grey
-	unknown: 'from-gray-300 via-gray-400 to-slate-500',
+	clear: 'from-orange-400 via-rose-500 to-indigo-600',       // Sunset: Rich Orange -> Deep Rose -> Indigo
+	cloudy: 'from-indigo-400 via-slate-600 to-gray-700',      // Cloudy: Moody Indigo -> Dark Slate
+	rain: 'from-teal-600 via-blue-700 to-slate-800',          // Rain: Deep Teal -> Dark Blue
+	snow: 'from-blue-400 via-indigo-500 to-violet-600',       // Snow: Vibrant Blue -> Violet (Not too light)
+	storm: 'from-slate-700 via-purple-900 to-black',          // Storm: Very Dark
+	fog: 'from-slate-500 via-zinc-600 to-stone-700',          // Fog: Medium Dark Grey
+	unknown: 'from-gray-600 via-gray-700 to-slate-800',
 };
 
 // WMO Weather Codes to text/icon mapping
