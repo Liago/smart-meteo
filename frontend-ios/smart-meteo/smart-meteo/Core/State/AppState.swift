@@ -89,10 +89,15 @@ class AppState: ObservableObject {
         #endif
     }
     
-    func fetchWeather(for location: CLLocation) {
+    func fetchWeather(for location: CLLocation, name: String? = nil) {
         self.currentLocation = location
         self.weatherState = .loading
-        reverseGeocode(location: location)
+        
+        if let name = name {
+            self.currentLocationName = name
+        } else {
+            reverseGeocode(location: location)
+        }
         
         Task {
             do {
@@ -100,17 +105,22 @@ class AppState: ObservableObject {
                     latitude: location.coordinate.latitude,
                     longitude: location.coordinate.longitude
                 )
-                self.weatherState = .success(forecast)
+                        
+                // Verify if we need to force UI update
+                await MainActor.run {
+                    self.weatherState = .success(forecast)
+                }
             } catch {
-                self.weatherState = .error(error)
+                await MainActor.run {
+                    self.weatherState = .error(error)
+                }
             }
         }
     }
     
     func selectLocation(coordinate: Coordinate, name: String) {
-        self.currentLocationName = name
         let location = CLLocation(latitude: coordinate.lat, longitude: coordinate.lon)
-        fetchWeather(for: location)
+        fetchWeather(for: location, name: name)
     }
     
     // MARK: - Helpers

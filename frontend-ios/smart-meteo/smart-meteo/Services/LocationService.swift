@@ -24,7 +24,7 @@ class LocationService {
         let url = SupabaseConfig.url.appendingPathComponent("/rest/v1/profiles")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "favorite_locations"),
+            URLQueryItem(name: "select", value: "id,favorite_locations"),
             URLQueryItem(name: "id", value: "eq.\(userId)")
         ]
         
@@ -113,7 +113,7 @@ class LocationService {
         let url = SupabaseConfig.url.appendingPathComponent("/rest/v1/profiles")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "favorite_locations"),
+            URLQueryItem(name: "select", value: "id,favorite_locations"),
             URLQueryItem(name: "id", value: "eq.\(userId)")
         ]
         

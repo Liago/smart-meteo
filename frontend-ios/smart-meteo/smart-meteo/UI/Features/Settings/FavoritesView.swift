@@ -2,6 +2,8 @@ import SwiftUI
 
 struct FavoritesView: View {
     @EnvironmentObject var appState: AppState
+    @Binding var isSidebarPresented: Bool
+    @Environment(\.dismiss) var dismiss
     
     var body: some View {
         List {
@@ -13,6 +15,10 @@ struct FavoritesView: View {
                 ForEach(appState.favoriteLocations) { location in
                     Button(action: {
                         appState.selectLocation(coordinate: location.coordinate, name: location.name)
+                        withAnimation {
+                            isSidebarPresented = false
+                        }
+                        dismiss()
                     }) {
                         HStack {
                             VStack(alignment: .leading) {
@@ -71,7 +77,7 @@ struct FavoritesView: View {
 
 #Preview {
     NavigationView {
-        FavoritesView()
+        FavoritesView(isSidebarPresented: .constant(true))
             .environmentObject(AppState.shared)
             .background(Color(hex: "0B1120"))
     }

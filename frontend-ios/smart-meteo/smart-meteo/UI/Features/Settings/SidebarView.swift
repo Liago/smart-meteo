@@ -55,7 +55,7 @@ struct SidebarView: View {
                             SidebarRow(icon: "server.rack", title: "Gestione Fonti", subtitle: "Configura provider dati")
                         }
                         
-                        NavigationLink(destination: FavoritesView()) {
+                        NavigationLink(destination: FavoritesView(isSidebarPresented: $isPresented)) {
                             SidebarRow(icon: "star.fill", title: "Località Preferite", subtitle: "Gestisci i tuoi luoghi salavati")
                         }
                         
