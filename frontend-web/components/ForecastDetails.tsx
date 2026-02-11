@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { ForecastCurrent, DailyForecast, HourlyForecast as HourlyForecastType } from '@/lib/types';
 import { getWMOWeatherInfo } from '@/lib/weather-utils';
 import HourlyForecast from './HourlyForecast';
+import WeatherIcon from './WeatherIcon';
 
 interface ForecastDetailsProps {
 	data: ForecastCurrent;
@@ -96,7 +97,7 @@ export default function ForecastDetails({ data, daily, hourly }: ForecastDetails
 															const info = getWMOWeatherInfo(day.condition_code);
 															return (
 																<div className="flex items-center gap-2">
-																	<span className="text-xl" role="img" aria-label={info.label}>{info.icon}</span>
+																	<WeatherIcon code={day.condition_code} className="w-6 h-6 text-white/90" />
 																	<span className="text-sm text-white/90 hidden sm:inline">{info.label}</span>
 																</div>
 															);

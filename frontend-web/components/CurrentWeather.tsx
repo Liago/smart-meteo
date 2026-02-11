@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ForecastCurrent } from '@/lib/types';
-import { getConditionLabel, getConditionIcon } from '@/lib/weather-utils';
+import { getConditionLabel } from '@/lib/weather-utils';
+import WeatherIcon from './WeatherIcon';
 
 interface CurrentWeatherProps {
 	data: ForecastCurrent;
@@ -41,8 +42,8 @@ export default function CurrentWeather({ data, locationName, sourcesCount }: Cur
 			<p className="text-white/70 text-sm mb-1 tracking-wide uppercase">{locationName}</p>
 
 			{/* Condition icon & text */}
-			<div className="flex items-center justify-center gap-2 mb-2">
-				<span className="text-4xl">{getConditionIcon(data.condition)}</span>
+			<div className="flex items-center justify-center gap-3 mb-2">
+				<WeatherIcon condition={data.condition} className="w-12 h-12 text-white/90 drop-shadow-lg" />
 				<span className="text-lg font-medium text-white/80">{getConditionLabel(data.condition)}</span>
 			</div>
 

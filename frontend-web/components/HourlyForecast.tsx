@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import type { HourlyForecast, AstronomyData } from '@/lib/types';
 import { useMemo } from 'react';
-import { getWMOWeatherInfo } from '@/lib/weather-utils';
+import WeatherIcon from './WeatherIcon';
 
 interface HourlyForecastProps {
 	hourly: HourlyForecast[];
@@ -199,9 +199,9 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 									<div className="flex flex-col items-center justify-end h-full">
 										{p.type === 'weather' ? (
 											<>
-												<span className="text-2xl drop-shadow-md leading-none mb-1">
-													{getWMOWeatherInfo(p.data.condition_code).icon}
-												</span>
+												<div className="mb-1 drop-shadow-md">
+													<WeatherIcon code={p.data.condition_code} className="w-8 h-8 text-white" />
+												</div>
 												<span className="text-sm font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
 													{Math.round(p.temp)}°
 												</span>
