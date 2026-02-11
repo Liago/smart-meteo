@@ -146,6 +146,7 @@ struct SavedLocation: Identifiable, Codable, Equatable {
     }
 }
 
+extension AppState {
     func fetchFavorites(userId: String, token: String) {
         Task {
             do {
@@ -221,7 +222,9 @@ struct SavedLocation: Identifiable, Codable, Equatable {
                 self.fetchFavorites(userId: userId, token: token)
             }
         }
-    }    func fetchSources() {
+    }
+    
+    func fetchSources() {
         Task {
             do {
                 let sources = try await weatherService.getSources()
