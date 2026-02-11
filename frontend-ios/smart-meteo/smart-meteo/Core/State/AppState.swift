@@ -1,3 +1,4 @@
+import SwiftUI
 import Foundation
 import Combine
 import CoreLocation
@@ -101,8 +102,10 @@ class AppState: ObservableObject {
     private func reverseGeocode(location: CLLocation) {
         let geocoder = CLGeocoder()
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            if let place = placemarks?.first {
-                self?.currentLocationName = place.locality ?? place.name ?? "Unknown Location"
+            DispatchQueue.main.async {
+                if let place = placemarks?.first {
+                    self?.currentLocationName = place.locality ?? place.name ?? "Unknown Location"
+                }
             }
         }
     }
@@ -116,34 +119,22 @@ struct UserProfile: Codable {
 }
 
 // Models
-struct WeatherSource: Identifiable, Codable, Equatable {
-    let id: String
-    let name: String
-    let description: String
-    let weight: Double
-    var isEnabled: Bool
-    
-    static var defaults: [WeatherSource] {
-        [
-            WeatherSource(id: "tomorrow", name: "Tomorrow.io", description: "Hyper-local nowcasting with minute-by-minute precision", weight: 1.2, isEnabled: true),
-            WeatherSource(id: "openmeteo", name: "Open-Meteo", description: "High-resolution scientific data from national weather services", weight: 1.1, isEnabled: true),
-            WeatherSource(id: "openweathermap", name: "OpenWeatherMap", description: "Global coverage baseline and fast fallback", weight: 1.0, isEnabled: true),
-            WeatherSource(id: "weatherapi", name: "WeatherAPI", description: "Cross-validation for temperature and conditions", weight: 1.0, isEnabled: true),
-            WeatherSource(id: "accuweather", name: "AccuWeather", description: "Quality-focused with RealFeel temperature", weight: 1.1, isEnabled: false)
-        ]
-    }
-}
+// WeatherSource is defined in Models/WeatherSource.swift
 
 struct SavedLocation: Identifiable, Codable, Equatable {
-    let id = UUID()
+    var id = UUID()
     let name: String
     let coordinate: Coordinate
+    
+    static func == (lhs: SavedLocation, rhs: SavedLocation) -> Bool {
+        return lhs.name == rhs.name && lhs.coordinate.lat == rhs.coordinate.lat && lhs.coordinate.lon == rhs.coordinate.lon
+    }
 }
 
 extension AppState {
     func toggleSource(_ sourceId: String) {
         if let index = weatherSources.firstIndex(where: { $0.id == sourceId }) {
-            weatherSources[index].isEnabled.toggle()
+            weatherSources[index].active.toggle()
         }
     }
     
