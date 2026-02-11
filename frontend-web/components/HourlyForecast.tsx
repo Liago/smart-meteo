@@ -107,16 +107,20 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		const tempRange = maxTemp - minTemp || 1;
 
 		const width = filtered.length * 80; // Estimated width
-		const height = 160;
+		const height = 200; // Increased to fit icons
 		const paddingX = 40;
-		const paddingY = 40; // Top/Bottom padding for labels
+		const paddingTop = 80;  // Space for icons
+		const paddingBottom = 40; // Space for labels
 
 		const points = itemsWithTemp.map((item, index) => {
 			// X coordinate based on time linear placement, but let's just do equidistant steps if it's hourly?
 			// Actually mix of hourly and specific sun times requires time-based mapping.
 			const x = paddingX + ((item.time - minTime) / duration) * (width - 2 * paddingX);
 			// Y coordinate: higher temp -> lower Y value (SVG coords)
-			const y = height - paddingY - ((item.temp - minTemp) / tempRange) * (height - 2 * paddingY);
+			// const y = height - paddingY - ((item.temp - minTemp) / tempRange) * (height - 2 * paddingY);
+			const usableHeight = height - paddingTop - paddingBottom;
+			const y = height - paddingBottom - ((item.temp - minTemp) / tempRange) * usableHeight;
+
 			return { x, y, ...item };
 		});
 
@@ -157,7 +161,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 			{title && <h3 className="text-sm font-medium text-white/50 mb-2 uppercase tracking-wider">{title}</h3>}
 
 			<div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-				<div style={{ width: chartData.width, height: chartData.height + 60, position: 'relative' }}>
+				<div style={{ width: chartData.width, height: chartData.height + 20, position: 'relative' }}>
 					<svg width={chartData.width} height={chartData.height} className="overflow-visible">
 						{/* Defs for gradients */}
 						<defs>
@@ -195,7 +199,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 								/>
 
 								{/* Info Group */}
-								<foreignObject x={p.x - 30} y={p.y - 60} width={60} height={50}>
+								<foreignObject x={p.x - 30} y={p.y - 80} width={60} height={70}>
 									<div className="flex flex-col items-center justify-end h-full">
 										{p.type === 'weather' ? (
 											<>
