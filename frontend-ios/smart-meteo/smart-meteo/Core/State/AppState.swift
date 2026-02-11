@@ -58,6 +58,18 @@ class AppState: ObservableObject {
     private func setupAuth() {
         authService.$isAuthenticated
             .assign(to: &$isAuthenticated)
+            
+        // improved flow: when auth changes to true, fetch favorites
+        authService.$isAuthenticated
+            .combineLatest(authService.$userId, authService.$accessToken)
+            .sink { [weak self] (isAuth, userId, token) in
+                if isAuth, let uid = userId, let tok = token {
+                    self?.fetchFavorites(userId: uid, token: tok)
+                } else if !isAuth {
+                    self?.favoriteLocations = [] // Clear on logout
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Actions
@@ -134,21 +146,46 @@ struct SavedLocation: Identifiable, Codable, Equatable {
     }
 }
 
-extension AppState {
+    func fetchFavorites(userId: String, token: String) {
+        Task {
+            do {
+                let favorites = try await LocationService.shared.getFavorites(userId: userId, token: token)
+                await MainActor.run {
+                    self.favoriteLocations = favorites
+                }
+            } catch {
+                print("Error loading favorites: \(error)")
+            }
+        }
+    }
+
     func toggleSource(_ sourceId: String) {
         if let index = weatherSources.firstIndex(where: { $0.id == sourceId }) {
             weatherSources[index].active.toggle()
         }
     }
     
-    func addFavorite(location: SavedLocation) {
+    // Internal optimistic update
+    private func addLocalFavorite(location: SavedLocation) {
         if !favoriteLocations.contains(where: { $0.name == location.name }) {
             favoriteLocations.append(location)
         }
     }
     
+    // Internal optimistic update
     func removeFavorite(at offsets: IndexSet) {
+        // Find items to remove to call backend
+        let itemsToDelete = offsets.map { favoriteLocations[$0] }
         favoriteLocations.remove(atOffsets: offsets)
+        
+        // Sync with backend
+        guard let userId = authService.userId, let token = authService.accessToken else { return }
+        
+        Task {
+            for item in itemsToDelete {
+                try? await LocationService.shared.removeFavorite(userId: userId, token: token, locationId: item.id)
+            }
+        }
     }
     
     func isFavorite(name: String) -> Bool {
@@ -159,17 +196,32 @@ extension AppState {
         guard let location = currentLocation else { return }
         let currentName = currentLocationName
         
-        if isFavorite(name: currentName) {
-            favoriteLocations.removeAll { $0.name == currentName }
+        if let existing = favoriteLocations.first(where: { $0.name == currentName }) {
+            // Remove
+            if let index = favoriteLocations.firstIndex(of: existing) {
+                favoriteLocations.remove(at: index)
+                
+                guard let userId = authService.userId, let token = authService.accessToken else { return }
+                Task {
+                    try? await LocationService.shared.removeFavorite(userId: userId, token: token, locationId: existing.id)
+                }
+            }
         } else {
+            // Add
             let saved = SavedLocation(
                 name: currentName,
                 coordinate: Coordinate(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
             )
-            addFavorite(location: saved)
+            addLocalFavorite(location: saved)
+            
+            guard let userId = authService.userId, let token = authService.accessToken else { return }
+            Task {
+                try? await LocationService.shared.addFavorite(userId: userId, token: token, location: saved)
+                // Optionally re-fetch to get real UUID from DB
+                self.fetchFavorites(userId: userId, token: token)
+            }
         }
-    }
-    func fetchSources() {
+    }    func fetchSources() {
         Task {
             do {
                 let sources = try await weatherService.getSources()

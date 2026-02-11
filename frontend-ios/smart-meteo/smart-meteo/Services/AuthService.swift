@@ -6,6 +6,7 @@ class AuthService: ObservableObject {
     
     @Published var isAuthenticated: Bool = false
     @Published var accessToken: String?
+    @Published var userId: String?
     
     private init() {
         // Here we would initialize Supabase Auth
@@ -13,17 +14,23 @@ class AuthService: ObservableObject {
     }
     
     func signIn(email: String, password: String) async throws {
-        // Implementation with Supabase SDK
-        // try await Supabase.auth.signIn(...)
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s delay for UX feedback
-        isAuthenticated = true
-        accessToken = "mock_token"
+        // Implementation with Supabase SDK via REST
+        let response = try await SupabaseClient.shared.signIn(email: email, password: password)
+        
+        await MainActor.run {
+            self.accessToken = response.access_token
+            self.userId = response.user.id
+            self.isAuthenticated = true
+        }
     }
     
     func signOut() async throws {
         // try await Supabase.auth.signOut()
-        isAuthenticated = false
-        accessToken = nil
+        await MainActor.run {
+            isAuthenticated = false
+            accessToken = nil
+            userId = nil
+        }
     }
     
     // Helper to get token for API requests
