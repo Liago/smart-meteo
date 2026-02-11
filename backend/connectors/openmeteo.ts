@@ -30,12 +30,9 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			condition_text: `Code ${daily.weather_code[index]}`
 		}));
 
-		// Map hourly data (next 12 hours from current time)
-		// OpenMeteo hourly returns all 24h for 7 days typically, need to find current hour index
-		// But simpler: just map the first 24 and let frontend filter or filter here
-		// Let's filter here for efficiency. We need to find the index corresponding to "now"
-		// The API takes "current_weather=true" so it knows "now". 
-		// Actually best to compare timestamps. OpenMeteo hourly.time is ISO string.
+		// Map hourly data (from current time onwards)
+		// OpenMeteo hourly returns all 24h for 7 days typically.
+		// We map from the current hour to the end of the available data.
 		const now = new Date();
 		const currentHourISO = now.toISOString().slice(0, 13) + ':00'; // Match approx format YYYY-MM-DDTHH:00
 
@@ -43,7 +40,8 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 		let startIndex = hourly.time.findIndex((t: string) => t >= currentHourISO);
 		if (startIndex === -1) startIndex = 0; // Fallback
 
-		const hourlyForecasts = hourly.time.slice(startIndex, startIndex + 12).map((time: string, index: number) => {
+		// Map ALL remaining hourly data
+		const hourlyForecasts = hourly.time.slice(startIndex).map((time: string, index: number) => {
 			const realIndex = startIndex + index;
 			return {
 				time: time,
