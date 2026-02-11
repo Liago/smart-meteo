@@ -59,9 +59,9 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 		}
 
 		// Map Astronomy
-		let astronomy: { sunrise: string; sunset: string } | undefined = undefined;
+		let astronomy: { sunrise: string; sunset: string; sunrise_next?: string; sunset_next?: string } | undefined = undefined;
 		const astro = data.weather[0].astronomy[0];
-		const toISO = (timeStr: string) => {
+		const toISO = (timeStr: string, dateStr: string) => {
 			if (!timeStr) return '';
 			const parts = timeStr.split(' ');
 			if (parts.length < 2) return ''; // Unexpected format
@@ -77,14 +77,22 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 
 			if (period === 'PM' && h !== 12) h += 12;
 			if (period === 'AM' && h === 12) h = 0;
-			return `${data.weather[0].date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+			return `${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 		};
 
-		const sunrise = toISO(astro.sunrise);
-		const sunset = toISO(astro.sunset);
+		const sunrise = toISO(astro.sunrise, data.weather[0].date);
+		const sunset = toISO(astro.sunset, data.weather[0].date);
 
 		if (sunrise && sunset) {
 			astronomy = { sunrise, sunset };
+			// Add tomorrow's sunrise/sunset if available
+			if (data.weather[1] && data.weather[1].astronomy && data.weather[1].astronomy[0]) {
+				const astroNext = data.weather[1].astronomy[0];
+				const sunriseNext = toISO(astroNext.sunrise, data.weather[1].date);
+				const sunsetNext = toISO(astroNext.sunset, data.weather[1].date);
+				if (sunriseNext) astronomy.sunrise_next = sunriseNext;
+				if (sunsetNext) astronomy.sunset_next = sunsetNext;
+			}
 		}
 
 		// Prepare data object to avoid undefined issue with exactOptionalPropertyTypes

@@ -52,11 +52,13 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			};
 		});
 
-		// Map Astronomy (Sunrise/Sunset for today)
+		// Map Astronomy (Sunrise/Sunset for today and tomorrow)
 		// daily.sunrise is ISO string array
-		const astronomy = {
-			sunrise: daily.sunrise[0], // Today's sunrise
-			sunset: daily.sunset[0]    // Today's sunset
+		const astronomy: { sunrise: string; sunset: string; sunrise_next?: string; sunset_next?: string } = {
+			sunrise: daily.sunrise[0],
+			sunset: daily.sunset[0],
+			sunrise_next: daily.sunrise[1],
+			sunset_next: daily.sunset[1]
 		};
 
 		return new UnifiedForecast({

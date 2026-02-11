@@ -44,8 +44,14 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 				}
 			};
 
-			addAstroEvent(astronomy.sunrise, 'Alba', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
-			addAstroEvent(astronomy.sunset, 'Tramonto', 'M17.293 13.293A8 8 0 016.707 2.707 8.001 8.001 0 1010 18h.005c.022 0 .045-.002.067-.006a8 8 0 007.221-4.701z');
+			const sunriseIcon = 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z';
+			const sunsetIcon = 'M17.293 13.293A8 8 0 016.707 2.707 8.001 8.001 0 1010 18h.005c.022 0 .045-.002.067-.006a8 8 0 007.221-4.701z';
+
+			addAstroEvent(astronomy.sunrise, 'Alba', sunriseIcon);
+			addAstroEvent(astronomy.sunset, 'Tramonto', sunsetIcon);
+			// Also add next-day sunrise/sunset so the 12h window can capture them
+			addAstroEvent(astronomy.sunrise_next, 'Alba', sunriseIcon);
+			addAstroEvent(astronomy.sunset_next, 'Tramonto', sunsetIcon);
 		}
 
 		events.sort((a, b) => a.time - b.time);
