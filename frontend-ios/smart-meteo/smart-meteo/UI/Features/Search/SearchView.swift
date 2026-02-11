@@ -52,15 +52,9 @@ class SearchViewModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
                 name: completion.title
             )
             
-            // Clear search or navigate back?
-            // Usually we'd dismiss the view. For TabView, likely just switch tab or show toast.
-            // For now, let's print and maybe reset query to indicate success? 
             print("Selected: \(completion.title)")
-            
-            // ToDo: Add UI feedback (e.g. haptic) or navigate back to Dashboard
         }
     }
-
 }
 
 struct SearchView: View {
