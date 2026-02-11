@@ -52,7 +52,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 	res.json({ status: 'ok', timestamp: new Date() });
 });
 
-app.use('/api/sources', requireAuth, sourcesRouter);
+app.use('/api/sources', sourcesRouter);
 
 app.get('/api/forecast', async (req: Request, res: Response) => {
 	const lat = req.query.lat as string;

@@ -16,6 +16,7 @@ class AppState: ObservableObject {
     @Published var selectedTab: Int = 0
     @Published var weatherSources: [WeatherSource] = WeatherSource.defaults
     @Published var favoriteLocations: [SavedLocation] = []
+    @Published var homeLocation: SavedLocation?
     @Published var currentLocationName: String = "Locating..."
     @Published var weatherState: ViewState<ForecastResponse> = .idle
     @Published var currentLocation: CLLocation?
@@ -36,8 +37,10 @@ class AppState: ObservableObject {
         self.locationManager = locationManager
         self.authService = authService
         
+        
         setupLocation()
         setupAuth()
+        fetchSources()
     }
     
     // MARK: - Setup
@@ -165,5 +168,27 @@ extension AppState {
             )
             addFavorite(location: saved)
         }
+    }
+    func fetchSources() {
+        Task {
+            do {
+                let sources = try await weatherService.getSources()
+                // Update on main thread since weatherSources is @Published
+                await MainActor.run {
+                    self.weatherSources = sources
+                }
+            } catch {
+                print("Failed to fetch sources: \(error)")
+            }
+        }
+    }
+    
+    func setAsHome(location: SavedLocation) {
+        homeLocation = location
+        //Ideally persist this preference
+    }
+    
+    func isHome(location: SavedLocation) -> Bool {
+        return homeLocation?.id == location.id
     }
 }

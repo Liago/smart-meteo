@@ -13,13 +13,21 @@ struct FavoritesView: View {
                 ForEach(appState.favoriteLocations) { location in
                     Button(action: {
                         appState.selectLocation(coordinate: location.coordinate, name: location.name)
-                        // Close sidebar? handled by parent or state
                     }) {
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(location.name)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
+                                HStack {
+                                    Text(location.name)
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    
+                                    if appState.isHome(location: location) {
+                                        Image(systemName: "house.fill")
+                                            .foregroundColor(.blue)
+                                            .font(.caption)
+                                    }
+                                }
+                                
                                 Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
                                     .font(.caption)
                                     .foregroundColor(.gray)
@@ -34,12 +42,28 @@ struct FavoritesView: View {
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            appState.setAsHome(location: location)
+                        } label: {
+                            Label("Imposta come Casa", systemImage: "house")
+                        }
+                        .tint(.blue)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            if let index = appState.favoriteLocations.firstIndex(of: location) {
+                                appState.favoriteLocations.remove(at: index)
+                            }
+                        } label: {
+                            Label("Elimina", systemImage: "trash")
+                        }
+                    }
                 }
-                .onDelete(perform: appState.removeFavorite)
             }
         }
         .listStyle(.plain)
-        .background(Color.black.edgesIgnoringSafeArea(.all))
+        .background(Color(hex: "0B1120").ignoresSafeArea())
         .navigationTitle("Località Preferite")
         .navigationBarTitleDisplayMode(.inline)
     }

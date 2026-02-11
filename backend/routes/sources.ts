@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { requireAuth } from '../middleware/auth';
 
 export interface WeatherSource {
 	id: string;
@@ -94,7 +95,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // PATCH /api/sources/:id - Update source active status
-router.patch('/:id', (req: Request, res: Response) => {
+router.patch('/:id', requireAuth, (req: Request, res: Response) => {
 	const { id } = req.params;
 
 	// Defensive: in serverless environments (Netlify Functions + serverless-http),

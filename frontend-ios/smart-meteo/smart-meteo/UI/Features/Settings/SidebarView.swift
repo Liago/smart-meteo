@@ -33,20 +33,6 @@ struct SidebarView: View {
                                     .cornerRadius(8)
                             }
                         }
-                    } else {
-                        Button(action: { showingLogin = true }) {
-                            HStack {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                    .font(.title2)
-                                Text("Accedi / Registrati")
-                                    .font(.headline)
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                        }
                     }
                 }
                 .padding(24)
@@ -83,7 +69,9 @@ struct SidebarView: View {
                             .padding(.top, 24)
                             .padding(.bottom, 8)
                         
-                        SidebarRow(icon: "gearshape", title: "Impostazioni Generali", subtitle: "Unità, notifiche, lingua")
+                        NavigationLink(destination: GeneralSettingsView()) {
+                            SidebarRow(icon: "gearshape", title: "Impostazioni Generali", subtitle: "Unità, notifiche, lingua")
+                        }
                         
                         if appState.isAuthenticated {
                             Button(action: {
@@ -96,7 +84,28 @@ struct SidebarView: View {
                     .padding(.vertical)
                 }
                 
+
+                
                 Spacer()
+                
+                // Moved Login/Register Button to bottom
+                if !appState.isAuthenticated {
+                    Button(action: { showingLogin = true }) {
+                        HStack {
+                            Image(systemName: "person.crop.circle.badge.plus")
+                                .font(.title3)
+                            Text("Accedi / Registrati")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                }
                 
                 // Footer
                 VStack(spacing: 4) {
