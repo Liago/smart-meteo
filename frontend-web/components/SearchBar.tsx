@@ -10,6 +10,8 @@ interface SearchBarProps {
 	isLoading?: boolean;
 	savedLocations?: SavedLocation[];
 	homeLocation?: SavedLocation | null;
+	onRemoveHome?: () => void;
+	onRemoveSaved?: (id: string) => void;
 }
 
 interface GeoResult {
@@ -39,7 +41,7 @@ async function searchLocation(query: string): Promise<GeoResult[]> {
 	}));
 }
 
-export default function SearchBar({ onLocationSelect, isLoading, savedLocations = [], homeLocation }: SearchBarProps) {
+export default function SearchBar({ onLocationSelect, isLoading, savedLocations = [], homeLocation, onRemoveHome, onRemoveSaved }: SearchBarProps) {
 	const [query, setQuery] = useState('');
 	const [results, setResults] = useState<GeoResult[]>([]);
 	const [showResults, setShowResults] = useState(false);
@@ -118,6 +120,17 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 					placeholder="Cerca una localita..."
 					className="flex-1 bg-transparent text-white placeholder-white/40 outline-none text-base"
 				/>
+				{query && (
+					<button
+						onClick={() => handleSearch('')}
+						className="p-1 rounded-full hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+						title="Cancella ricerca"
+					>
+						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				)}
 				<button
 					onClick={handleGeolocate}
 					disabled={geoLoading}
@@ -153,28 +166,53 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 						{showSavedMap && (
 							<div className="py-2">
 								{homeLocation && (
-									<button
-										onClick={() => handleSelect(homeLocation.lat, homeLocation.lon, homeLocation.name)}
-										className="w-full text-left px-4 py-2 text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
-									>
-										<svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-											<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-										</svg>
-										<span>{homeLocation.name} (Home)</span>
-									</button>
+									<div className="flex items-center hover:bg-white/10 transition-colors group">
+										<button
+											onClick={() => handleSelect(homeLocation.lat, homeLocation.lon, homeLocation.name)}
+											className="flex-1 text-left px-4 py-2 text-white/90 flex items-center gap-2 min-w-0"
+										>
+											<svg className="w-4 h-4 text-yellow-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+												<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+											</svg>
+											<span className="truncate">{homeLocation.name} (Home)</span>
+										</button>
+										{onRemoveHome && (
+											<button
+												onClick={(e) => { e.stopPropagation(); onRemoveHome(); }}
+												className="p-1.5 mr-2 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+												title="Rimuovi Home"
+											>
+												<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
+										)}
+									</div>
 								)}
 								{savedLocations.map((loc) => (
-									<button
-										key={loc.id}
-										onClick={() => handleSelect(loc.lat, loc.lon, loc.name)}
-										className="w-full text-left px-4 py-2 text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
-									>
-										<svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-										</svg>
-										<span>{loc.name}</span>
-									</button>
+									<div key={loc.id} className="flex items-center hover:bg-white/10 transition-colors group">
+										<button
+											onClick={() => handleSelect(loc.lat, loc.lon, loc.name)}
+											className="flex-1 text-left px-4 py-2 text-white/90 flex items-center gap-2 min-w-0"
+										>
+											<svg className="w-4 h-4 text-white/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+											</svg>
+											<span className="truncate">{loc.name}</span>
+										</button>
+										{onRemoveSaved && (
+											<button
+												onClick={(e) => { e.stopPropagation(); onRemoveSaved(loc.id); }}
+												className="p-1.5 mr-2 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+												title="Rimuovi dai preferiti"
+											>
+												<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
+										)}
+									</div>
 								))}
 								<div className="border-t border-white/10 my-1 font-medium text-xs text-white/40 px-4 py-1 uppercase tracking-wider">
 									Risultati Ricerca

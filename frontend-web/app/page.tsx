@@ -101,6 +101,8 @@ export default function Home() {
 					isLoading={isLoading}
 					savedLocations={savedLocations}
 					homeLocation={homeLocation}
+					onRemoveHome={removeHomeLocation}
+					onRemoveSaved={removeSavedLocation}
 				/>
 
 				{/* Location Actions Toolbar */}
