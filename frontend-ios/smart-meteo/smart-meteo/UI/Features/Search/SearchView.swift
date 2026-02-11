@@ -37,7 +37,7 @@ class SearchViewModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
         print("Search error: \(error.localizedDescription)")
     }
     
-    func selectLocation(_ completion: MKLocalSearchCompletion) {
+    func selectLocation(_ completion: MKLocalSearchCompletion, onComplete: @escaping () -> Void) {
         let searchRequest = MKLocalSearch.Request(completion: completion)
         let search = MKLocalSearch(request: searchRequest)
         search.start { [weak self] response, error in
@@ -53,18 +53,26 @@ class SearchViewModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
             )
             
             print("Selected: \(completion.title)")
+            
+            // Execute completion for navigation
+            DispatchQueue.main.async {
+                onComplete()
+            }
         }
     }
 }
 
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
+    @EnvironmentObject var appState: AppState
     
     var body: some View {
         NavigationStack {
             List(viewModel.results, id: \.self) { result in
                 Button {
-                    viewModel.selectLocation(result)
+                    viewModel.selectLocation(result) {
+                        appState.selectedTab = 0
+                    }
                 } label: {
                     VStack(alignment: .leading) {
                         Text(result.title)

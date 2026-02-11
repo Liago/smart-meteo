@@ -12,6 +12,7 @@ class AppState: ObservableObject {
     @Published var isAuthenticated: Bool = false
     
     // Weather Data State
+    @Published var selectedTab: Int = 0
     @Published var currentLocationName: String = "Locating..."
     @Published var weatherState: ViewState<ForecastResponse> = .idle
     @Published var currentLocation: CLLocation?

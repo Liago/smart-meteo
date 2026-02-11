@@ -58,13 +58,13 @@ struct DashboardView: View {
                         
                         // Hourly Forecast
                         if let hourly = forecast.hourly {
-                            HourlyForecastView(hourly: hourly)
+                            HourlyForecastView(hourly: hourly, astronomy: forecast.astronomy)
                                 .padding(.horizontal)
                         }
                         
                         // Daily Forecast
                         if let daily = forecast.daily {
-                            DailyForecastView(daily: daily)
+                            DailyForecastView(daily: daily, hourly: forecast.hourly)
                                 .padding(.horizontal)
                         }
                         
