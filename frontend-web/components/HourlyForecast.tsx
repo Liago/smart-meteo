@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import type { HourlyForecast, AstronomyData } from '@/lib/types';
 import { useMemo } from 'react';
+import { getWMOWeatherInfo } from '@/lib/weather-utils';
 
 interface HourlyForecastProps {
 	hourly: HourlyForecast[];
@@ -149,16 +150,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 	};
 
-	const getWeatherIcon = (code: string) => {
-		const c = parseInt(code);
-		if (c === 0) return '☀️';
-		if (c >= 1 && c <= 3) return '⛅';
-		if (c >= 45 && c <= 48) return '🌫️';
-		if (c >= 51 && c <= 67) return '🌧️';
-		if (c >= 71 && c <= 77) return '❄️';
-		if (c >= 95) return '⛈️';
-		return '❓';
-	};
+
 
 	return (
 		<div className="glass p-4 sm:p-6 mb-4 overflow-hidden">
@@ -208,7 +200,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 										{p.type === 'weather' ? (
 											<>
 												<span className="text-2xl drop-shadow-md leading-none mb-1">
-													{getWeatherIcon(p.data.condition_code)}
+													{getWMOWeatherInfo(p.data.condition_code).icon}
 												</span>
 												<span className="text-sm font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
 													{Math.round(p.temp)}°
