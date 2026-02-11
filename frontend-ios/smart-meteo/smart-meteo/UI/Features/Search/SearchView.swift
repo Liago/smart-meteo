@@ -66,12 +66,14 @@ struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @EnvironmentObject var appState: AppState
     
+    @Environment(\.dismiss) var dismiss
+    
     var body: some View {
         NavigationStack {
             List(viewModel.results, id: \.self) { result in
                 Button {
                     viewModel.selectLocation(result) {
-                        appState.selectedTab = 0
+                        dismiss()
                     }
                 } label: {
                     VStack(alignment: .leading) {

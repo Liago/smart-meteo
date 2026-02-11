@@ -13,6 +13,8 @@ class AppState: ObservableObject {
     
     // Weather Data State
     @Published var selectedTab: Int = 0
+    @Published var weatherSources: [WeatherSource] = WeatherSource.defaults
+    @Published var favoriteLocations: [SavedLocation] = []
     @Published var currentLocationName: String = "Locating..."
     @Published var weatherState: ViewState<ForecastResponse> = .idle
     @Published var currentLocation: CLLocation?
@@ -111,4 +113,66 @@ struct UserProfile: Codable {
     let id: String
     let email: String
     let name: String?
+}
+
+// Models
+struct WeatherSource: Identifiable, Codable, Equatable {
+    let id: String
+    let name: String
+    let description: String
+    let weight: Double
+    var isEnabled: Bool
+    
+    static var defaults: [WeatherSource] {
+        [
+            WeatherSource(id: "tomorrow", name: "Tomorrow.io", description: "Hyper-local nowcasting with minute-by-minute precision", weight: 1.2, isEnabled: true),
+            WeatherSource(id: "openmeteo", name: "Open-Meteo", description: "High-resolution scientific data from national weather services", weight: 1.1, isEnabled: true),
+            WeatherSource(id: "openweathermap", name: "OpenWeatherMap", description: "Global coverage baseline and fast fallback", weight: 1.0, isEnabled: true),
+            WeatherSource(id: "weatherapi", name: "WeatherAPI", description: "Cross-validation for temperature and conditions", weight: 1.0, isEnabled: true),
+            WeatherSource(id: "accuweather", name: "AccuWeather", description: "Quality-focused with RealFeel temperature", weight: 1.1, isEnabled: false)
+        ]
+    }
+}
+
+struct SavedLocation: Identifiable, Codable, Equatable {
+    let id = UUID()
+    let name: String
+    let coordinate: Coordinate
+}
+
+extension AppState {
+    func toggleSource(_ sourceId: String) {
+        if let index = weatherSources.firstIndex(where: { $0.id == sourceId }) {
+            weatherSources[index].isEnabled.toggle()
+        }
+    }
+    
+    func addFavorite(location: SavedLocation) {
+        if !favoriteLocations.contains(where: { $0.name == location.name }) {
+            favoriteLocations.append(location)
+        }
+    }
+    
+    func removeFavorite(at offsets: IndexSet) {
+        favoriteLocations.remove(atOffsets: offsets)
+    }
+    
+    func isFavorite(name: String) -> Bool {
+        favoriteLocations.contains { $0.name == name }
+    }
+    
+    func toggleFavorite() {
+        guard let location = currentLocation else { return }
+        let currentName = currentLocationName
+        
+        if isFavorite(name: currentName) {
+            favoriteLocations.removeAll { $0.name == currentName }
+        } else {
+            let saved = SavedLocation(
+                name: currentName,
+                coordinate: Coordinate(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
+            )
+            addFavorite(location: saved)
+        }
+    }
 }

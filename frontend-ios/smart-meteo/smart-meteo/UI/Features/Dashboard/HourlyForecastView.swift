@@ -212,7 +212,13 @@ struct HourlyForecastView: View {
     }
 }
 
-// MARK: - Subviews
+    // MARK: - Subviews
+    private struct Layout {
+        static let topPadding: CGFloat = 80
+        static let bottomPadding: CGFloat = 50
+        static let totalPadding: CGFloat = topPadding + bottomPadding
+    }
+
 struct ChartPath: View {
     let data: HourlyForecastView.ChartData
     
@@ -220,9 +226,14 @@ struct ChartPath: View {
         Canvas { context, size in
             let points = data.items.enumerated().map { index, item -> CGPoint in
                 let x = CGFloat(index) * 80 + 40 // Center in 80px slot
+                
                 let yRange = data.maxTemp - data.minTemp
-                let yStep = size.height / (yRange == 0 ? 1 : yRange)
-                let y = size.height - ((item.temp - data.minTemp) * yStep) - 20 // Padding bottom
+                let range = yRange == 0 ? 1 : yRange
+                
+                let availableHeight = size.height - Layout.totalPadding
+                let yStep = availableHeight / range
+                
+                let y = size.height - Layout.bottomPadding - ((item.temp - data.minTemp) * yStep)
                 return CGPoint(x: x, y: y)
             }
             
@@ -232,13 +243,10 @@ struct ChartPath: View {
             path.move(to: points[0])
             
             // Cubic Bezier Smoothing
-            // Just simple quad or straight lines for now to ensure stability, or Catmull-Rom logic if desired.
-            // Let's implement simple smoothing.
             for i in 0..<points.count-1 {
                 let p1 = points[i]
                 let p2 = points[i+1]
                 let mid = CGPoint(x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2)
-                // Use control points for smoothing
                 let cp1 = CGPoint(x: (p1.x + mid.x)/2, y: p1.y)
                 let cp2 = CGPoint(x: (mid.x + p2.x)/2, y: p2.y)
                 
@@ -258,55 +266,65 @@ struct ChartPointView: View {
     let data: HourlyForecastView.ChartData
     
     var body: some View {
-        let x = CGFloat(index) * 80 + 40
-        let yRange = data.maxTemp - data.minTemp
-        let yStep = data.height / (yRange == 0 ? 1 : yRange)
-        let y = data.height - ((item.temp - data.minTemp) * yStep) - 20
-        
-        return ZStack {
-            // Dot
-            Circle()
-                .fill(item.type.isSun ? Color.yellow : Color.white)
-                .frame(width: 8, height: 8)
-                .position(x: x, y: y)
+        GeometryReader { proxy in
+            let size = proxy.size
+            let x = CGFloat(index) * 80 + 40
             
-            // Info Group (Icon & Temp) - Above
-            VStack(spacing: 4) {
-                switch item.type {
-                case .weather(let h):
-                    Image(systemName: iconName(for: h.conditionCode))
-                        .symbolRenderingMode(.multicolor)
-                        .font(.title2)
-                        .shadow(radius: 2)
-                    Text("\(Int(round(item.temp)))°")
-                        .font(.custom("Inter", size: 16))
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
-                case .sun(let label, let icon):
-                    Text(label)
-                        .font(.system(size: 10, weight: .bold))
-                        .textCase(.uppercase)
-                        .foregroundColor(.yellow)
-                    Image(systemName: icon)
-                        .foregroundColor(.yellow)
-                }
-            }
-            .position(x: x, y: y - 45)
+            let yRange = data.maxTemp - data.minTemp
+            let range = yRange == 0 ? 1 : yRange
             
-            // Time & Precip - Below
-            VStack(spacing: 2) {
-                Text(formatTime(item.time))
-                    .font(.caption2)
-                    .foregroundColor(item.type.isSun ? .yellow.opacity(0.8) : .white.opacity(0.5))
+            let availableHeight = data.height - Layout.totalPadding
+            let yStep = availableHeight / range
+            
+            let y = data.height - Layout.bottomPadding - ((item.temp - data.minTemp) * yStep)
+
+            ZStack {
+                // Dot
+                Circle()
+                    .fill(item.type.isSun ? Color.yellow : Color.white)
+                    .frame(width: 8, height: 8)
+                    .position(x: x, y: y)
                 
-                if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
-                    Text("\(Int(prob))%") // Prob is 0-100 based on web 13 means 13%
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.cyan)
+                // Info Group (Icon & Temp) - Above
+                VStack(spacing: 4) {
+                    switch item.type {
+                    case .weather(let h):
+                        Image(systemName: iconName(for: h.conditionCode))
+                            .symbolRenderingMode(.multicolor)
+                            .font(.title2)
+                            .shadow(radius: 2)
+                        Text("\(Int(round(item.temp)))°")
+                            .font(.custom("Inter", size: 16))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+                    case .sun(let label, let icon):
+                        Text(label)
+                            .font(.system(size: 10, weight: .bold))
+                            .textCase(.uppercase)
+                            .foregroundColor(.yellow)
+                        Image(systemName: icon)
+                            .foregroundColor(.yellow)
+                    }
                 }
+                .frame(width: 80) // Constrain width to slot
+                .position(x: x, y: y - 40) // Shift up from dot
+                
+                // Time & Precip - Below
+                VStack(spacing: 2) {
+                    Text(formatTime(item.time))
+                        .font(.caption2)
+                        .foregroundColor(item.type.isSun ? .yellow.opacity(0.8) : .white.opacity(0.5))
+                    
+                    if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
+                        Text("\(Int(prob))%") // Prob is 0-100 based on web 13 means 13%
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.cyan)
+                    }
+                }
+                .frame(width: 80)
+                .position(x: x, y: y + 30) // Shift down from dot
             }
-            .position(x: x, y: y + 25)
         }
     }
     

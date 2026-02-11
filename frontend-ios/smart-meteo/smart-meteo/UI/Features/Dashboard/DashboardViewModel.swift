@@ -8,6 +8,8 @@ class DashboardViewModel: ObservableObject {
     @Published var currentLocationName: String = "Locating..."
     @Published var currentCondition: String = "clear"
     
+    @Published var isAuthenticated: Bool = false
+    
     private var appState: AppState
     private var cancellables = Set<AnyCancellable>()
     
@@ -17,6 +19,10 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func setupBindings() {
+        // Sync Auth State
+        appState.$isAuthenticated
+            .assign(to: &$isAuthenticated)
+
         // Sync API State
         appState.$weatherState
             .assign(to: &$state)
