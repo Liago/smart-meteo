@@ -162,36 +162,26 @@ struct DailyRow: View {
             
             // Expanded Content
             if isExpanded {
-                VStack(alignment: .leading, spacing: 10) {
-                    Divider().background(Color.white.opacity(0.1))
-                    
-                    if !hourly.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(hourly) { hour in
-                                    HourlyItemView(hour: hour)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                        }
-                    } else {
-                        Text("Dati orari non disponibili")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(8)
-                    }
+                if !hourly.isEmpty {
+                    WeatherChartView(hourly: hourly)
+                        .frame(height: 180) // Constrain height for the scrollview inside
+                        .padding(.horizontal, 4)
+                        .padding(.bottom, 10)
+                } else {
+                    Text("Dati orari non disponibili")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(8)
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.1))
-                        .padding(.top, -10) // Overlap slightly to look connected
-                )
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(isExpanded ? 0.1 : 0))
+        )
     }
+
     
     private func iconName(for condition: String) -> String {
         switch condition.lowercased() {
@@ -207,50 +197,7 @@ struct DailyRow: View {
     }
 }
 
-struct HourlyItemView: View {
-    let hour: HourlyForecast
-    
-    private var timeString: String {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: hour.time) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: date)
-        }
-        return "--:--"
-    }
-    
-    var body: some View {
-        VStack(spacing: 6) {
-            Text(timeString)
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
-            
-            Image(systemName: iconName(for: hour.conditionCode))
-                .renderingMode(.original)
-                .font(.body)
-            
-            Text("\(Int(hour.temp))°")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-        }
-    }
-    
-    private func iconName(for condition: String) -> String {
-        switch condition.lowercased() {
-        case "clear": return "sun.max.fill"
-        case "cloudy": return "cloud.fill"
-        case "rain": return "cloud.rain.fill"
-        case "snow": return "cloud.snow.fill"
-        case "storm": return "cloud.bolt.rain.fill"
-        case "fog": return "cloud.fog.fill"
-        case "partly-cloudy", "partly cloudy": return "cloud.sun.fill"
-        default: return "cloud.sun.fill"
-        }
-    }
-}
+
 
 struct TemperatureBar: View {
     let min: Double

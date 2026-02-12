@@ -36,6 +36,12 @@ struct ForecastCurrent: Codable {
     let condition: String
     let conditionText: String
     
+    // New fields
+    let dewPoint: Double?
+    let windGust: Double?
+    let windDirectionLabel: String?
+    let aqi: Double?
+    
     enum CodingKeys: String, CodingKey {
         case temperature
         case feelsLike = "feels_like"
@@ -44,6 +50,12 @@ struct ForecastCurrent: Codable {
         case precipitationProb = "precipitation_prob"
         case condition
         case conditionText = "condition_text"
+        
+        // New keys
+        case dewPoint = "dew_point"
+        case windGust = "wind_gust"
+        case windDirectionLabel = "wind_direction_label"
+        case aqi
     }
 }
 

@@ -53,6 +53,9 @@ class AppState: ObservableObject {
                 self?.fetchWeather(for: location)
             }
             .store(in: &cancellables)
+        
+        // Trigger location request on startup
+        requestLocation()
     }
     
     private func setupAuth() {

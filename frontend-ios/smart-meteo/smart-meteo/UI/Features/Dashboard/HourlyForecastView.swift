@@ -206,7 +206,7 @@ struct HourlyForecastView: View {
         let maxTemp = (temps.max() ?? 0) + 2
         
         let width = CGFloat(items.count * 80)
-        let height: CGFloat = 160
+        let height: CGFloat = 250
         
         self.chartData = ChartData(items: items, minTemp: minTemp, maxTemp: maxTemp, width: width, height: height)
     }
@@ -214,7 +214,7 @@ struct HourlyForecastView: View {
 
     // MARK: - Subviews
     private struct Layout {
-        static let topPadding: CGFloat = 80
+        static let topPadding: CGFloat = 60
         static let bottomPadding: CGFloat = 50
         static let totalPadding: CGFloat = topPadding + bottomPadding
     }
@@ -291,10 +291,10 @@ struct ChartPointView: View {
                     case .weather(let h):
                         Image(systemName: iconName(for: h.conditionCode))
                             .symbolRenderingMode(.multicolor)
-                            .font(.title2)
+                            .font(.title) // Increased from title2
                             .shadow(radius: 2)
                         Text("\(Int(round(item.temp)))°")
-                            .font(.custom("Inter", size: 16))
+                            .font(.custom("Inter", size: 18)) // Increased from 16
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
@@ -313,12 +313,12 @@ struct ChartPointView: View {
                 // Time & Precip - Below
                 VStack(spacing: 2) {
                     Text(formatTime(item.time))
-                        .font(.caption2)
+                        .font(.caption) // Increased from caption2
                         .foregroundColor(item.type.isSun ? .yellow.opacity(0.8) : .white.opacity(0.5))
                     
                     if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
                         Text("\(Int(prob))%") // Prob is 0-100 based on web 13 means 13%
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 11, weight: .medium)) // Increased from 10
                             .foregroundColor(.cyan)
                     }
                 }

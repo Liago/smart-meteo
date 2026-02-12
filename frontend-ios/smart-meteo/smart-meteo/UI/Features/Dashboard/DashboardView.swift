@@ -80,7 +80,8 @@ struct DashboardView: View {
                                 
                         case .loading:
                             LoadingView()
-                                .frame(height: 200)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 100) // Visual spacing
                                 
                         case .success(let forecast):
                             // Current Weather

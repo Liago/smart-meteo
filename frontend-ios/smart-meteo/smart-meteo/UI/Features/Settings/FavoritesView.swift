@@ -42,10 +42,12 @@ struct FavoritesView: View {
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.gray)
                         }
+
                         .padding()
                         .background(Color.white.opacity(0.05))
                         .cornerRadius(12)
                     }
+                    .buttonStyle(.plain) // Ensure tap works in List
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .swipeActions(edge: .leading) {

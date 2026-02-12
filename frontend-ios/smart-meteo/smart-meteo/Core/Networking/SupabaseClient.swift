@@ -55,6 +55,29 @@ class SupabaseClient {
         
         return try JSONDecoder().decode(AuthResponse.self, from: data)
     }
+        
+    func refreshToken(refreshToken: String) async throws -> AuthResponse {
+        let url = SupabaseConfig.url.appendingPathComponent("/auth/v1/token")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        urlComponents?.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
+        request.url = urlComponents?.url
+        
+        request.allHTTPHeaderFields = authHeaders(token: nil)
+        
+        let body = ["refresh_token": refreshToken]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+             let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown server error"
+            throw SupabaseError.serverError(httpResponse.statusCode, errorMsg)
+        }
+        
+        return try JSONDecoder().decode(AuthResponse.self, from: data)
+    }
     
     // MARK: - Database
     

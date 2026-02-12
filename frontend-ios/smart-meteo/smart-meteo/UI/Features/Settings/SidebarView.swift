@@ -56,7 +56,7 @@ struct SidebarView: View {
                         }
                         
                         NavigationLink(destination: FavoritesView(isSidebarPresented: $isPresented)) {
-                            SidebarRow(icon: "star.fill", title: "Località Preferite", subtitle: "Gestisci i tuoi luoghi salavati")
+                            SidebarRow(icon: "star.fill", title: "Località Preferite", subtitle: "Gestisci i tuoi luoghi salvati")
                         }
                         
                         // Section: App
