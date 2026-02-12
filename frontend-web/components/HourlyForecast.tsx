@@ -287,7 +287,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 								</svg>
 							</div>
 							<div>
-								<div className="text-sm font-medium">Vento</div>
+								<div className="text-sm font-medium text-white">Vento</div>
 								<div className="text-xs text-white/50">Velocita e direzione</div>
 							</div>
 						</div>
@@ -307,7 +307,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 								</svg>
 							</div>
 							<div>
-								<div className="text-sm font-medium">Temperatura (Oggi)</div>
+								<div className="text-sm font-medium text-white">Temperatura (Oggi)</div>
 								<div className="text-xs text-white/50">Effettiva vs percepita</div>
 							</div>
 						</div>
