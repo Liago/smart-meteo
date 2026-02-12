@@ -250,7 +250,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 					<div>
 						<div className="flex justify-between text-sm mb-1.5">
 							<span className="text-white/60">Probabilita precipitazione (Oggi)</span>
-							<span className="font-medium">{Math.round(current.precipitation_prob)}%</span>
+							<span className="font-medium text-white">{Math.round(current.precipitation_prob)}%</span>
 						</div>
 						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
 							<motion.div
@@ -266,7 +266,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 					<div>
 						<div className="flex justify-between text-sm mb-1.5">
 							<span className="text-white/60">Umidita</span>
-							<span className="font-medium">{current.humidity !== null ? `${Math.round(current.humidity)}%` : '--'}</span>
+							<span className="font-medium text-white">{current.humidity !== null ? `${Math.round(current.humidity)}%` : '--'}</span>
 						</div>
 						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
 							<motion.div
@@ -292,7 +292,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 							</div>
 						</div>
 						<div className="text-right">
-							<div className="font-semibold">
+							<div className="font-semibold text-white">
 								{current.wind_speed !== null ? `${current.wind_speed.toFixed(1)} m/s` : '--'}
 							</div>
 						</div>
@@ -312,7 +312,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 							</div>
 						</div>
 						<div className="text-right">
-							<div className="font-semibold">
+							<div className="font-semibold text-white">
 								{current.temperature !== null ? `${current.temperature}°C` : '--'}
 							</div>
 							<div className="text-xs text-white/50">
