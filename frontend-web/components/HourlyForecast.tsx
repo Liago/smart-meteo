@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import type { HourlyForecast, AstronomyData } from '@/lib/types';
+import type { HourlyForecast, AstronomyData, ForecastCurrent } from '@/lib/types';
 import { useMemo } from 'react';
 import WeatherIcon from './WeatherIcon';
 
@@ -10,6 +10,7 @@ interface HourlyForecastProps {
 	astronomy?: AstronomyData;
 	mode?: 'next-12' | 'exact';
 	title?: string;
+	current?: ForecastCurrent;
 }
 
 // Discriminator type for the items in our timeline
@@ -17,7 +18,7 @@ type TimelineItem =
 	| { type: 'weather'; time: number; data: HourlyForecast }
 	| { type: 'sun'; time: number; data: { label: string; icon: string } };
 
-export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore' }: HourlyForecastProps) {
+export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore', current }: HourlyForecastProps) {
 	const chartData = useMemo(() => {
 		// 1. Merge and sort events
 		const events: TimelineItem[] = hourly.map(h => ({
@@ -241,6 +242,87 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 					</svg>
 				</div>
 			</div>
+
+			{/* Weather Details Section */}
+			{current && (
+				<div className="mt-6 space-y-4 pt-4 border-t border-white/10">
+					{/* Precipitation bar */}
+					<div>
+						<div className="flex justify-between text-sm mb-1.5">
+							<span className="text-white/60">Probabilita precipitazione (Oggi)</span>
+							<span className="font-medium">{Math.round(current.precipitation_prob)}%</span>
+						</div>
+						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+							<motion.div
+								initial={{ width: 0 }}
+								animate={{ width: `${current.precipitation_prob}%` }}
+								transition={{ duration: 0.6, delay: 0.1 }}
+								className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600"
+							/>
+						</div>
+					</div>
+
+					{/* Humidity bar */}
+					<div>
+						<div className="flex justify-between text-sm mb-1.5">
+							<span className="text-white/60">Umidita</span>
+							<span className="font-medium">{current.humidity !== null ? `${Math.round(current.humidity)}%` : '--'}</span>
+						</div>
+						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+							<motion.div
+								initial={{ width: 0 }}
+								animate={{ width: `${current.humidity ?? 0}%` }}
+								transition={{ duration: 0.6, delay: 0.2 }}
+								className="h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-500"
+							/>
+						</div>
+					</div>
+
+					{/* Wind detail */}
+					<div className="flex items-center justify-between py-2 border-t border-white/10">
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+								<svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2" />
+								</svg>
+							</div>
+							<div>
+								<div className="text-sm font-medium">Vento</div>
+								<div className="text-xs text-white/50">Velocita e direzione</div>
+							</div>
+						</div>
+						<div className="text-right">
+							<div className="font-semibold">
+								{current.wind_speed !== null ? `${current.wind_speed.toFixed(1)} m/s` : '--'}
+							</div>
+						</div>
+					</div>
+
+					{/* Temperature detail */}
+					<div className="flex items-center justify-between py-2 border-t border-white/10">
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+								<svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+							</div>
+							<div>
+								<div className="text-sm font-medium">Temperatura (Oggi)</div>
+								<div className="text-xs text-white/50">Effettiva vs percepita</div>
+							</div>
+						</div>
+						<div className="text-right">
+							<div className="font-semibold">
+								{current.temperature !== null ? `${current.temperature}°C` : '--'}
+							</div>
+							<div className="text-xs text-white/50">
+								Percepita {current.feels_like !== null ? `${current.feels_like}°C` : '--'}
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+
 		</div>
 	);
 }

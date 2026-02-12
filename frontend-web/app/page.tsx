@@ -163,7 +163,7 @@ export default function Home() {
 							sourcesCount={data.sources_used.length}
 						/>
 						{data.hourly && (
-							<HourlyForecast hourly={data.hourly} astronomy={data.astronomy} />
+							<HourlyForecast hourly={data.hourly} astronomy={data.astronomy} current={data.current} />
 						)}
 						<ForecastDetails data={data.current} daily={data.daily} hourly={data.hourly} />
 						<SourcesIndicator sources={data.sources_used} />
