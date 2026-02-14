@@ -22,6 +22,27 @@ interface GeoResult {
 	state?: string;
 }
 
+// Reverse geocoding to get a place name from coordinates
+async function reverseGeocode(lat: number, lon: number): Promise<string> {
+	try {
+		const res = await fetch(
+			`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+			{ headers: { 'Accept-Language': 'it' } }
+		);
+		if (!res.ok) return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+		const data = await res.json();
+		const addr = data.address;
+		const city = addr?.city || addr?.town || addr?.village || addr?.municipality || '';
+		const state = addr?.state || '';
+		if (city && state) return `${city}, ${state}`;
+		if (city) return city;
+		const name = String(data.display_name || '').split(',')[0];
+		return name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+	} catch {
+		return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+	}
+}
+
 // Geocoding using OpenStreetMap Nominatim (free, no API key needed)
 async function searchLocation(query: string): Promise<GeoResult[]> {
 	if (!query || query.length < 2) return [];
@@ -81,10 +102,13 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 		if (!navigator.geolocation) return;
 		setGeoLoading(true);
 		navigator.geolocation.getCurrentPosition(
-			(pos) => {
+			async (pos) => {
+				const { latitude, longitude } = pos.coords;
+				// Resolve a real place name via reverse geocoding
+				const name = await reverseGeocode(latitude, longitude);
 				setGeoLoading(false);
-				setQuery('La tua posizione');
-				onLocationSelect(pos.coords.latitude, pos.coords.longitude, 'La tua posizione');
+				setQuery(name);
+				onLocationSelect(latitude, longitude, name);
 			},
 			() => {
 				setGeoLoading(false);

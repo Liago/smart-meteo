@@ -24,12 +24,18 @@ begin
 
   if v_id is null then
     insert into locations (name, latitude, longitude, country, timezone, search_count)
-    values (p_name, p_latitude, p_longitude, p_country, p_timezone, 1)
+    values (
+      coalesce(nullif(trim(p_name), ''), round(p_latitude, 4) || ', ' || round(p_longitude, 4)),
+      p_latitude, p_longitude, p_country, p_timezone, 1
+    )
     returning id into v_id;
   else
+    -- Solo incrementa il contatore. NON sovrascrivere il nome:
+    -- il backend passa nomi placeholder ("Location 45.xx, 9.xx") che
+    -- rimpiazzavano i nomi reali salvati dagli utenti.
     update locations
     set search_count = search_count + 1,
-        name = coalesce(p_name, name)
+        updated_at = now()
     where id = v_id;
   end if;
 
