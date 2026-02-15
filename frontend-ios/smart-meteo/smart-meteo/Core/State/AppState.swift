@@ -126,6 +126,10 @@ class AppState: ObservableObject {
         fetchWeather(for: location, name: name)
     }
     
+    /// Names that indicate reverse geocoding hasn't resolved yet (or failed).
+    /// These should never be persisted as a location name.
+    static let invalidLocationNames: Set<String> = ["Locating...", "Unknown Location", ""]
+
     // MARK: - Helpers
     private func reverseGeocode(location: CLLocation) {
         let geocoder = CLGeocoder()
@@ -133,6 +137,11 @@ class AppState: ObservableObject {
             DispatchQueue.main.async {
                 if let place = placemarks?.first {
                     self?.currentLocationName = place.locality ?? place.name ?? "Unknown Location"
+                } else {
+                    // Fallback to coordinates when reverse geocoding fails
+                    let lat = String(format: "%.4f", location.coordinate.latitude)
+                    let lon = String(format: "%.4f", location.coordinate.longitude)
+                    self?.currentLocationName = "\(lat), \(lon)"
                 }
             }
         }
@@ -209,7 +218,10 @@ extension AppState {
     func toggleFavorite() {
         guard let location = currentLocation else { return }
         let currentName = currentLocationName
-        
+
+        // Don't save if the name hasn't been resolved yet
+        guard !AppState.invalidLocationNames.contains(currentName) else { return }
+
         if let existing = favoriteLocations.first(where: { $0.name == currentName }) {
             // Remove
             if let index = favoriteLocations.firstIndex(of: existing) {

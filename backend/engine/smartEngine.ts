@@ -68,8 +68,11 @@ function degreesToCompass(deg: number): string {
 async function upsertLocation(lat: number, lon: number): Promise<string | null> {
 	// Round to 4 decimals for location ID stability (~11m)
 	// Using the RPC function defined in migration 011
+	// Pass null as name: the real name is set by the frontend when the user
+	// saves the location. Passing a coordinate placeholder here was
+	// overwriting proper names in the DB.
 	const { data, error } = await supabase.rpc('upsert_location', {
-		p_name: `Location ${lat.toFixed(4)}, ${lon.toFixed(4)}`, // Placeholder name if new
+		p_name: null,
 		p_latitude: lat,
 		p_longitude: lon
 	});
