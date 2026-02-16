@@ -205,11 +205,13 @@ struct HourlyForecastView: View {
         let now = Date()
         // If the data is old (mock data) or from different timezone, we might filter everything out.
         // Let's be a bit more lenient or relative.
-        // If all data is in the past, maybe show the last 12 hours?
-        // Or just show whatever is in the array if it matches loosely.
-        
-        let end = now.addingTimeInterval(13 * 3600) // 12h + buffer
-        let start = now.addingTimeInterval(-2 * 3600) // 2h ago buffer
+        let cal = Calendar.current
+        // Start from the beginning of the current hour (align with Web)
+        // e.g. if now is 16:45, start at 16:00
+        let currentHourStart = cal.dateInterval(of: .hour, for: now)?.start ?? now
+        // Small buffer (10 mins) just in case, but effective start is current hour
+        let start = currentHourStart.addingTimeInterval(-600) 
+        let end = start.addingTimeInterval(13 * 3600) // 12h from start
         
         var items: [TimelineItem] = []
         
