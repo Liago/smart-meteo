@@ -79,7 +79,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			wind_gust: current.wind_gusts_10m != null ? current.wind_gusts_10m / 3.6 : null,
 			condition_text: `Code ${current.weather_code}`,
 			condition_code: String(current.weather_code),
-			precipitation_prob: null,
+			precipitation_prob: daily.precipitation_probability_max ? daily.precipitation_probability_max[0] : null,
 			precipitation_intensity: current.precipitation,
 			pressure: current.pressure_msl, // Added pressure mapping
 			daily: dailyForecasts,
