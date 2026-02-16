@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ForecastCurrent, DailyForecast, HourlyForecast as HourlyForecastType } from '@/lib/types';
+import type { ForecastCurrent, DailyForecast, HourlyForecast as HourlyForecastType, AstronomyData } from '@/lib/types';
 import { getWMOWeatherInfo } from '@/lib/weather-utils';
 import HourlyForecast from './HourlyForecast';
 import WeatherIcon from './WeatherIcon';
@@ -11,9 +11,10 @@ interface ForecastDetailsProps {
 	data: ForecastCurrent;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecastType[];
+	astronomy?: AstronomyData;
 }
 
-export default function ForecastDetails({ data, daily, hourly }: ForecastDetailsProps) {
+export default function ForecastDetails({ data, daily, hourly, astronomy }: ForecastDetailsProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
@@ -64,10 +65,31 @@ export default function ForecastDetails({ data, daily, hourly }: ForecastDetails
 						transition={{ duration: 0.3 }}
 						className="overflow-hidden"
 					>
-						<div className="pt-4 space-y-4">
+						<div className="pt-4 space-y-6">
+							{/* Astronomy Section */}
+							{astronomy && (
+								<div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-white/5">
+									<div className="flex flex-col items-center text-center">
+										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Alba</div>
+										<div className="text-2xl mb-1">🌅</div>
+										<div className="font-medium text-lg">{astronomy.sunrise ? new Date(astronomy.sunrise).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
+									</div>
+									<div className="flex flex-col items-center text-center">
+										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Tramonto</div>
+										<div className="text-2xl mb-1">🌇</div>
+										<div className="font-medium text-lg">{astronomy.sunset ? new Date(astronomy.sunset).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
+									</div>
+									<div className="flex flex-col items-center text-center">
+										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Luna</div>
+										<div className="text-2xl mb-1">🌑</div>
+										<div className="font-medium text-sm leading-tight">{astronomy.moon_phase || 'N/D'}</div>
+									</div>
+								</div>
+							)}
+
 							{/* Daily Forecast */}
 							{daily && daily.length > 0 && (
-								<div className="mb-6">
+								<div>
 									<h3 className="text-sm font-medium text-white/50 mb-3 uppercase tracking-wider">Prossimi 6 Giorni</h3>
 									<div className="space-y-2">
 										{/* Headers */}

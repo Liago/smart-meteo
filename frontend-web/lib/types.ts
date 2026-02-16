@@ -33,6 +33,7 @@ export interface HourlyForecast {
 export interface AstronomyData {
 	sunrise: string;
 	sunset: string;
+	moon_phase: string;
 }
 
 export interface ForecastResponse {
