@@ -185,29 +185,32 @@ struct SunWindCard: View {
         .onChange(of: astronomy?.sunrise) { _ in calculateSunPosition() }
     }
     
+    // Helper for robust date parsing
+    private func parseDate(_ str: String) -> Date? {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = isoFormatter.date(from: str) { return d }
+        
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        if let d = isoFormatter.date(from: str) { return d }
+        
+        let simpleFormatter = DateFormatter()
+        simpleFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return simpleFormatter.date(from: str)
+    }
+
     private func formatTime(_ iso: String?) -> String {
-        guard let iso = iso else { return "--:--" }
-        // Simple parser or shared formatter
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: iso) {
-            let p = DateFormatter()
-            p.dateFormat = "HH:mm"
-            return p.string(from: d)
-        }
-        // Fallback for types that might not match exactly or if just time string
-        return "--:--"
+        guard let iso = iso, let date = parseDate(iso) else { return "--:--" }
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
     
     private func calculateSunPosition() {
         guard let astro = astronomy else { return }
         
-        // Parse dates (Needs proper parsing, assume ISO with timezone)
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        
-        guard let sunriseDate = f.date(from: astro.sunrise),
-              let sunsetDate = f.date(from: astro.sunset) else { return }
+        guard let sunriseDate = parseDate(astro.sunrise),
+              let sunsetDate = parseDate(astro.sunset) else { return }
         
         let now = Date()
         
@@ -216,7 +219,9 @@ struct SunWindCard: View {
             let elapsed = now.timeIntervalSince(sunriseDate)
             sunProgress = min(max(elapsed / total, 0), 1)
         } else {
-            sunProgress = 0 // Or 0 if night?
+            sunProgress = 0
+            // Optionally set to 0 or 1 based on if it's before sunrise or after sunset
+            // For now 0 to hide or start is fine across the arc logic
         }
     }
 }
@@ -227,39 +232,37 @@ struct TurbineView: View {
     let rotation: Double
     
     var body: some View {
-        ZStack(alignment: .top) {
+        VStack(spacing: 0) {
+            // Blades Header
+            ZStack {
+                ForEach(0..<3) { i in
+                    BladeShape()
+                        .fill(Color.white)
+                        .frame(width: 14, height: 35)
+                        // Pivot at bottom center of blade
+                        .offset(y: -17.5) // Blade center is at 0,0. This moves it up so bottom is at 0,0?
+                        // Wait. BladeShape draws (w/2, h) as base.
+                        // Frame (14, 35). Base is at (7, 35).
+                        // View center is (7, 17.5).
+                        // Base relative to center is y = 17.5.
+                        // We want base at (0,0) of the ZStack rotation point.
+                        // So we need to move the view up by 17.5.
+                        .offset(y: -17.5)
+                        .rotationEffect(.degrees(Double(i) * 120))
+                }
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 4, height: 4)
+            }
+            .rotationEffect(.degrees(rotation))
+            .zIndex(10)
+            
             // Pole
             Rectangle()
                 .fill(Color.white)
-                .frame(width: 2, height: 50)
-                .offset(y: 0) // Grows down from top? No, ZStack aligns center by default
-            
-            // Blades
-            // To animate correctly around "top" of pole:
-            // We can just put them in a group and rotate
-            
-            GeometryReader { _ in
-                ZStack {
-                    ForEach(0..<3) { i in
-                        BladeShape()
-                            .fill(Color.white)
-                            .frame(width: 20, height: 30) // Aspect ratio roughly
-                            .offset(y: -15) // Move up so bottom is at center?
-                            .rotationEffect(.degrees(Double(i) * 120))
-                    }
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 4, height: 4)
-                }
-            }
-            .frame(width: 60, height: 60) // Container for blades
-            .rotationEffect(.degrees(rotation))
-            .offset(y: 0) // Center of blades at top of pole (0,0 in ZStack alignment top)
+                .frame(width: 2, height: 40)
+                .offset(y: -2) // Connect to hub
         }
-        // Combined structure:
-        // The ZStack alignment is top.
-        // Pole is here.
-        // Blades are at top.
         .scaleEffect(scale)
     }
 }
@@ -267,17 +270,18 @@ struct TurbineView: View {
 struct BladeShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        // Simple blade shape: wider at base, pointy at tip
-        // rect.midX, rect.maxY is base center
         let w = rect.width
         let h = rect.height
         
-        path.move(to: CGPoint(x: w/2, y: h)) // Base center
-        path.addLine(to: CGPoint(x: 0, y: h * 0.2)) // Top Left
-        path.addLine(to: CGPoint(x: w/2, y: 0)) // Tip
-        path.addLine(to: CGPoint(x: w, y: h * 0.2)) // Top Right
+        // Base center at (w/2, h)
+        path.move(to: CGPoint(x: w/2, y: h))
+        // Top Left
+        path.addLine(to: CGPoint(x: 0, y: h * 0.2))
+        // Tip
+        path.addLine(to: CGPoint(x: w/2, y: 0))
+        // Top Right
+        path.addLine(to: CGPoint(x: w, y: h * 0.2))
         path.closeSubpath()
-        
         return path
     }
 }
