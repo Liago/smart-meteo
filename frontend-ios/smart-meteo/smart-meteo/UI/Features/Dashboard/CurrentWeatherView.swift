@@ -151,7 +151,8 @@ struct FlipWeatherDetail: View {
             dewPoint: 18,
             windGust: 20,
             windDirectionLabel: "NW",
-            aqi: 2
+            aqi: 2,
+            pressure: 1013
         ))
     }
 }

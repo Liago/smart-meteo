@@ -41,6 +41,7 @@ struct ForecastCurrent: Codable {
     let windGust: Double?
     let windDirectionLabel: String?
     let aqi: Double?
+    let pressure: Double?
     
     enum CodingKeys: String, CodingKey {
         case temperature
@@ -56,6 +57,7 @@ struct ForecastCurrent: Codable {
         case windGust = "wind_gust"
         case windDirectionLabel = "wind_direction_label"
         case aqi
+        case pressure
     }
 }
 
@@ -101,4 +103,11 @@ struct HourlyForecast: Codable, Identifiable {
 struct AstronomyData: Codable {
     let sunrise: String
     let sunset: String
+    let moonPhase: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case sunrise
+        case sunset
+        case moonPhase = "moon_phase"
+    }
 }

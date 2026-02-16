@@ -3,6 +3,7 @@ import SwiftUI
 struct HourlyForecastView: View {
     let hourly: [HourlyForecast]
     let astronomy: AstronomyData?
+    let current: ForecastCurrent?
     
     // MARK: - Processed Data
     struct ChartData {
@@ -62,6 +63,99 @@ struct HourlyForecastView: View {
                 } else {
                     ProgressView()
                         .frame(height: 200)
+                }
+                
+                // Extra Details (Precipitation, Humidity, SunWindCard)
+                if let current = current {
+                    VStack(spacing: 16) {
+                        Divider().background(Color.white.opacity(0.1))
+                        
+                        // Precipitation Bar
+                        VStack(spacing: 6) {
+                            HStack {
+                                Text("Probabilità precipitazione (Oggi)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                                Spacer()
+                                Text("\(Int(current.precipitationProb))%")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            GeometryReader { proxy in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.1))
+                                    
+                                    Capsule()
+                                        .fill(LinearGradient(colors: [.blue, .blue.opacity(0.8)], startPoint: .leading, endPoint: .trailing))
+                                        .frame(width: proxy.size.width * (current.precipitationProb / 100))
+                                }
+                            }
+                            .frame(height: 6)
+                        }
+                        
+                        // Humidity Bar
+                        VStack(spacing: 6) {
+                            HStack {
+                                Text("Umidità")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                                Spacer()
+                                Text("\(Int(current.humidity ?? 0))%")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            GeometryReader { proxy in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.1))
+                                    
+                                    Capsule()
+                                        .fill(LinearGradient(colors: [Color.teal, Color.cyan], startPoint: .leading, endPoint: .trailing))
+                                        .frame(width: proxy.size.width * ((current.humidity ?? 0) / 100))
+                                }
+                            }
+                            .frame(height: 6)
+                        }
+                        
+                        // Sun & Wind Card
+                        SunWindCard(astronomy: astronomy, current: current)
+                            .padding(.top, 8)
+                        
+                        Divider().background(Color.white.opacity(0.1))
+                        
+                        // Temperature Detail
+                        HStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 40, height: 40)
+                                .overlay(Image(systemName: "thermometer.medium").foregroundColor(.white.opacity(0.7)))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Temperatura (Oggi)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                Text("Effettiva vs percepita")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(Int(round(current.temperature ?? 0)))°C")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Percepita \(Int(round(current.feelsLike ?? 0)))°C")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        .padding(.top, 4)
+                        
+                    }
+                    .padding(.top, 8)
                 }
             }
             .padding(16)
