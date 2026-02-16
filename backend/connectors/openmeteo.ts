@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { UnifiedForecast } from '../utils/formatter';
+import { getMoonPhase } from '../utils/moon';
 
 export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<UnifiedForecast | null> {
 	try {
@@ -9,7 +10,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			longitude: lon,
 			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl', // Added pressure_msl
 			hourly: 'temperature_2m,precipitation_probability,weather_code',
-			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,moon_phase', // Added moon_phase
+			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset', // Removed moon_phase as it likely caused regressions
 			timezone: 'auto'
 		};
 
@@ -52,25 +53,17 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			};
 		});
 
-		// Helper to map moon phase (0-1) to string
-		const getMoonPhaseLabel = (phase: number): string => {
-			if (phase === 0 || phase === 1) return 'Luna Nuova';
-			if (phase < 0.25) return 'Luna Crescente';
-			if (phase === 0.25) return 'Primo Quarto';
-			if (phase < 0.5) return 'Gibbosa Crescente';
-			if (phase === 0.5) return 'Luna Piena';
-			if (phase < 0.75) return 'Gibbosa Calante';
-			if (phase === 0.75) return 'Ultimo Quarto';
-			return 'Luna Calante';
-		};
+
 
 		// Map Astronomy (Sunrise/Sunset for today)
 		// daily.sunrise is ISO string array
-		const moonPhaseValue = daily.moon_phase ? daily.moon_phase[0] : 0;
+
+		// Use local moon phase calculation
+		// We can just use the current date or the date of the forecast
 		const astronomy = {
 			sunrise: daily.sunrise[0], // Today's sunrise
 			sunset: daily.sunset[0],    // Today's sunset
-			moon_phase: getMoonPhaseLabel(moonPhaseValue)
+			moon_phase: getMoonPhase(new Date())
 		};
 
 		return new UnifiedForecast({

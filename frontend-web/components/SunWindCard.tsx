@@ -108,20 +108,35 @@ export default function SunWindCard({ astronomy, current }: SunWindCardProps) {
 					<g transform="translate(100, 110)">
 						{/* Pole */}
 						<line x1="0" y1="0" x2="0" y2="-50" stroke="white" strokeWidth="2" />
-						{/* Blades animation */}
-						<motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }} style={{ originX: "0px", originY: "-50px" }}>
-							<path d="M0 -50 L-10 -75 L0 -72 Z" fill="white" />
-							<path d="M0 -50 L10 -75 L2 -72 Z" fill="white" transform="rotate(120, 0, -50)" />
-							<path d="M0 -50 L0 -80 L-2 -75 Z" fill="white" transform="rotate(240, 0, -50)" />
-						</motion.g>
+						{/* Blades animation - centered group translated to pole top */}
+						<g transform="translate(0, -50)">
+							<motion.g
+								animate={{ rotate: 360 }}
+								transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+							>
+								{/* Blades centered at 0,0 (relative to hub) */}
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" />
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" transform="rotate(120)" />
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" transform="rotate(240)" />
+
+								{/* Center Hub */}
+								<circle r="2" fill="white" />
+							</motion.g>
+						</g>
 					</g>
 					<g transform="translate(140, 110) scale(0.7)">
 						<line x1="0" y1="0" x2="0" y2="-50" stroke="white" strokeWidth="2" />
-						<motion.g animate={{ rotate: -360 }} transition={{ repeat: Infinity, duration: 3, ease: "linear" }} style={{ originX: "0px", originY: "-50px" }}>
-							<path d="M0 -50 L-10 -75 L0 -72 Z" fill="white" />
-							<path d="M0 -50 L10 -75 L2 -72 Z" fill="white" transform="rotate(120, 0, -50)" />
-							<path d="M0 -50 L0 -80 L-2 -75 Z" fill="white" transform="rotate(240, 0, -50)" />
-						</motion.g>
+						<g transform="translate(0, -50)">
+							<motion.g
+								animate={{ rotate: -360 }}
+								transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+							>
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" />
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" transform="rotate(120)" />
+								<path d="M0 0 L-10 -25 L0 -22 Z" fill="white" transform="rotate(240)" />
+								<circle r="2" fill="white" />
+							</motion.g>
+						</g>
 					</g>
 				</svg>
 
