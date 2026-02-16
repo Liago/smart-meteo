@@ -59,9 +59,13 @@ struct SunWindCard: View {
                     GeometryReader { proxy in
                         let w = proxy.size.width
                         let h = proxy.size.height
-                        let centerX = w / 2
+                        
+                        // Shift center left to make room for text on the right
+                        let centerX = w * 0.4
                         let centerY = h - 20
-                        let radius = min(w, h * 2) / 2 - 20
+                        
+                        // Radius constrained by the left side (centerX - padding)
+                        let radius = centerX - 20
                         
                         // Dashed Arc
                         Path { path in
@@ -76,22 +80,13 @@ struct SunWindCard: View {
                         // Sun Icon
                         let angle = Angle.degrees(180 - (sunProgress * 180))
                         let sunX = centerX + radius * cos(angle.radians)
-                        let sunY = centerY + radius * sin(angle.radians) // SwiftUI Y is down, but sin(180...0) is 0...0 positive? Wait.
-                        // Standard unit circle: 180 deg is (-1, 0). 0 deg is (1, 0). 90 deg is (0, 1).
-                        // In screen coords: Y is down.
-                        // We want 180 (left) to 0 (right).
-                        // cos(180) = -1. CenterX + R*(-1) = Left. Correct.
-                        // sin(180) = 0. CenterY + R*(0) = CenterY. Correct.
-                        // We want UP for 90 deg. sin(90) = 1. CenterY + R*(1) = Down. Incorrect.
-                        // So we need CenterY - R*sin(angle).
-                        
-                        let correctedSunY = centerY - radius * sin(angle.radians)
+                        let sunY = centerY - radius * sin(angle.radians)
                         
                         Image(systemName: "sun.max.fill")
                             .font(.system(size: 24))
                             .foregroundColor(.yellow)
                             .shadow(color: .orange.opacity(0.6), radius: 4, x: 0, y: 0)
-                            .position(x: sunX, y: correctedSunY)
+                            .position(x: sunX, y: sunY)
                     }
                     
                     // 3. Wind Turbines
@@ -99,13 +94,13 @@ struct SunWindCard: View {
                          let w = proxy.size.width
                          let h = proxy.size.height - 20 // Ground level approx
                         
-                        // Turbine 1 (Left-ish center)
+                        // Turbine 1 (Left-ish)
                         TurbineView(scale: 0.8, rotation: turbineRotation1)
-                            .position(x: w * 0.35, y: h)
+                            .position(x: w * 0.25, y: h)
                         
-                        // Turbine 2 (Right-ish center, smaller)
+                        // Turbine 2 (Center-ish)
                         TurbineView(scale: 0.6, rotation: turbineRotation2)
-                            .position(x: w * 0.55, y: h)
+                            .position(x: w * 0.5, y: h)
                     }
                     
                     // 4. Info Overlay (Right side)
