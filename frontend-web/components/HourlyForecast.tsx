@@ -228,11 +228,11 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 								{/* Time and Precip below line */}
 								<foreignObject x={p.x - 25} y={p.y + 15} width={50} height={60}>
 									<div className="flex flex-col items-center justify-start h-full pt-1">
-										<span className={`text-xs ${p.type === 'sun' ? 'text-yellow-200' : 'text-white/50'}`}>
+										<span className={`text-sm ${p.type === 'sun' ? 'text-yellow-200' : 'text-white/50'}`}>
 											{formatHour(p.time)}
 										</span>
 										{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
-											<span className="text-[10px] text-blue-300 font-medium mt-1">
+											<span className="text-xs text-blue-300 font-medium mt-1">
 												{Math.round(p.data.precipitation_prob)}%
 											</span>
 										)}
