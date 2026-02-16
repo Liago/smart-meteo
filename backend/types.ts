@@ -37,6 +37,7 @@ export interface UnifiedForecastData {
 	precipitation_prob: number | null;
 	precipitation_intensity?: number | null;
 	aqi: number | null;
+	pressure: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

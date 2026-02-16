@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import type { HourlyForecast, AstronomyData, ForecastCurrent } from '@/lib/types';
 import { useMemo } from 'react';
 import WeatherIcon from './WeatherIcon';
+import SunWindCard from './SunWindCard';
 
 interface HourlyForecastProps {
 	hourly: HourlyForecast[];
@@ -278,24 +279,9 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 						</div>
 					</div>
 
-					{/* Wind detail */}
-					<div className="flex items-center justify-between py-2 border-t border-white/10">
-						<div className="flex items-center gap-3">
-							<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-								<svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2" />
-								</svg>
-							</div>
-							<div>
-								<div className="text-sm font-medium text-white">Vento</div>
-								<div className="text-xs text-white/50">Velocita e direzione</div>
-							</div>
-						</div>
-						<div className="text-right">
-							<div className="font-semibold text-white">
-								{current.wind_speed !== null ? `${current.wind_speed.toFixed(1)} m/s` : '--'}
-							</div>
-						</div>
+					{/* Sun & Wind Card */}
+					<div className="py-2">
+						<SunWindCard astronomy={astronomy} current={current} />
 					</div>
 
 					{/* Temperature detail */}

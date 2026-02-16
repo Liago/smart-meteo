@@ -35,6 +35,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	precipitation_prob: number | null;
 	precipitation_intensity: number | null;
 	aqi: number | null;
+	pressure: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
@@ -56,6 +57,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.precipitation_prob = data.precipitation_prob ?? null;
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
 		this.aqi = data.aqi ?? null;
+		this.pressure = data.pressure ?? null;
 		this.raw_data = data.raw_data;
 		if (data.daily) {
 			this.daily = data.daily;

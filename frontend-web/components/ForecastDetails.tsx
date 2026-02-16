@@ -66,27 +66,6 @@ export default function ForecastDetails({ data, daily, hourly, astronomy }: Fore
 						className="overflow-hidden"
 					>
 						<div className="pt-4 space-y-6">
-							{/* Astronomy Section */}
-							{astronomy && (
-								<div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-white/5">
-									<div className="flex flex-col items-center text-center">
-										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Alba</div>
-										<div className="text-2xl mb-1">🌅</div>
-										<div className="font-medium text-lg">{astronomy.sunrise ? new Date(astronomy.sunrise).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
-									</div>
-									<div className="flex flex-col items-center text-center">
-										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Tramonto</div>
-										<div className="text-2xl mb-1">🌇</div>
-										<div className="font-medium text-lg">{astronomy.sunset ? new Date(astronomy.sunset).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
-									</div>
-									<div className="flex flex-col items-center text-center">
-										<div className="text-white/40 text-xs mb-1 uppercase tracking-wider">Luna</div>
-										<div className="text-2xl mb-1">🌑</div>
-										<div className="font-medium text-sm leading-tight">{astronomy.moon_phase || 'N/D'}</div>
-									</div>
-								</div>
-							)}
-
 							{/* Daily Forecast */}
 							{daily && daily.length > 0 && (
 								<div>

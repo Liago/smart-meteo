@@ -9,6 +9,7 @@ export interface ForecastCurrent {
 	precipitation_prob: number;
 	dew_point: number | null;
 	aqi: number | null;
+	pressure: number | null;
 	condition: string;
 	condition_text: string;
 }
