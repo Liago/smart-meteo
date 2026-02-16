@@ -25,9 +25,9 @@ struct CurrentWeatherView: View {
                 // Wind -> Gusts
                 FlipWeatherDetail(
                     icon: "wind",
-                    mainValue: "\(Int(current.windSpeed ?? 0)) km/h",
+                    mainValue: "\(Int((current.windSpeed ?? 0) * 3.6)) km/h",
                     mainLabel: "Wind",
-                    altValue: "\(Int(current.windGust ?? 0)) km/h",
+                    altValue: "\(Int((current.windGust ?? 0) * 3.6)) km/h",
                     altLabel: current.windDirectionLabel != nil ? "Gust \(current.windDirectionLabel!)" : "Gust",
                     altIcon: "wind"
                 )
@@ -45,7 +45,7 @@ struct CurrentWeatherView: View {
                 // Rain -> AQI
                 FlipWeatherDetail(
                     icon: "drop.fill",
-                    mainValue: "\(Int(current.precipitationProb * 100))%",
+                    mainValue: "\(Int(current.precipitationProb))%",
                     mainLabel: "Rain",
                     altValue: aqiValue(current.aqi),
                     altLabel: "AQI",
