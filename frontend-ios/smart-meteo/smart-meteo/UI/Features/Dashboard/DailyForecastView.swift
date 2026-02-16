@@ -183,8 +183,24 @@ struct DailyRow: View {
     }
 
     
-    private func iconName(for condition: String) -> String {
-        switch condition.lowercased() {
+    private func iconName(for code: String) -> String {
+        // Try parsing as Int (WMO code)
+        if let c = Int(code) {
+            switch c {
+            case 0: return "sun.max.fill"
+            case 1, 2: return "cloud.sun.fill"
+            case 3: return "cloud.fill"
+            case 45, 48: return "cloud.fog.fill"
+            case 51, 53, 55, 56, 57: return "cloud.drizzle.fill"
+            case 61, 63, 65, 66, 67, 80, 81: return "cloud.rain.fill"
+            case 71, 73, 75, 77, 85, 86: return "snowflake"
+            case 82, 95, 96, 99: return "cloud.bolt.rain.fill"
+            default: return "cloud.sun.fill" // Fallback
+            }
+        }
+        
+        // Fallback for string keys if legacy
+        switch code.lowercased() {
         case "clear": return "sun.max.fill"
         case "cloudy": return "cloud.fill"
         case "rain": return "cloud.rain.fill"
