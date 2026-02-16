@@ -150,7 +150,7 @@ export default function SunWindCard({ astronomy, current }: SunWindCardProps) {
 						<div className="text-white/50 text-xs">
 							{/* We assume backend gives us something or calculate direction string */}
 							{/* Just showing generic direction if not available in format */}
-							Dir: {current?.wind_direction || '--'}°
+							Dir: {current?.wind_direction_label || '--'}
 						</div>
 					</div>
 
