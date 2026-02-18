@@ -13,6 +13,7 @@ import ErrorFallback from '@/components/ErrorFallback';
 import AuthButton from '@/components/AuthButton';
 import { useForecast } from '@/lib/hooks';
 import { useLocations } from '@/lib/useLocations';
+import { getConditionLabel, isDaytime } from '@/lib/weather-utils';
 
 export default function Home() {
 	const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -68,6 +69,9 @@ export default function Home() {
 	};
 
 	const condition = data?.current?.condition || 'unknown';
+	const isDay = data?.astronomy
+		? isDaytime(data.astronomy.sunrise, data.astronomy.sunset)
+		: true;
 
 	return (
 		<div className="relative min-h-screen">
@@ -161,6 +165,7 @@ export default function Home() {
 							data={data.current}
 							locationName={locationName}
 							sourcesCount={data.sources_used.length}
+							isDay={isDay}
 						/>
 						{data.hourly && (
 							<HourlyForecast hourly={data.hourly} astronomy={data.astronomy} current={data.current} />

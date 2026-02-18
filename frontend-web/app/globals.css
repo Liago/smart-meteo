@@ -106,3 +106,248 @@ body {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
+
+/* --- Weather Effects --- */
+
+.weather-effect-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 1.5rem; /* Match card border radius */
+  z-index: 0;
+  /* pointer-events: none; - Handled in component, but good to have here too */
+  pointer-events: none;
+}
+
+/* Sun */
+.sun-core {
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, #fbbf24 20%, #f59e0b 60%, transparent 80%);
+  border-radius: 50%;
+  box-shadow: 0 0 40px #f59e0b;
+  animation: sun-pulse 4s ease-in-out infinite alternate;
+  opacity: 0.9;
+}
+
+.sun-rays {
+  position: absolute;
+  top: -120px;
+  right: -120px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: sun-rotate 20s linear infinite;
+}
+
+@keyframes sun-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.1); opacity: 1; }
+}
+
+@keyframes sun-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Stars */
+.stars-layer-1, .stars-layer-2, .stars-layer-3 {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+}
+
+.stars-layer-1 {
+  background-image: 
+    radial-gradient(1px 1px at 10% 10%, white, transparent),
+    radial-gradient(1px 1px at 20% 80%, white, transparent),
+    radial-gradient(2px 2px at 30% 40%, white, transparent);
+  background-size: 200px 200px;
+  animation: twinkle 3s ease-in-out infinite;
+}
+.stars-layer-2 {
+  background-image:
+    radial-gradient(1px 1px at 40% 20%, white, transparent),
+    radial-gradient(1px 1px at 50% 90%, white, transparent),
+    radial-gradient(2px 2px at 60% 30%, white, transparent);
+  background-size: 250px 250px;
+  animation: twinkle 4s ease-in-out infinite 1s;
+}
+.stars-layer-3 {
+  background-image:
+    radial-gradient(1px 1px at 70% 60%, white, transparent),
+    radial-gradient(1px 1px at 80% 10%, white, transparent),
+    radial-gradient(2px 2px at 90% 80%, white, transparent);
+  background-size: 300px 300px;
+  animation: twinkle 5s ease-in-out infinite 2s;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* Clouds */
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%; /* More organic cloud shape base */
+  filter: blur(15px);
+  /* Use box-shadow to create complex cloud shapes from a single div if needed, 
+     but here we just use blur and movement for a soft effect */
+}
+
+/* Day clouds */
+.clouds-day .cloud-1 { width: 150px; height: 60px; top: 10%; left: -150px; animation: float-cloud 25s linear infinite; }
+.clouds-day .cloud-2 { width: 200px; height: 80px; top: 30%; left: -200px; animation: float-cloud 35s linear infinite 5s; opacity: 0.5; }
+.clouds-day .cloud-3 { width: 100px; height: 40px; top: 60%; left: -100px; animation: float-cloud 20s linear infinite 10s; opacity: 0.4; }
+
+/* Night clouds */
+.clouds-night .cloud { background: rgba(255, 255, 255, 0.1); }
+.clouds-night .cloud-1 { width: 150px; height: 60px; top: 15%; left: -150px; animation: float-cloud 30s linear infinite; }
+.clouds-night .cloud-2 { width: 180px; height: 70px; top: 40%; left: -180px; animation: float-cloud 40s linear infinite 8s; opacity: 0.15; }
+
+/* Gray clouds for rain/snow */
+.cloud-gray-1 { background: rgba(200, 200, 210, 0.4); width: 160px; height: 60px; top: 5%; left: -160px; animation: float-cloud 20s linear infinite; filter: blur(12px); }
+.cloud-gray-2 { background: rgba(180, 185, 200, 0.3); width: 200px; height: 70px; top: 25%; left: -200px; animation: float-cloud 28s linear infinite 2s; filter: blur(12px); }
+
+/* Storm clouds */
+.cloud-storm-1 { background: rgba(30, 30, 40, 0.5); width: 220px; height: 80px; top: 10%; left: -220px; animation: float-cloud 15s linear infinite; filter: blur(10px); }
+.cloud-storm-2 { background: rgba(20, 20, 30, 0.4); width: 180px; height: 70px; top: 40%; left: -180px; animation: float-cloud 22s linear infinite 5s; filter: blur(10px); }
+
+
+@keyframes float-cloud {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 300px)); } /* Move across screen */
+}
+/* In the card context, 100vw is too much. 
+   Ideally we want to move relative to the container width. 
+   Since container width varies, let's use a large pixel value usually safe for the card size (max-w-lg) */
+@keyframes float-cloud {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(600px); } 
+}
+
+
+/* Rain */
+.rain-layer-1, .rain-layer-2, .rain-layer-3, .rain-layer-storm {
+  position: absolute;
+  inset: -100% 0 0 0; /* Star higher up */
+  height: 200%; /* Double height for loop */
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(200,220,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-repeat: repeat-y;
+}
+
+.rain-layer-1 { background-size: 2px 50px; animation: rain-fall 1s linear infinite; opacity: 0.3; }
+.rain-layer-2 { background-size: 1px 30px; animation: rain-fall 1.5s linear infinite; opacity: 0.2; }
+.rain-layer-3 { background-size: 2px 40px; animation: rain-fall 0.8s linear infinite; opacity: 0.1; }
+
+.rain-night .rain-layer-1 { opacity: 0.2; }
+.rain-night .rain-layer-2 { opacity: 0.1; }
+
+.rain-layer-storm {
+  background-size: 3px 80px;
+  animation: rain-fall 0.6s linear infinite;
+  opacity: 0.5;
+}
+
+@keyframes rain-fall {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(50%); }
+}
+
+/* Snow */
+.snow-layer-1, .snow-layer-2, .snow-layer-3 {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: repeat;
+}
+
+.snow-layer-1 {
+  background-image: radial-gradient(3px 3px at 20% 30%, white, transparent), radial-gradient(2px 2px at 80% 10%, white, transparent);
+  background-size: 200px 200px;
+  animation: snow-fall-gentle 8s linear infinite;
+  opacity: 0.7;
+}
+
+.snow-layer-2 {
+  background-image: radial-gradient(2px 2px at 10% 80%, white, transparent), radial-gradient(2px 2px at 60% 40%, white, transparent);
+  background-size: 150px 150px;
+  animation: snow-fall-gentle 12s linear infinite 1s;
+  opacity: 0.5;
+}
+
+.snow-layer-3 {
+  background-image: radial-gradient(2px 2px at 50% 50%, white, transparent);
+  background-size: 250px 250px;
+  animation: snow-fall-gentle 15s linear infinite 2s;
+  opacity: 0.3;
+}
+
+@keyframes snow-fall-gentle {
+  0% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(50px) translateX(10px); }
+  50% { transform: translateY(100px) translateX(-10px); }
+  75% { transform: translateY(150px) translateX(10px); }
+  100% { transform: translateY(200px) translateX(0); }
+}
+/* Re-override snow for better continuous fall */
+@keyframes snow-fall-gentle {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 200px; }
+}
+/* Actually, background-position animation is smoother for infinite loop */
+.snow-layer-1 { animation: snow-fall-1 10s linear infinite; }
+.snow-layer-2 { animation: snow-fall-2 15s linear infinite; }
+.snow-layer-3 { animation: snow-fall-3 20s linear infinite; }
+
+@keyframes snow-fall-1 { 0% { background-position: 0 0; } 100% { background-position: 50px 400px; } }
+@keyframes snow-fall-2 { 0% { background-position: 0 0; } 100% { background-position: -30px 400px; } }
+@keyframes snow-fall-3 { 0% { background-position: 0 0; } 100% { background-position: 20px 400px; } }
+
+
+/* Lightning */
+.lightning-flash {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.3);
+  opacity: 0;
+  z-index: 5;
+  animation: lightning 6s infinite;
+  pointer-events: none;
+}
+
+@keyframes lightning {
+  0%, 90%, 93%, 96%, 100% { opacity: 0; }
+  91% { opacity: 0.6; }
+  94% { opacity: 0.1; }
+}
+
+/* Fog */
+.fog-layer-1, .fog-layer-2 {
+  position: absolute;
+  inset: 0;
+  background-size: 200% 100%;
+  opacity: 0.4;
+}
+
+.fog-layer-1 {
+  background: linear-gradient(90deg, transparent 0%, rgba(200, 200, 200, 0.2) 50%, transparent 100%);
+  animation: fog-drift 15s linear infinite;
+}
+.fog-layer-2 {
+  background: linear-gradient(90deg, rgba(200, 200, 200, 0.1) 0%, transparent 50%, rgba(200, 200, 200, 0.1) 100%);
+  animation: fog-drift 20s linear infinite reverse;
+}
+
+@keyframes fog-drift {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
