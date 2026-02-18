@@ -15,6 +15,24 @@ interface CurrentWeatherProps {
 	isDay: boolean;
 }
 
+function getAqiLabel(aqi: number): string {
+	if (aqi <= 1) return 'Buono';
+	if (aqi <= 2) return 'Moderato';
+	if (aqi <= 3) return 'Discreto';
+	if (aqi <= 4) return 'Scarso';
+	if (aqi <= 5) return 'Molto scarso';
+	return 'Pericoloso';
+}
+
+function getAqiColor(aqi: number): string {
+	if (aqi <= 1) return 'text-green-300';
+	if (aqi <= 2) return 'text-yellow-300';
+	if (aqi <= 3) return 'text-orange-300';
+	if (aqi <= 4) return 'text-red-300';
+	if (aqi <= 5) return 'text-purple-300';
+	return 'text-rose-300';
+}
+
 export default function CurrentWeather({ data, locationName, sourcesCount, isDay }: CurrentWeatherProps) {
 	return (
 		<motion.section

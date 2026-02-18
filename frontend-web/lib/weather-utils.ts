@@ -90,6 +90,33 @@ export function getWMOWeatherInfo(code: string | number): { label: string; icon:
 		case 96: return { label: 'Temporale con grandine', icon: '⛈️' };
 		case 99: return { label: 'Temporale forte con grandine', icon: '⛈️' };
 
-		default: return { label: 'N/D', icon: '❓' };
+	}
+}
+
+export function isDaytime(sunrise: string, sunset: string): boolean {
+	if (!sunrise || !sunset) return true; // Default to day if unknown
+
+	try {
+		// Formats expected: "06:00 AM", "06:00", "6:00 AM"
+		const parseTime = (timeStr: string) => {
+			const [time, modifier] = timeStr.split(' ');
+			let [hours, minutes] = time.split(':').map(Number);
+
+			if (modifier === 'PM' && hours < 12) hours += 12;
+			if (modifier === 'AM' && hours === 12) hours = 0;
+
+			const date = new Date();
+			date.setHours(hours, minutes, 0, 0);
+			return date;
+		};
+
+		const now = new Date();
+		const sunriseDate = parseTime(sunrise);
+		const sunsetDate = parseTime(sunset);
+
+		return now >= sunriseDate && now < sunsetDate;
+	} catch (e) {
+		console.error('Error parsing astronomy time:', e);
+		return true;
 	}
 }
