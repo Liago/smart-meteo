@@ -90,6 +90,7 @@ export function getWMOWeatherInfo(code: string | number): { label: string; icon:
 		case 96: return { label: 'Temporale con grandine', icon: '⛈️' };
 		case 99: return { label: 'Temporale forte con grandine', icon: '⛈️' };
 
+		default: return { label: 'N/D', icon: '❓' };
 	}
 }
 
