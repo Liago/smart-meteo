@@ -102,13 +102,14 @@ struct FavoriteRowView: View {
         )
         // Row Tap Gesture
         .onTapGesture {
-            dismiss()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                appState.selectLocation(coordinate: location.coordinate, name: location.name)
-                withAnimation {
-                    isSidebarPresented = false
-                }
+            // 1. Trigger weather fetch FIRST
+            appState.selectLocation(coordinate: location.coordinate, name: location.name)
+            
+            // 2. Then close everything
+            withAnimation {
+                isSidebarPresented = false
             }
+            dismiss()
         }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
