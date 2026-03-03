@@ -38,6 +38,7 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			wind_gust: current.gust_kph ? current.gust_kph / 3.6 : null,
 			condition_text: current.condition.text,
 			precipitation_prob: null,
+			pressure: current.pressure_mb ?? null,
 			aqi: aqiIndex
 		});
 

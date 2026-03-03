@@ -29,42 +29,33 @@ struct DailyForecastView: View {
     }()
     
     var body: some View {
-        GlassContainer(cornerRadius: 16) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "calendar")
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("PROSSIMI GIORNI")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white.opacity(0.7))
-                        .textCase(.uppercase)
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Prossimi Giorni")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(.black)
                 .padding(.bottom, 4)
-                
-                // Filter out the first day (Today) to match "Next 7 Days" logic
-                let nextDays = daily.dropFirst()
-                
-                VStack(spacing: 12) {
-                    ForEach(Array(nextDays), id: \.date) { day in
-                        DailyRow(
-                            day: day,
-                            isExpanded: expandedDate == day.date,
-                            hourly: hourlyForDay(day.date),
-                            onTap: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                    if expandedDate == day.date {
-                                        expandedDate = nil
-                                    } else {
-                                        expandedDate = day.date
-                                    }
+            
+            // Exclude today since it's already shown in the detail above
+            let nextDays = daily.dropFirst()
+            
+            VStack(spacing: 12) {
+                ForEach(Array(nextDays), id: \.date) { day in
+                    DailyRow(
+                        day: day,
+                        isExpanded: expandedDate == day.date,
+                        hourly: hourlyForDay(day.date),
+                        onTap: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                if expandedDate == day.date {
+                                    expandedDate = nil
+                                } else {
+                                    expandedDate = day.date
                                 }
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
-            .padding(4)
         }
     }
     
@@ -85,8 +76,11 @@ struct DailyRow: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         if let date = formatter.date(from: day.date) {
+            if Calendar.current.isDateInToday(date) {
+                return "Oggi"
+            }
             let displayFormatter = DateFormatter()
-            displayFormatter.dateFormat = "EEE d"
+            displayFormatter.dateFormat = "EEE"
             displayFormatter.locale = Locale(identifier: "it_IT")
             return displayFormatter.string(from: date).capitalized
         }
@@ -97,32 +91,38 @@ struct DailyRow: View {
         VStack(spacing: 0) {
             Button(action: onTap) {
                 HStack(spacing: 12) {
-                    // Date
-                    Text(displayDate)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 60, alignment: .leading)
+                    // Date and Rain Probability
+                    VStack(alignment: .center, spacing: 2) {
+                        Text(displayDate)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+                        
+                        if let precip = day.precipitationProb, precip > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "drop.fill")
+                                    .font(.system(size: 10))
+                                Text("\(Int(precip))%")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundColor(.blue.opacity(0.8))
+                        } else {
+                            HStack(spacing: 2) {
+                                Image(systemName: "drop.fill")
+                                    .font(.system(size: 10))
+                                Text("0%")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundColor(.clear)
+                        }
+                    }
+                    .frame(width: 55, alignment: .center)
                     
                     // Icon
                     Image(systemName: iconName(for: day.conditionCode))
-                        .symbolRenderingMode(.multicolor)
+                        .renderingMode(.template)
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray
                         .font(.title3)
                         .frame(width: 30)
-                    
-                    // Rain probability
-                    if let precip = day.precipitationProb, precip > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "drop.fill")
-                                .font(.caption2)
-                            Text("\(Int(precip))%")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.blue.opacity(0.8))
-                        .frame(width: 50)
-                    } else {
-                        Spacer().frame(width: 50)
-                    }
                     
                     Spacer()
                     
@@ -131,16 +131,16 @@ struct DailyRow: View {
                         HStack(spacing: 8) {
                             Text("\(Int(min))°")
                                 .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(.gray)
                                 .frame(width: 25, alignment: .trailing)
                             
                             TemperatureBar(min: min, max: max, rangeMin: -5, rangeMax: 40)
-                                .frame(height: 4)
-                                .frame(maxWidth: 80)
+                                .frame(height: 6)
+                                .frame(maxWidth: .infinity)
                             
                             Text("\(Int(max))°")
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.black)
                                 .frame(width: 25, alignment: .leading)
                         }
                     }
@@ -148,15 +148,11 @@ struct DailyRow: View {
                     // Chevron
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(.gray.opacity(0.6))
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(.vertical, 12)
                 .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(isExpanded ? 0.15 : 0.05))
-                )
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -170,15 +166,16 @@ struct DailyRow: View {
                 } else {
                     Text("Dati orari non disponibili")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.gray)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(8)
                 }
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(isExpanded ? 0.1 : 0))
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isExpanded ? Color.white : Color.clear)
+                .shadow(color: Color.black.opacity(isExpanded ? 0.06 : 0), radius: 10, x: 0, y: 4)
         )
     }
 
@@ -237,8 +234,8 @@ struct TemperatureBar: View {
             ZStack(alignment: .leading) {
                 // Background track
                 Capsule()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(height: 4)
+                    .fill(Color.gray.opacity(0.2)) // Slightly darker gray for light mode contrast
+                    .frame(height: 6)
                 
                 // Active range
                 Capsule()
@@ -247,7 +244,7 @@ struct TemperatureBar: View {
                         startPoint: .leading,
                         endPoint: .trailing
                     ))
-                    .frame(width: CGFloat.maximum(4, barWidth), height: 4)
+                    .frame(width: CGFloat.maximum(6, barWidth), height: 6)
                     .offset(x: barStart)
             }
         }

@@ -12,68 +12,106 @@ struct FavoritesView: View {
                     .foregroundColor(.gray)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(appState.favoriteLocations) { location in
-                    Button(action: {
-                        appState.selectLocation(coordinate: location.coordinate, name: location.name)
-                        withAnimation {
-                            isSidebarPresented = false
-                        }
-                        dismiss()
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                HStack {
-                                    Text(location.name)
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                    
-                                    if appState.isHome(location: location) {
-                                        Image(systemName: "house.fill")
-                                            .foregroundColor(.blue)
-                                            .font(.caption)
-                                    }
+                // HOME SECTION
+                if let home = appState.homeLocation, appState.favoriteLocations.contains(where: { $0.id == home.id }) {
+                    Section {
+                        FavoriteRowView(
+                            location: home,
+                            appState: appState,
+                            isSidebarPresented: $isSidebarPresented,
+                            dismiss: dismiss
+                        )
+                    } header: {
+                        Text("CASA")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                // OTHER LOCATIONS SECTION
+                Section {
+                    ForEach(appState.favoriteLocations.filter { $0.id != appState.homeLocation?.id }) { location in
+                        FavoriteRowView(
+                            location: location,
+                            appState: appState,
+                            isSidebarPresented: $isSidebarPresented,
+                            dismiss: dismiss
+                        )
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                if let index = appState.favoriteLocations.firstIndex(of: location) {
+                                    appState.favoriteLocations.remove(at: index)
                                 }
-                                
-                                Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                            } label: {
+                                Label("Elimina", systemImage: "trash")
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-
-                        .padding()
-                        .background(Color.white.opacity(0.05))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(.plain) // Ensure tap works in List
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .swipeActions(edge: .leading) {
-                        Button {
-                            appState.setAsHome(location: location)
-                        } label: {
-                            Label("Imposta come Casa", systemImage: "house")
-                        }
-                        .tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            if let index = appState.favoriteLocations.firstIndex(of: location) {
-                                appState.favoriteLocations.remove(at: index)
-                            }
-                        } label: {
-                            Label("Elimina", systemImage: "trash")
                         }
                     }
+                } header: {
+                    Text(appState.homeLocation != nil ? "ALTRE LOCALITÀ" : "LOCALITÀ")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.gray)
                 }
             }
         }
         .listStyle(.plain)
-        .background(Color(hex: "0B1120").ignoresSafeArea())
+        .background(Color(red: 252/255, green: 249/255, blue: 246/255).ignoresSafeArea()) // Off-white
         .navigationTitle("Località Preferite")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct FavoriteRowView: View {
+    let location: SavedLocation
+    @ObservedObject var appState: AppState
+    @Binding var isSidebarPresented: Bool
+    var dismiss: DismissAction
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(location.name)
+                    .font(.headline)
+                    .foregroundColor(.black)
+                    
+                Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
+            
+            // Home Toggle Button
+            Button(action: {
+                appState.setAsHome(location: location)
+            }) {
+                Image(systemName: appState.isHome(location: location) ? "house.fill" : "house")
+                    .foregroundColor(appState.isHome(location: location) ? Color(red: 236/255, green: 104/255, blue: 90/255) : .gray)
+                    .font(.title3)
+                    .padding(8)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        )
+        // Row Tap Gesture
+        .onTapGesture {
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                appState.selectLocation(coordinate: location.coordinate, name: location.name)
+                withAnimation {
+                    isSidebarPresented = false
+                }
+            }
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 }
 
@@ -81,6 +119,6 @@ struct FavoritesView: View {
     NavigationView {
         FavoritesView(isSidebarPresented: .constant(true))
             .environmentObject(AppState.shared)
-            .background(Color(hex: "0B1120"))
+            .background(Color(red: 252/255, green: 249/255, blue: 246/255))
     }
 }

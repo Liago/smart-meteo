@@ -36,134 +36,73 @@ struct HourlyForecastView: View {
     @State private var chartData: ChartData?
     
     var body: some View {
-        GlassContainer(cornerRadius: 16) {
-            VStack(alignment: .leading, spacing: 15) {
-                Text("PROSSIME 12 ORE")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(1)
-                
-                if let data = chartData {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        ZStack(alignment: .topLeading) {
-                            // Chart Background (Line & Fill)
-                            ChartPath(data: data)
-                                .frame(width: data.width, height: data.height)
-                            
-                            // Points & Labels
-                            ForEach(Array(data.items.enumerated()), id: \.element.id) { index, item in
-                                ChartPointView(item: item, index: index, total: data.items.count, data: data)
-                            }
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Prossime 24 Ore")
+                .font(.system(size: 28, weight: .bold, design: .serif))
+                .foregroundColor(.black)
+                .padding(.horizontal, 8)
+            
+            // Generate dynamic description
+            let dynamicDesc = generateDailyDescription()
+            
+            Text(dynamicDesc)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .lineSpacing(4)
+                .padding(.horizontal, 8)
+            
+            if let data = chartData {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    ZStack(alignment: .topLeading) {
+                        // Chart Background (Line & Fill)
+                        ChartPath(data: data)
+                            .frame(width: data.width, height: data.height)
+                        
+                        // Points & Labels
+                        ForEach(Array(data.items.enumerated()), id: \.element.id) { index, item in
+                            ChartPointView(item: item, index: index, total: data.items.count, data: data)
                         }
-                        .frame(width: data.width, height: data.height + 60) // Extra space for labels
-                        .padding(.horizontal, 20)
                     }
-                } else {
-                    ProgressView()
-                        .frame(height: 200)
+                    .frame(width: data.width, height: data.height + 40) // Extra space for top labels if needed
+                    .padding(.horizontal, 8)
                 }
-                
-                // Extra Details (Precipitation, Humidity, SunWindCard)
-                if let current = current {
-                    VStack(spacing: 16) {
-                        Divider().background(Color.white.opacity(0.1))
-                        
-                        // Precipitation Bar
-                        VStack(spacing: 6) {
-                            HStack {
-                                Text("Probabilità precipitazione (Oggi)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.6))
-                                Spacer()
-                                Text("\(Int(current.precipitationProb))%")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            GeometryReader { proxy in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.white.opacity(0.1))
-                                    
-                                    Capsule()
-                                        .fill(LinearGradient(colors: [.blue, .blue.opacity(0.8)], startPoint: .leading, endPoint: .trailing))
-                                        .frame(width: proxy.size.width * (current.precipitationProb / 100))
-                                }
-                            }
-                            .frame(height: 6)
-                        }
-                        
-                        // Humidity Bar
-                        VStack(spacing: 6) {
-                            HStack {
-                                Text("Umidità")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.6))
-                                Spacer()
-                                Text("\(Int(current.humidity ?? 0))%")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            GeometryReader { proxy in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.white.opacity(0.1))
-                                    
-                                    Capsule()
-                                        .fill(LinearGradient(colors: [Color.teal, Color.cyan], startPoint: .leading, endPoint: .trailing))
-                                        .frame(width: proxy.size.width * ((current.humidity ?? 0) / 100))
-                                }
-                            }
-                            .frame(height: 6)
-                        }
-                        
-                        // Sun & Wind Card
-                        SunWindCard(astronomy: astronomy, current: current)
-                            .padding(.top, 8)
-                        
-                        Divider().background(Color.white.opacity(0.1))
-                        
-                        // Temperature Detail
-                        HStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                                .overlay(Image(systemName: "thermometer.medium").foregroundColor(.white.opacity(0.7)))
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Temperatura (Oggi)")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                                Text("Effettiva vs percepita")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(Int(round(current.temperature ?? 0)))°C")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                Text("Percepita \(Int(round(current.feelsLike ?? 0)))°C")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                        }
-                        .padding(.top, 4)
-                        
-                    }
-                    .padding(.top, 8)
-                }
+            } else {
+                ProgressView()
+                    .frame(height: 180)
             }
-            .padding(16)
+                
         }
+        .padding(.vertical)
         .onAppear {
             processData()
         }
         .onChange(of: hourly.count) { _ in processData() }
+    }
+    
+    private func extractTime(from isoDateStr: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var d = formatter.date(from: isoDateStr)
+        if d == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            d = formatter.date(from: isoDateStr)
+        }
+        
+        guard let date = d else {
+            // Fallback: try to just extract HH:mm if it's already a time string or simple date
+            if isoDateStr.contains("T") {
+                let parts = isoDateStr.split(separator: "T")
+                if parts.count > 1 {
+                    let timeStr = String(parts[1])
+                    return String(timeStr.prefix(5)) // take HH:mm
+                }
+            }
+            return isoDateStr.count >= 5 ? String(isoDateStr.prefix(5)) : isoDateStr
+        }
+        
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm" // 24h format
+        return f.string(from: date)
     }
     
     private func processData() {
@@ -306,12 +245,127 @@ struct HourlyForecastView: View {
         
         self.chartData = ChartData(items: items, minTemp: minTemp, maxTemp: maxTemp, width: width, height: height)
     }
+    
+    private func generateDailyDescription() -> String {
+        let calendar = Calendar.current
+        
+        let formatters: [ISO8601DateFormatter] = [
+            {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return f
+            }(),
+            {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime]
+                return f
+            }()
+        ]
+        
+        let simpleFormatter = DateFormatter()
+        simpleFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        
+        func parseDate(_ str: String) -> Date? {
+            for f in formatters {
+                if let d = f.date(from: str) { return d }
+            }
+            return simpleFormatter.date(from: str)
+        }
+        
+        var morningCodes: [Int: Int] = [:]
+        var afternoonCodes: [Int: Int] = [:]
+        var eveningCodes: [Int: Int] = [:]
+        var maxTemp: Double = -100
+        var minTemp: Double = 100
+        var hasTodayData = false
+        
+        for h in hourly {
+            guard let date = parseDate(h.time), calendar.isDateInToday(date) else { continue }
+            hasTodayData = true
+            let hour = calendar.component(.hour, from: date)
+            let code = Int(h.conditionCode) ?? 0
+            
+            if hour >= 6 && hour < 12 {
+                morningCodes[code, default: 0] += 1
+            } else if hour >= 12 && hour < 18 {
+                afternoonCodes[code, default: 0] += 1
+            } else if hour >= 18 && hour < 24 {
+                eveningCodes[code, default: 0] += 1
+            }
+            
+            if h.temp > maxTemp { maxTemp = h.temp }
+            if h.temp < minTemp { minTemp = h.temp }
+        }
+        
+        if !hasTodayData {
+            return "Previsioni dettagliate per la giornata odierna in fase di aggiornamento."
+        }
+        
+        func topCondition(_ codes: [Int: Int]) -> Int? {
+            return codes.max(by: { $0.value < $1.value })?.key
+        }
+        
+        let topMorning = topCondition(morningCodes)
+        let topAfternoon = topCondition(afternoonCodes)
+        let topEvening = topCondition(eveningCodes)
+        
+        let firstCode = topAfternoon ?? topMorning ?? topEvening ?? 0
+        let secondCode = topEvening ?? topAfternoon ?? 0
+        
+        let timePeriod1 = topAfternoon != nil ? "questo pomeriggio" : (topMorning != nil ? "questa mattina" : "questa sera")
+        let timePeriod2 = (topEvening != nil && topAfternoon != nil) ? "in serata" : "più tardi"
+        
+        var desc = "Cieli \(conditionAdjectivePlural(for: firstCode)) \(timePeriod1)"
+        if firstCode != secondCode && topEvening != nil {
+            desc += ", \(conditionAdjectiveSingular(for: secondCode)) \(timePeriod2)."
+        } else {
+            desc += " e \(timePeriod2)."
+        }
+        
+        if maxTemp > -100 {
+            desc += " Temperature previste tra \(Int(round(minTemp)))° e \(Int(round(maxTemp)))°."
+        }
+        
+        let sunsetStr = astronomy?.sunset ?? "17:10"
+        let sunsetTime = extractTime(from: sunsetStr)
+        desc += " Tramonto alle \(sunsetTime)."
+        
+        return desc
+    }
+    
+    private func conditionAdjectivePlural(for code: Int) -> String {
+        switch code {
+        case 0: return "sereni"
+        case 1, 2: return "poco nuvolosi"
+        case 3: return "coperti"
+        case 45, 48: return "nebbiosi"
+        case 51...57: return "con pioviggine"
+        case 61...67, 80...81: return "con pioggia"
+        case 71...77, 85...86: return "con neve"
+        case 82, 95...99: return "temporaleschi"
+        default: return "variabili"
+        }
+    }
+    
+    private func conditionAdjectiveSingular(for code: Int) -> String {
+        switch code {
+        case 0: return "sereno"
+        case 1, 2: return "poco nuvoloso"
+        case 3: return "coperto"
+        case 45, 48: return "nebbioso"
+        case 51...57: return "con pioviggine"
+        case 61...67, 80...81: return "piovoso"
+        case 71...77, 85...86: return "nevoso"
+        case 82, 95...99: return "temporalesco"
+        default: return "variabile"
+        }
+    }
 }
 
     // MARK: - Subviews
     private struct Layout {
-        static let topPadding: CGFloat = 60
-        static let bottomPadding: CGFloat = 50
+        static let topPadding: CGFloat = 80
+        static let bottomPadding: CGFloat = 40
         static let totalPadding: CGFloat = topPadding + bottomPadding
     }
 
@@ -350,7 +404,14 @@ struct ChartPath: View {
                 path.addQuadCurve(to: p2, control: cp2)
             }
             
-            context.stroke(path, with: .color(.white.opacity(0.4)), lineWidth: 3)
+            // Draw gradient fill below the line
+            var fillPath = path
+            fillPath.addLine(to: CGPoint(x: points.last!.x, y: size.height - Layout.bottomPadding))
+            fillPath.addLine(to: CGPoint(x: points.first!.x, y: size.height - Layout.bottomPadding))
+            fillPath.closeSubpath()
+            context.fill(fillPath, with: .linearGradient(Gradient(colors: [Color.black.opacity(0.05), Color.clear]), startPoint: CGPoint(x: 0, y: Layout.topPadding), endPoint: CGPoint(x: 0, y: size.height - Layout.bottomPadding)))
+            
+            context.stroke(path, with: .color(.black.opacity(0.8)), lineWidth: 3)
         }
     }
 }
@@ -375,58 +436,72 @@ struct ChartPointView: View {
             let y = data.height - Layout.bottomPadding - ((item.temp - data.minTemp) * yStep)
 
             ZStack {
-                // Dot
-                Circle()
-                    .fill(item.type.isSun ? Color.yellow : Color.white)
-                    .frame(width: 8, height: 8)
-                    .position(x: x, y: y)
-                
                 // Info Group (Icon & Temp) - Above
                 VStack(spacing: 4) {
+                    if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "drop.fill").font(.system(size: 8, weight: .bold))
+                            Text("\(Int(prob))%")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(.gray)
+                    } else if case .weather(_) = item.type {
+                        // Empty space to keep vertical alignment consistent
+                        Text(" ").font(.system(size: 10, weight: .bold))
+                    }
+                    
                     switch item.type {
                     case .weather(let h):
                         Image(systemName: iconName(for: h.conditionCode))
-                            .symbolRenderingMode(.multicolor)
-                            .font(.title) // Increased from title2
-                            .shadow(radius: 2)
+                            .renderingMode(.template)
+                            .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray
+                            .font(.title2)
                         Text("\(Int(round(item.temp)))°")
-                            .font(.custom("Inter", size: 18)) // Increased from 16
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.black)
                     case .sun(let label, let icon):
                         Text(label)
                             .font(.system(size: 10, weight: .bold))
                             .textCase(.uppercase)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(.orange)
                         Image(systemName: icon)
-                            .foregroundColor(.yellow)
-                    }
-                }
-                .frame(width: 80) // Constrain width to slot
-                .position(x: x, y: y - 40) // Shift up from dot
-                
-                // Time & Precip - Below
-                VStack(spacing: 2) {
-                    Text(formatTime(item.time))
-                        .font(.caption) // Increased from caption2
-                        .foregroundColor(item.type.isSun ? .yellow.opacity(0.8) : .white.opacity(0.5))
-                    
-                    if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
-                        Text("\(Int(prob))%") // Prob is 0-100 based on web 13 means 13%
-                            .font(.system(size: 11, weight: .medium)) // Increased from 10
-                            .foregroundColor(.cyan)
+                            .foregroundColor(.orange)
+                            .font(.title2)
                     }
                 }
                 .frame(width: 80)
-                .position(x: x, y: y + 30) // Shift down from dot
+                .position(x: x, y: y - 50)
+                
+                // Dot Line (Optional, design has dotted line pointing down, we'll keep it simple)
+                
+                // Dot on the curve
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 8, height: 8)
+                    .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                    .position(x: x, y: y)
+                
+                // Time - Always at the bottom
+                VStack(spacing: 2) {
+                    if index == 0 {
+                        Text("Ora")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red accent for "Now"
+                    } else {
+                        Text(formatTime(item.time))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.gray)
+                    }
+                }
+                .frame(width: 80)
+                .position(x: x, y: data.height - Layout.bottomPadding + 20)
             }
         }
     }
     
     private func formatTime(_ date: Date) -> String {
         let f = DateFormatter()
-        f.dateFormat = "HH:mm"
+        f.dateFormat = "HH:mm" // 24h format
         return f.string(from: date)
     }
     

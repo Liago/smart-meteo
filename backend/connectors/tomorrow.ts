@@ -12,6 +12,7 @@ interface TomorrowValues {
 	windGust: number;
 	weatherCode: number;
 	precipitationProbability: number;
+	pressureSurfaceLevel: number;
 }
 
 interface TomorrowResponse {
@@ -52,7 +53,8 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 			wind_direction: values.windDirection,
 			wind_gust: values.windGust ?? null,
 			condition_text: 'Code: ' + values.weatherCode,
-			precipitation_prob: values.precipitationProbability
+			precipitation_prob: values.precipitationProbability,
+			pressure: values.pressureSurfaceLevel ?? null
 		});
 
 	} catch (error: any) {

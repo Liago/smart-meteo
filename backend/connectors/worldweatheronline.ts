@@ -103,6 +103,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			condition_code: String(current.weatherCode),
 			precipitation_prob: null,
 			precipitation_intensity: Number(current.precipMM),
+			pressure: current.pressure ? Number(current.pressure) : null,
 			daily: daily,
 			hourly: hourly
 		};
