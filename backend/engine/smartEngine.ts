@@ -42,6 +42,7 @@ interface AggregationData {
 	wind_gust: { val: number; weight: number }[];
 	precipitation_prob: { val: number; weight: number }[];
 	aqi: { val: number; weight: number }[];
+	pressure: { val: number; weight: number }[];
 	conditions: { [key: string]: number };
 }
 
@@ -220,6 +221,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		wind_gust: [],
 		precipitation_prob: [],
 		aqi: [],
+		pressure: [],
 		conditions: {}
 	};
 
@@ -238,6 +240,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('wind_gust', f.wind_gust);
 		pushValue('precipitation_prob', f.precipitation_prob);
 		pushValue('aqi', f.aqi);
+		pushValue('pressure', f.pressure);
 
 		const code = f.condition_code || 'unknown';
 		if (!aggregation.conditions[code]) aggregation.conditions[code] = 0;
@@ -316,6 +319,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
 			dew_point: (aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null,
 			aqi: avg(aggregation.aqi),
+			pressure: avg(aggregation.pressure),
 			condition: bestCondition,
 			condition_text: bestCondition.toUpperCase()
 		},

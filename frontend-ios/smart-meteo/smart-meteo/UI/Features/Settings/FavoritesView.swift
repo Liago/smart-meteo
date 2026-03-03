@@ -102,14 +102,14 @@ struct FavoriteRowView: View {
         )
         // Row Tap Gesture
         .onTapGesture {
-            // 1. Trigger weather fetch FIRST
-            appState.selectLocation(coordinate: location.coordinate, name: location.name)
-            
-            // 2. Then close everything
+            // Close sidebar FIRST so the dashboard is back in view
             withAnimation {
                 isSidebarPresented = false
             }
-            dismiss()
+            // Then select the location on next run loop — dashboard will be active to respond
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                appState.selectLocation(coordinate: location.coordinate, name: location.name)
+            }
         }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
