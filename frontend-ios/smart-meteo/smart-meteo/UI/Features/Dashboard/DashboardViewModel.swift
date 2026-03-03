@@ -49,4 +49,25 @@ class DashboardViewModel: ObservableObject {
             appState.requestLocation()
         }
     }
+    
+    // MARK: - Favorites / Home
+    
+    var isCurrentLocationFavorite: Bool {
+        appState.isFavorite(name: currentLocationName)
+    }
+    
+    var isCurrentLocationHome: Bool {
+        appState.homeLocation?.name == currentLocationName
+    }
+    
+    func toggleFavorite() {
+        appState.toggleFavorite()
+    }
+    
+    func setCurrentAsHome() {
+        // Find the favorite matching the current location name
+        if let fav = appState.favoriteLocations.first(where: { $0.name == currentLocationName }) {
+            appState.setAsHome(location: fav)
+        }
+    }
 }

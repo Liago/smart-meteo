@@ -32,13 +32,37 @@ struct DashboardView: View {
                             Spacer()
                             
                             HStack(spacing: 4) {
-                                Image(systemName: "location.fill")
+                                Image(systemName: viewModel.isCurrentLocationHome ? "house.fill" : "location.fill")
                                     .font(.subheadline)
                                     .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
                                 Text(viewModel.currentLocationName)
                                     .font(.headline)
                                     .fontWeight(.bold)
                                     .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
+                            }
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                // Toggle Favorite
+                                Button {
+                                    viewModel.toggleFavorite()
+                                } label: {
+                                    Label(
+                                        viewModel.isCurrentLocationFavorite ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti",
+                                        systemImage: viewModel.isCurrentLocationFavorite ? "star.slash" : "star"
+                                    )
+                                }
+                                
+                                // Set as Home (only when it's already a favorite)
+                                if viewModel.isCurrentLocationFavorite {
+                                    Button {
+                                        viewModel.setCurrentAsHome()
+                                    } label: {
+                                        Label(
+                                            viewModel.isCurrentLocationHome ? "Rimuovi come Casa" : "Imposta come Casa",
+                                            systemImage: viewModel.isCurrentLocationHome ? "house.slash" : "house"
+                                        )
+                                    }
+                                }
                             }
                             
                             Spacer()
