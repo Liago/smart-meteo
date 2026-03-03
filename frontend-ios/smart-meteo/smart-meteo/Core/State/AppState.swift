@@ -62,13 +62,13 @@ class AppState: ObservableObject {
         authService.$isAuthenticated
             .assign(to: &$isAuthenticated)
             
-        // improved flow: when auth changes to true, fetch favorites
+        // When auth changes to true, fetch favorites with a fresh token
         authService.$isAuthenticated
-            .combineLatest(authService.$userId, authService.$accessToken)
-            .sink { [weak self] (isAuth, userId, token) in
-                if isAuth, let uid = userId, let tok = token {
-                    self?.fetchFavorites(userId: uid, token: tok)
-                } else if !isAuth {
+            .removeDuplicates()
+            .sink { [weak self] isAuth in
+                if isAuth {
+                    self?.fetchFavorites()
+                } else {
                     self?.favoriteLocations = [] // Clear on logout
                 }
             }
@@ -169,9 +169,14 @@ struct SavedLocation: Identifiable, Codable, Equatable {
 }
 
 extension AppState {
-    func fetchFavorites(userId: String, token: String) {
+    func fetchFavorites() {
         Task {
             do {
+                guard let token = try await authService.getValidToken(),
+                      let userId = authService.userId else {
+                    print("No valid token or userId for fetching favorites")
+                    return
+                }
                 let favorites = try await LocationService.shared.getFavorites(userId: userId, token: token)
                 await MainActor.run {
                     self.favoriteLocations = favorites
@@ -202,9 +207,9 @@ extension AppState {
         favoriteLocations.remove(atOffsets: offsets)
         
         // Sync with backend
-        guard let userId = authService.userId, let token = authService.accessToken else { return }
-        
         Task {
+            guard let token = try? await authService.getValidToken(),
+                  let userId = authService.userId else { return }
             for item in itemsToDelete {
                 try? await LocationService.shared.removeFavorite(userId: userId, token: token, locationId: item.id)
             }
@@ -227,8 +232,9 @@ extension AppState {
             if let index = favoriteLocations.firstIndex(of: existing) {
                 favoriteLocations.remove(at: index)
                 
-                guard let userId = authService.userId, let token = authService.accessToken else { return }
                 Task {
+                    guard let token = try? await authService.getValidToken(),
+                          let userId = authService.userId else { return }
                     try? await LocationService.shared.removeFavorite(userId: userId, token: token, locationId: existing.id)
                 }
             }
@@ -240,11 +246,12 @@ extension AppState {
             )
             addLocalFavorite(location: saved)
             
-            guard let userId = authService.userId, let token = authService.accessToken else { return }
             Task {
+                guard let token = try? await authService.getValidToken(),
+                      let userId = authService.userId else { return }
                 try? await LocationService.shared.addFavorite(userId: userId, token: token, location: saved)
-                // Optionally re-fetch to get real UUID from DB
-                self.fetchFavorites(userId: userId, token: token)
+                // Re-fetch to get real UUID from DB
+                self.fetchFavorites()
             }
         }
     }

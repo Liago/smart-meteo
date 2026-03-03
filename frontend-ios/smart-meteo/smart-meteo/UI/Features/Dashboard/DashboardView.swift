@@ -78,9 +78,21 @@ struct DashboardView: View {
                             }
                                 
                         case .loading:
-                            LoadingView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 100) // Visual spacing
+                            VStack(spacing: 20) {
+                                ProgressView()
+                                    .scaleEffect(1.3)
+                                    .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
+                                
+                                Text(viewModel.currentLocationName)
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.black)
+                                
+                                Text("Caricamento previsioni...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 120)
                                 
                         case .success(let forecast):
                             // Current Weather
