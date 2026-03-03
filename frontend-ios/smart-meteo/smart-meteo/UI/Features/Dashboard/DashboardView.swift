@@ -8,8 +8,8 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Dynamic Background
-                DynamicBackground(condition: viewModel.currentCondition)
+                // Light Background
+                Color(red: 252/255, green: 249/255, blue: 246/255)
                     .ignoresSafeArea()
                 
                 // Content
@@ -17,50 +17,49 @@ struct DashboardView: View {
                     VStack(spacing: 20) {
                         // Header
                         HStack {
-                            // Avatar / Sidebar Trigger
+                            // Search Trigger
+                            Button(action: { isSearchPresented = true }) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
+                                    .padding(12)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "location.fill")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
+                                Text(viewModel.currentLocationName)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
+                            }
+                            
+                            Spacer()
+                            
+                            // Settings / Sidebar Trigger
                             Button(action: {
                                 withAnimation {
                                     isSidebarPresented = true
                                 }
                             }) {
-                                if viewModel.isAuthenticated {
-                                    Image(systemName: "person.circle.fill")
-                                        .resizable()
-                                        .frame(width: 40, height: 40)
-                                        .foregroundColor(.white)
-                                } else {
-                                    Image(systemName: "person.crop.circle")
-                                        .resizable()
-                                        .frame(width: 40, height: 40)
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .center) {
-                                Text(viewModel.currentLocationName)
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                Text(Date().formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            
-                            Spacer()
-                            
-                            // Search Trigger
-                            Button(action: { isSearchPresented = true }) {
-                                Image(systemName: "magnifyingglass")
+                                Image(systemName: "gearshape")
                                     .font(.title2)
-                                    .foregroundColor(.white)
-                                    .padding(8)
-                                    .background(Color.white.opacity(0.1))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
+                                    .padding(12)
+                                    .background(Color.white)
                                     .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 24)
                         .padding(.top, 10)
                         
                         switch viewModel.state {
@@ -85,7 +84,7 @@ struct DashboardView: View {
                                 
                         case .success(let forecast):
                             // Current Weather
-                            CurrentWeatherView(current: forecast.current)
+                            CurrentWeatherView(current: forecast.current, today: forecast.daily?.first, astronomy: forecast.astronomy)
                             
                             // Hourly Forecast
                             if let hourly = forecast.hourly {

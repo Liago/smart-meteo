@@ -119,7 +119,7 @@ struct WeatherChartPath: View {
                 path.addQuadCurve(to: p2, control: cp2)
             }
             
-            context.stroke(path, with: .color(.white.opacity(0.4)), lineWidth: 2)
+            context.stroke(path, with: .color(.black.opacity(0.6)), lineWidth: 2.5)
         }
     }
 }
@@ -144,20 +144,19 @@ struct WeatherChartPointView: View {
             ZStack {
                 // Dot
                 Circle()
-                    .fill(Color.white)
+                    .fill(Color.black.opacity(0.5))
                     .frame(width: 6, height: 6)
                     .position(x: x, y: y)
                 
                 // Icon & Temp - Above
                 VStack(spacing: 2) {
                     Image(systemName: iconName(for: item.weather.conditionCode))
-                        .symbolRenderingMode(.multicolor)
+                        .renderingMode(.template)
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
                         .font(.body)
-                        .shadow(radius: 1)
                     Text("\(Int(round(item.temp)))°")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+                        .foregroundColor(.black)
                 }
                 .frame(width: 60)
                 .position(x: x, y: y - 25)
@@ -166,7 +165,7 @@ struct WeatherChartPointView: View {
                 VStack(spacing: 2) {
                     Text(formatTime(item.time))
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.gray)
                     
                     if let prob = item.weather.precipitationProb, prob > 0 {
                         Text("\(Int(prob))%")

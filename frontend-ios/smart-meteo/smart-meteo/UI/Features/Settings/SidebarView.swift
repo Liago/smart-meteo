@@ -8,7 +8,7 @@ struct SidebarView: View {
     var body: some View {
         ZStack {
             // Background Layer
-            Color(hex: "0B1120").ignoresSafeArea()
+            Color(red: 252/255, green: 249/255, blue: 246/255).ignoresSafeArea() // Off-white for light theme
             
             VStack(alignment: .leading, spacing: 0) {
                 // Header (User Profile)
@@ -18,25 +18,27 @@ struct SidebarView: View {
                             Image(systemName: "person.circle.fill")
                                 .resizable()
                                 .frame(width: 50, height: 50)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(appState.currentUser?.email ?? "Utente")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.black)
                                 Text("Premium")
                                     .font(.caption)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
+                                    .background(Color(red: 236/255, green: 104/255, blue: 90/255).opacity(0.1)) // Light Red bg
+                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
                                     .cornerRadius(8)
                             }
                         }
                     }
                 }
-                .padding(24)
-                .background(Color.white.opacity(0.05))
+                .padding(.top, 60)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+                .background(Color.black.opacity(0.05))
                 
                 // Menu Items
                 ScrollView {
@@ -100,7 +102,7 @@ struct SidebarView: View {
                         .foregroundColor(.white)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
                         .cornerRadius(12)
                     }
                     .padding(.horizontal, 24)
@@ -130,14 +132,14 @@ struct SidebarRow: View {
     let icon: String
     let title: String
     let subtitle: String?
-    var color: Color = .white
+    var color: Color = .black
     
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .frame(width: 30)
-                .foregroundColor(color)
+                .foregroundColor(color == .black ? Color(red: 0.2, green: 0.2, blue: 0.2) : color) // Dark gray for default icons
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

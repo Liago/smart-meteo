@@ -37,10 +37,10 @@ class AppState: ObservableObject {
         self.locationManager = locationManager
         self.authService = authService
         
-        
         setupLocation()
         setupAuth()
         fetchSources()
+        loadHomeLocation()
     }
     
     // MARK: - Setup
@@ -264,8 +264,23 @@ extension AppState {
     }
     
     func setAsHome(location: SavedLocation) {
-        homeLocation = location
-        //Ideally persist this preference
+        if homeLocation?.id == location.id {
+            // Toggle off
+            homeLocation = nil
+            UserDefaults.standard.removeObject(forKey: "homeLocation")
+        } else {
+            homeLocation = location
+            if let encoded = try? JSONEncoder().encode(location) {
+                UserDefaults.standard.set(encoded, forKey: "homeLocation")
+            }
+        }
+    }
+    
+    private func loadHomeLocation() {
+        if let savedLoc = UserDefaults.standard.data(forKey: "homeLocation"),
+           let decoded = try? JSONDecoder().decode(SavedLocation.self, from: savedLoc) {
+            self.homeLocation = decoded
+        }
     }
     
     func isHome(location: SavedLocation) -> Bool {

@@ -34,7 +34,8 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 			wind_direction: data.wind.deg,
 			wind_gust: data.wind.gust ?? null,
 			condition_text: data.weather[0] ? data.weather[0].main : 'Unknown',
-			precipitation_prob: null
+			precipitation_prob: null,
+			pressure: data.main.pressure ?? null
 		});
 
 	} catch (error: any) {

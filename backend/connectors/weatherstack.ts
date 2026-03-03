@@ -52,6 +52,7 @@ export async function fetchFromWeatherstack(lat: number, lon: number): Promise<U
 			condition_code: String(current.weather_code),
 			precipitation_prob: null, // Weatherstack current doesn't have prob
 			precipitation_intensity: current.precip,
+			pressure: current.pressure ?? null,
 			daily: [] // No daily on simple current endpoint
 		});
 
