@@ -7,7 +7,7 @@ import { fetchFromWWO } from '../connectors/worldweatheronline';
 import { fetchFromWeatherstack } from '../connectors/weatherstack';
 import { fetchFromMeteostat } from '../connectors/meteostat';
 import { UnifiedForecast } from '../utils/formatter';
-import { WeatherConditionWeights } from '../types';
+import { WeatherConditionWeights, AirQualityDetail } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
 
@@ -43,6 +43,9 @@ interface AggregationData {
 	precipitation_prob: { val: number; weight: number }[];
 	aqi: { val: number; weight: number }[];
 	pressure: { val: number; weight: number }[];
+	uv_index: { val: number; weight: number }[];
+	visibility: { val: number; weight: number }[];
+	cloud_cover: { val: number; weight: number }[];
 	conditions: { [key: string]: number };
 }
 
@@ -67,11 +70,6 @@ function degreesToCompass(deg: number): string {
 }
 
 async function upsertLocation(lat: number, lon: number): Promise<string | null> {
-	// Round to 4 decimals for location ID stability (~11m)
-	// Using the RPC function defined in migration 011
-	// Pass null as name: the real name is set by the frontend when the user
-	// saves the location. Passing a coordinate placeholder here was
-	// overwriting proper names in the DB.
 	const { data, error } = await supabase.rpc('upsert_location', {
 		p_name: null,
 		p_latitude: lat,
@@ -103,62 +101,18 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			.single();
 
 		if (cached && !error) {
-			console.log('Cache HIT: returning smart forecast from DB');
-			// Return cached data, potentially parsing JSON if needed or just mapping fields
-			// The table structure matches the output object closely but we need to reconstruct nested objects if flattened
-			// Current migration 005 has flattened fields.
-			// Ideally we store the FULL JSON result to avoid mapping headaches, OR map carefully.
-			// For MVP, let's just return the cached object if it matches expectation.
-			// Wait, migration 005 doesn't store 'daily' or 'hourly' arrays! It only stores aggregated current metrics.
-			// This means if we return from cache we lose daily/hourly data unless we store them too.
-			// The migration 005 `smart_forecasts` table seems to be designed for "Current Weather".
-			// If we want full forecast caching, we should have stored a JSONB column `full_data`.
-			// Let's check migration 005 content again... YES, it only has temp, humidity etc.
-			// LIMITATION: The current schema only caches "Current" weather.
-			// So for now, we can ONLY cache "Current" parts. If we need Daily/Hourly, we might still need to fetch?
-			// OR we update schema to store `full_data` jsonb.
-			// User asked to use "existing tables". Existing `smart_forecasts` is limited.
-			// OPTION: We use the cache for current weather, but we might have to re-fetch for hourly? That defeats the purpose.
-			// Actually, let's look at `smart_forecasts` again.
-			// It has `temperature`, `feels_like`, etc.
-			// It DOES NOT have a JSON dump column.
-			// This suggests the DB is for analytics or simple current weather.
-			// TO PROPERLY CACHE THE API RESPONSE, we need a JSONB column.
-			// However, I cannot change schema easily without migration.
-			// Let's see if 005 has any extra columns... No.
-			// Wait, `011_utility_functions.sql` mentioned something about cleanup.
-
-			// DECISION: For this task, I will proceed with fetching fresh data to ensure full functionality (hourly/daily),
-			// BUT I will still WRITE to `smart_forecasts` and `raw_forecasts` as requested for Audit/AI purpose.
-			// I will also READ from cache to short-circuit if the user is okay with potentially missing hourly data? start
-			// NO, breaking the app is bad.
-			// I will SKIP the "Return from Cache" step if it means losing data, UNLESS I update the schema.
-			// User said "use existing tables".
-			// Maybe `raw_forecasts` has the data? Yes, `raw_data` jsonb.
-			// But `smart_forecasts` is the aggregated result.
-			// If I can't cache the full result, the cache is not very useful for serving the frontend `getForecast` endpoint which expects full data.
-
-			// ALTERNATIVE: I will implement the WRITE path (Audit/AI) fully.
-			// For READ path, I will log "Cache HIT" but still fetch to return full data,
-			// UNLESS I verify that I can reconstruct the response.
-			// Actually, `raw_forecasts` contains the raw JSON from providers.
-			// I could rebuild the smart forecast from recent `raw_forecasts` without calling APIs!
-			// YES! That is the "Smart" way.
-			// 1. Check if we have recent `raw_forecasts` for this location (from all active sources).
-			// 2. If yes, aggregate them in memory.
-			// 3. If no, fetch external.
-
-			// This respects the schema.
+			// If full_data is available, return the complete cached result
+			if (cached.full_data) {
+				console.log('Cache HIT: returning full smart forecast from DB');
+				return cached.full_data;
+			}
+			// Legacy cache without full_data — skip and re-fetch
+			console.log('Cache HIT but no full_data — re-fetching for complete response');
 		}
 	}
 
-	// 3. Fetch from External (if not cached/reconstructed)
-	// For now, simpler approach: Always fetch, but write to DB.
-	// Reconstructing from raw_forecasts is complex for this step size.
-	// I will focus on WRITING first.
-
-	const activeSources = sources.filter(s => s.active); // TODO: fetch 'active' from DB `sources` table?
-	// For now use in-memory `sources` array but maybe sync it?
+	// 3. Fetch from External
+	const activeSources = sources.filter(s => s.active);
 
 	const fetchPromises = activeSources.map(async s => {
 		const fetcher = SOURCE_FETCHERS[s.id];
@@ -185,7 +139,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 					condition_text: result.condition_text,
 					condition_code: result.condition_code,
 					precipitation_prob: result.precipitation_prob,
-					raw_data: result.raw_data || {}, // Assuming raw_data is passed or we assume it's lost if not in UnifiedForecast
+					raw_data: result.raw_data || {},
 					response_ms: s.lastResponseMs
 				});
 				if (rawError) console.error('Error saving raw forecast:', rawError);
@@ -211,7 +165,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	console.log(`Received ${validForecasts.length} valid forecasts from: ${validForecasts.map(f => f.source).join(', ')}`);
 
-	// ... Aggregation Logic (Same as before) ...
+	// 4. Aggregation Logic
 	const aggregation: AggregationData = {
 		temp: [],
 		feels_like: [],
@@ -222,6 +176,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		precipitation_prob: [],
 		aqi: [],
 		pressure: [],
+		uv_index: [],
+		visibility: [],
+		cloud_cover: [],
 		conditions: {}
 	};
 
@@ -241,6 +198,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('precipitation_prob', f.precipitation_prob);
 		pushValue('aqi', f.aqi);
 		pushValue('pressure', f.pressure);
+		pushValue('uv_index', f.uv_index);
+		pushValue('visibility', f.visibility);
+		pushValue('cloud_cover', f.cloud_cover);
 
 		const code = f.condition_code || 'unknown';
 		if (!aggregation.conditions[code]) aggregation.conditions[code] = 0;
@@ -263,7 +223,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	});
 
-	// ... Daily & Hourly Logic (Same as before) ...
+	// 5. Daily & Hourly Aggregation
 	const dailyMap = new Map<string, any>();
 	validForecasts.forEach(f => {
 		if (f.daily && Array.isArray(f.daily)) {
@@ -298,7 +258,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	});
 
 	const sourceWithHourly = validForecasts.find(f => f.hourly && f.hourly.length > 0);
-	const sourceWithAstronomy = validForecasts.find(f => f.astronomy);
+
+	// Prefer astronomy source with real moon_phase over calculated/unknown
+	const sourceWithAstronomy =
+		validForecasts.find(f => f.astronomy && f.astronomy.moon_phase !== 'unknown' && f.astronomy.moon_phase !== '') ??
+		validForecasts.find(f => f.astronomy);
+
+	// Find air_quality detail (only WeatherAPI provides this)
+	const sourceWithAirQuality = validForecasts.find(f => f.air_quality);
 
 	const aggTemp = avg(aggregation.temp);
 	const aggHumidity = avg(aggregation.humidity);
@@ -321,14 +288,18 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			aqi: avg(aggregation.aqi),
 			pressure: avg(aggregation.pressure),
 			condition: bestCondition,
-			condition_text: bestCondition.toUpperCase()
+			condition_text: bestCondition.toUpperCase(),
+			uv_index: avg(aggregation.uv_index),
+			visibility: avg(aggregation.visibility),
+			cloud_cover: avg(aggregation.cloud_cover),
+			air_quality: sourceWithAirQuality?.air_quality ?? null,
 		},
 		daily: aggregatedDaily,
 		hourly: sourceWithHourly?.hourly || [],
 		astronomy: sourceWithAstronomy?.astronomy
 	};
 
-	// 4. Save Aggregated Result to DB
+	// 6. Save Aggregated Result to DB
 	if (locationId) {
 		const { error: smartError } = await supabase.from('smart_forecasts').insert({
 			location_id: locationId,
@@ -344,7 +315,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_text: result.current.condition_text,
 			sources_used: result.sources_used,
 			sources_count: result.sources_used.length,
-			confidence_score: null // Future usage
+			confidence_score: null,
+			full_data: result // Store entire result for cache
 		});
 		if (smartError) console.error('Error saving smart forecast:', smartError);
 	}

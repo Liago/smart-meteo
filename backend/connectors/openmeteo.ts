@@ -8,9 +8,9 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 		const params = {
 			latitude: lat,
 			longitude: lon,
-			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl', // Added pressure_msl
+			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,cloud_cover',
 			hourly: 'temperature_2m,precipitation_probability,weather_code',
-			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset', // Removed moon_phase as it likely caused regressions
+			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max',
 			timezone: 'auto'
 		};
 
@@ -28,18 +28,16 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			temp_min: daily.temperature_2m_min[index],
 			precipitation_prob: daily.precipitation_probability_max[index],
 			condition_code: String(daily.weather_code[index]),
-			condition_text: `Code ${daily.weather_code[index]}`
+			condition_text: `Code ${daily.weather_code[index]}`,
+			uv_index_max: daily.uv_index_max?.[index] ?? null,
 		}));
 
 		// Map hourly data (from current time onwards)
-		// OpenMeteo hourly returns all 24h for 7 days typically.
-		// We map from the current hour to the end of the available data.
 		const now = new Date();
-		const currentHourISO = now.toISOString().slice(0, 13) + ':00'; // Match approx format YYYY-MM-DDTHH:00
+		const currentHourISO = now.toISOString().slice(0, 13) + ':00';
 
-		// Find start index. hourly.time array is sorted.
 		let startIndex = hourly.time.findIndex((t: string) => t >= currentHourISO);
-		if (startIndex === -1) startIndex = 0; // Fallback
+		if (startIndex === -1) startIndex = 0;
 
 		// Map ALL remaining hourly data
 		const hourlyForecasts = hourly.time.slice(startIndex).map((time: string, index: number) => {
@@ -53,16 +51,10 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			};
 		});
 
-
-
 		// Map Astronomy (Sunrise/Sunset for today)
-		// daily.sunrise is ISO string array
-
-		// Use local moon phase calculation
-		// We can just use the current date or the date of the forecast
 		const astronomy = {
-			sunrise: daily.sunrise[0], // Today's sunrise
-			sunset: daily.sunset[0],    // Today's sunset
+			sunrise: daily.sunrise[0],
+			sunset: daily.sunset[0],
 			moon_phase: getMoonPhase(new Date())
 		};
 
@@ -81,7 +73,10 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			condition_code: String(current.weather_code),
 			precipitation_prob: daily.precipitation_probability_max ? daily.precipitation_probability_max[0] : null,
 			precipitation_intensity: current.precipitation,
-			pressure: current.pressure_msl, // Added pressure mapping
+			pressure: current.pressure_msl,
+			uv_index: current.uv_index ?? null,
+			cloud_cover: current.cloud_cover ?? null,
+			visibility: null, // Open-Meteo current doesn't include visibility by default
 			daily: dailyForecasts,
 			hourly: hourlyForecasts,
 			astronomy: astronomy
