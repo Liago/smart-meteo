@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { UnifiedForecast } from '../utils/formatter';
+import { DailyForecast, HourlyForecast } from '../types';
 
 const TOMORROW_API_URL = 'https://api.tomorrow.io/v4/weather/realtime';
+const TOMORROW_FORECAST_URL = 'https://api.tomorrow.io/v4/weather/forecast';
 
 // Tomorrow.io weatherCode → normalized condition string
 const TOMORROW_CODE_TO_CONDITION: Record<number, string> = {
@@ -64,17 +66,60 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 		return null;
 	}
 
-	try {
-		const response = await axios.get<TomorrowResponse>(TOMORROW_API_URL, {
-			params: {
-				location: `${lat},${lon}`,
-				apikey: apiKey,
-				units: 'metric'
-			}
-		});
+	const baseParams = {
+		location: `${lat},${lon}`,
+		apikey: apiKey,
+		units: 'metric'
+	};
 
-		const data = response.data.data;
+	try {
+		// Fetch realtime + forecast in parallel
+		const [realtimeRes, forecastRes] = await Promise.allSettled([
+			axios.get<TomorrowResponse>(TOMORROW_API_URL, { params: baseParams }),
+			axios.get(TOMORROW_FORECAST_URL, { params: { ...baseParams, timesteps: '1d,1h' } })
+		]);
+
+		// Realtime is required
+		if (realtimeRes.status !== 'fulfilled') {
+			console.error('Tomorrow.io realtime failed:', (realtimeRes as PromiseRejectedResult).reason?.message);
+			return null;
+		}
+
+		const data = realtimeRes.value.data.data;
 		const values = data.values;
+
+		// Parse forecast data if available
+		let daily: DailyForecast[] = [];
+		let hourly: HourlyForecast[] = [];
+
+		if (forecastRes.status === 'fulfilled') {
+			const forecastData = forecastRes.value.data;
+
+			// Map daily forecasts
+			if (forecastData.timelines?.daily) {
+				daily = forecastData.timelines.daily.map((day: any) => ({
+					date: day.time.slice(0, 10),
+					temp_max: day.values.temperatureMax ?? null,
+					temp_min: day.values.temperatureMin ?? null,
+					precipitation_prob: day.values.precipitationProbabilityMax ?? null,
+					condition_code: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
+					condition_text: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
+				}));
+			}
+
+			// Map hourly forecasts (first 24 hours)
+			if (forecastData.timelines?.hourly) {
+				hourly = forecastData.timelines.hourly.slice(0, 24).map((h: any) => ({
+					time: h.time,
+					temp: h.values.temperature,
+					precipitation_prob: h.values.precipitationProbability ?? null,
+					condition_code: tomorrowCodeToText(h.values.weatherCode),
+					condition_text: tomorrowCodeToText(h.values.weatherCode),
+				}));
+			}
+		} else {
+			console.warn('Tomorrow.io forecast failed, using realtime only:', (forecastRes as PromiseRejectedResult).reason?.message);
+		}
 
 		return new UnifiedForecast({
 			source: 'tomorrow.io',
@@ -90,7 +135,9 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 			condition_text: tomorrowCodeToText(values.weatherCode),
 			condition_code: tomorrowCodeToText(values.weatherCode),
 			precipitation_prob: values.precipitationProbability,
-			pressure: values.pressureSurfaceLevel ?? null
+			pressure: values.pressureSurfaceLevel ?? null,
+			daily: daily,
+			hourly: hourly
 		});
 
 	} catch (error: any) {

@@ -1,4 +1,4 @@
-import { UnifiedForecastData, DailyForecast, HourlyForecast, AstronomyData } from '../types';
+import { UnifiedForecastData, DailyForecast, HourlyForecast, AstronomyData, AirQualityDetail } from '../types';
 
 /**
  * Standardizes the weather condition codes across different providers.
@@ -36,6 +36,10 @@ export class UnifiedForecast implements UnifiedForecastData {
 	precipitation_intensity: number | null;
 	aqi: number | null;
 	pressure: number | null;
+	uv_index: number | null;
+	visibility: number | null;
+	cloud_cover: number | null;
+	air_quality?: AirQualityDetail;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
@@ -60,7 +64,13 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
 		this.aqi = data.aqi ?? null;
 		this.pressure = data.pressure ?? null;
+		this.uv_index = data.uv_index ?? null;
+		this.visibility = data.visibility ?? null;
+		this.cloud_cover = data.cloud_cover ?? null;
 		this.raw_data = data.raw_data;
+		if (data.air_quality) {
+			this.air_quality = data.air_quality;
+		}
 		if (data.daily) {
 			this.daily = data.daily;
 		}

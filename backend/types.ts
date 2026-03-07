@@ -5,6 +5,7 @@ export interface DailyForecast {
 	precipitation_prob: number | null;
 	condition_code: string;
 	condition_text: string | null;
+	uv_index_max?: number | null;
 }
 
 export interface HourlyForecast {
@@ -19,6 +20,16 @@ export interface AstronomyData {
 	sunrise: string;
 	sunset: string;
 	moon_phase: string;
+}
+
+export interface AirQualityDetail {
+	aqi_us_epa: number | null;
+	pm2_5: number | null;
+	pm10: number | null;
+	no2: number | null;
+	o3: number | null;
+	co: number | null;
+	so2: number | null;
 }
 
 export interface UnifiedForecastData {
@@ -38,6 +49,10 @@ export interface UnifiedForecastData {
 	precipitation_intensity?: number | null;
 	aqi: number | null;
 	pressure: number | null;
+	uv_index?: number | null;
+	visibility?: number | null;        // km
+	cloud_cover?: number | null;       // %
+	air_quality?: AirQualityDetail;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

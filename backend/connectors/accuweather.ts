@@ -1,12 +1,17 @@
 import axios from 'axios';
 import { UnifiedForecast } from '../utils/formatter';
+import { normalizeCondition } from '../utils/formatter';
+import { DailyForecast, AstronomyData } from '../types';
 
 const BASE_URL = 'http://dataservice.accuweather.com';
-const locationCache = new Map<string, string>();
+
+// Cache locationKey with TTL (1 hour) to reduce API calls
+const locationCache = new Map<string, { key: string; expiresAt: number }>();
 
 async function getLocationKey(lat: number, lon: number, apiKey: string): Promise<string | null> {
-	const key = `${lat},${lon}`;
-	if (locationCache.has(key)) return locationCache.get(key) || null;
+	const cacheKey = `${lat},${lon}`;
+	const cached = locationCache.get(cacheKey);
+	if (cached && cached.expiresAt > Date.now()) return cached.key;
 
 	try {
 		const response = await axios.get(`${BASE_URL}/locations/v1/cities/geoposition/search`, {
@@ -16,7 +21,10 @@ async function getLocationKey(lat: number, lon: number, apiKey: string): Promise
 			}
 		});
 		if (response.data && response.data.Key) {
-			locationCache.set(key, response.data.Key);
+			locationCache.set(cacheKey, {
+				key: response.data.Key,
+				expiresAt: Date.now() + 60 * 60 * 1000 // 1 hour TTL
+			});
 			return response.data.Key;
 		}
 	} catch (error: any) {
@@ -36,17 +44,57 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 		const locationKey = await getLocationKey(lat, lon, apiKey);
 		if (!locationKey) return null;
 
-		const response = await axios.get(`${BASE_URL}/currentconditions/v1/${locationKey}`, {
-			params: {
-				apikey: apiKey,
-				details: 'true'
-			}
-		});
+		// Fetch current conditions + 5-day forecast in parallel
+		const [currentRes, forecastRes] = await Promise.allSettled([
+			axios.get(`${BASE_URL}/currentconditions/v1/${locationKey}`, {
+				params: { apikey: apiKey, details: 'true' }
+			}),
+			axios.get(`${BASE_URL}/forecasts/v1/daily/5day/${locationKey}`, {
+				params: { apikey: apiKey, metric: true, details: true }
+			})
+		]);
 
-		const data = response.data[0];
+		// Current is required
+		if (currentRes.status !== 'fulfilled') {
+			console.error('AccuWeather current failed:', (currentRes as PromiseRejectedResult).reason?.message);
+			return null;
+		}
+
+		const data = currentRes.value.data[0];
 		if (!data) return null;
 
-		return new UnifiedForecast({
+		// Parse 5-day forecast if available
+		let daily: DailyForecast[] = [];
+		let astronomy: AstronomyData | undefined;
+
+		if (forecastRes.status === 'fulfilled') {
+			const forecastData = forecastRes.value.data;
+
+			if (forecastData.DailyForecasts) {
+				daily = forecastData.DailyForecasts.map((day: any) => ({
+					date: day.Date.slice(0, 10),
+					temp_max: day.Temperature.Maximum.Value,
+					temp_min: day.Temperature.Minimum.Value,
+					precipitation_prob: day.Day?.PrecipitationProbability ?? null,
+					condition_code: normalizeCondition(day.Day?.IconPhrase),
+					condition_text: day.Day?.IconPhrase ?? null,
+				}));
+
+				// Extract astronomy from first day
+				const firstDay = forecastData.DailyForecasts[0];
+				if (firstDay?.Sun?.Rise && firstDay?.Sun?.Set) {
+					astronomy = {
+						sunrise: firstDay.Sun.Rise,
+						sunset: firstDay.Sun.Set,
+						moon_phase: firstDay.Moon?.Phase ?? 'unknown',
+					};
+				}
+			}
+		} else {
+			console.warn('AccuWeather forecast failed, using current only:', (forecastRes as PromiseRejectedResult).reason?.message);
+		}
+
+		const forecastPayload: any = {
 			source: 'accuweather',
 			lat: lat,
 			lon: lon,
@@ -59,8 +107,17 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 			wind_gust: data.WindGust?.Speed?.Metric?.Value ? data.WindGust.Speed.Metric.Value / 3.6 : null,
 			condition_text: data.WeatherText,
 			precipitation_prob: null,
-			pressure: data.Pressure?.Metric?.Value ?? null
-		});
+			pressure: data.Pressure?.Metric?.Value ?? null,
+			visibility: data.Visibility?.Metric?.Value ?? null, // already in km
+			uv_index: data.UVIndex ?? null,
+			daily: daily,
+		};
+
+		if (astronomy) {
+			forecastPayload.astronomy = astronomy;
+		}
+
+		return new UnifiedForecast(forecastPayload);
 
 	} catch (error: any) {
 		console.error('Error fetching AccuWeather:', error.message);
