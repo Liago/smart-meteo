@@ -48,8 +48,25 @@ export const conditionGradients: Record<WeatherCondition, string> = {
 
 // WMO Weather Codes to text/icon mapping
 // Source: https://open-meteo.com/en/docs
+// Also handles normalized condition strings ('clear', 'cloudy', etc.)
+// returned by non-WMO sources (Tomorrow.io, OWM, AccuWeather, WeatherAPI)
 export function getWMOWeatherInfo(code: string | number): { label: string; icon: string } {
+	// First, try normalized condition strings (from non-WMO sources)
+	if (typeof code === 'string') {
+		const norm = code.toLowerCase();
+		switch (norm) {
+			case 'clear': return { label: 'Sereno', icon: '☀️' };
+			case 'cloudy': return { label: 'Nuvoloso', icon: '☁️' };
+			case 'rain': return { label: 'Pioggia', icon: '🌧️' };
+			case 'snow': return { label: 'Neve', icon: '🌨️' };
+			case 'storm': return { label: 'Temporale', icon: '⛈️' };
+			case 'fog': return { label: 'Nebbia', icon: '🌫️' };
+			case 'unknown': return { label: 'N/D', icon: '❓' };
+		}
+	}
+
 	const c = Number(code);
+	if (isNaN(c)) return { label: 'N/D', icon: '❓' };
 
 	switch (c) {
 		case 0: return { label: 'Sereno', icon: '☀️' };

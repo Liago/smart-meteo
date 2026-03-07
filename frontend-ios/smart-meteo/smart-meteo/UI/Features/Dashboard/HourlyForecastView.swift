@@ -283,7 +283,7 @@ struct HourlyForecastView: View {
             guard let date = parseDate(h.time), calendar.isDateInToday(date) else { continue }
             hasTodayData = true
             let hour = calendar.component(.hour, from: date)
-            let code = Int(h.conditionCode) ?? 0
+            let code = Int(h.conditionCode) ?? normalizedToWMO(h.conditionCode)
             
             if hour >= 6 && hour < 12 {
                 morningCodes[code, default: 0] += 1
@@ -333,6 +333,18 @@ struct HourlyForecastView: View {
         return desc
     }
     
+    private func normalizedToWMO(_ code: String) -> Int {
+        switch code.lowercased() {
+        case "clear": return 0
+        case "cloudy": return 3
+        case "rain": return 61
+        case "snow": return 71
+        case "storm": return 95
+        case "fog": return 45
+        default: return 0
+        }
+    }
+
     private func conditionAdjectivePlural(for code: Int) -> String {
         switch code {
         case 0: return "sereni"
@@ -506,16 +518,28 @@ struct ChartPointView: View {
     }
     
     private func iconName(for code: String) -> String {
-        guard let c = Int(code) else { return "questionmark" }
-        switch c {
-        case 0: return "sun.max.fill"
-        case 1, 2: return "cloud.sun.fill"
-        case 3: return "cloud.fill"
-        case 45, 48: return "cloud.fog.fill"
-        case 51, 53, 55, 56, 57: return "cloud.drizzle.fill"
-        case 61, 63, 65, 66, 67, 80, 81: return "cloud.rain.fill"
-        case 71, 73, 75, 77, 85, 86: return "snowflake"
-        case 82, 95, 96, 99: return "cloud.bolt.rain.fill"
+        // Try WMO numeric codes first
+        if let c = Int(code) {
+            switch c {
+            case 0: return "sun.max.fill"
+            case 1, 2: return "cloud.sun.fill"
+            case 3: return "cloud.fill"
+            case 45, 48: return "cloud.fog.fill"
+            case 51, 53, 55, 56, 57: return "cloud.drizzle.fill"
+            case 61, 63, 65, 66, 67, 80, 81: return "cloud.rain.fill"
+            case 71, 73, 75, 77, 85, 86: return "snowflake"
+            case 82, 95, 96, 99: return "cloud.bolt.rain.fill"
+            default: return "questionmark"
+            }
+        }
+        // Handle normalized condition strings (from non-WMO sources)
+        switch code.lowercased() {
+        case "clear": return "sun.max.fill"
+        case "cloudy": return "cloud.fill"
+        case "rain": return "cloud.rain.fill"
+        case "snow": return "snowflake"
+        case "storm": return "cloud.bolt.rain.fill"
+        case "fog": return "cloud.fog.fill"
         default: return "questionmark"
         }
     }
