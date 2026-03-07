@@ -46,7 +46,7 @@ export async function fetchFromWeatherstack(lat: number, lon: number): Promise<U
 			temp: current.temperature,
 			feels_like: current.feelslike,
 			humidity: current.humidity,
-			wind_speed: current.wind_speed,
+			wind_speed: current.wind_speed != null ? Number((current.wind_speed / 3.6).toFixed(2)) : null,
 			wind_direction: current.wind_degree,
 			condition_text: current.weather_descriptions ? current.weather_descriptions[0] : 'Unknown',
 			condition_code: String(current.weather_code),

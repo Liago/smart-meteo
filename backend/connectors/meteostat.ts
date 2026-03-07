@@ -57,6 +57,7 @@ export async function fetchFromMeteostat(lat: number, lon: number): Promise<Unif
 			condition_code: String(latest.coco),
 			precipitation_prob: null,
 			precipitation_intensity: latest.prcp,
+			pressure: latest.pres ?? null,
 			daily: [],
 			hourly: [] // Could map this, but it's historical "forecast" so maybe confusing? Let's leave empty for now.
 		});

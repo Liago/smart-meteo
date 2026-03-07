@@ -53,7 +53,9 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.wind_direction = data.wind_direction ?? null;
 		this.wind_gust = typeof data.wind_gust === 'number' ? Number(data.wind_gust.toFixed(1)) : null;
 		this.condition_text = data.condition_text ?? null;
-		this.condition_code = normalizeCondition(data.condition_text);
+		this.condition_code = data.condition_code
+			? data.condition_code
+			: normalizeCondition(data.condition_text);
 		this.precipitation_prob = data.precipitation_prob ?? null;
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
 		this.aqi = data.aqi ?? null;
