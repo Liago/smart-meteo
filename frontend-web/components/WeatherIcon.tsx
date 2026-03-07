@@ -25,6 +25,18 @@ export default function WeatherIcon({ code, condition, isNight = false, classNam
 	if (code !== undefined) {
 		const c = Number(code);
 
+		// Handle normalized condition strings passed as code
+		if (isNaN(c) && typeof code === 'string') {
+			const norm = code.toLowerCase();
+			if (norm === 'clear') return isNight ? <Moon className={className} /> : <Sun className={className} />;
+			if (norm === 'cloudy') return <Cloud className={className} />;
+			if (norm === 'rain') return <CloudRain className={className} />;
+			if (norm === 'snow') return <CloudSnow className={className} />;
+			if (norm === 'storm') return <CloudLightning className={className} />;
+			if (norm === 'fog') return <CloudFog className={className} />;
+			return <Cloud className={className} />;
+		}
+
 		// WMO Weather Codes
 		switch (c) {
 			case 0: // Clear sky
