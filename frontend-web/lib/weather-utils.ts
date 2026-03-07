@@ -121,3 +121,21 @@ export function isDaytime(sunrise: string, sunset: string): boolean {
 		return true;
 	}
 }
+
+// UV Index labels and colors
+export function getUvLabel(uv: number): string {
+	if (uv <= 2) return 'Basso';
+	if (uv <= 5) return 'Moderato';
+	if (uv <= 7) return 'Alto';
+	if (uv <= 10) return 'Molto Alto';
+	return 'Estremo';
+}
+
+export function getUvColor(uv: number): string {
+	if (uv <= 2) return 'text-green-300';
+	if (uv <= 5) return 'text-yellow-300';
+	if (uv <= 7) return 'text-orange-300';
+	if (uv <= 10) return 'text-red-300';
+	return 'text-purple-300';
+}
+
