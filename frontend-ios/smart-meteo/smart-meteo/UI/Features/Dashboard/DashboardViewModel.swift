@@ -21,15 +21,27 @@ class DashboardViewModel: ObservableObject {
     private func setupBindings() {
         // Sync Auth State
         appState.$isAuthenticated
-            .assign(to: &$isAuthenticated)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] auth in
+                self?.isAuthenticated = auth
+            }
+            .store(in: &cancellables)
 
         // Sync API State
         appState.$weatherState
-            .assign(to: &$state)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] newState in
+                self?.state = newState
+            }
+            .store(in: &cancellables)
         
         // Sync Location Name
         appState.$currentLocationName
-            .assign(to: &$currentLocationName)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] newName in
+                self?.currentLocationName = newName
+            }
+            .store(in: &cancellables)
             
         // Sync Condition for Background
         appState.$weatherState
@@ -39,7 +51,11 @@ class DashboardViewModel: ObservableObject {
                 }
                 return nil
             }
-            .assign(to: &$currentCondition)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] condition in
+                self?.currentCondition = condition ?? "clear"
+            }
+            .store(in: &cancellables)
     }
     
     func refresh() {

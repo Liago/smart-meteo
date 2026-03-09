@@ -70,47 +70,51 @@ struct FavoriteRowView: View {
     var dismiss: DismissAction
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(location.name)
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    
-                Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
+        Button(action: {
+            appState.selectLocation(coordinate: location.coordinate, name: location.name)
             
-            Spacer()
+            // Navigate back
+            dismiss()
             
-            // Home Toggle Button
-            Button(action: {
-                appState.setAsHome(location: location)
-            }) {
-                Image(systemName: appState.isHome(location: location) ? "house.fill" : "house")
-                    .foregroundColor(appState.isHome(location: location) ? Color(red: 236/255, green: 104/255, blue: 90/255) : .gray)
-                    .font(.title3)
-                    .padding(8)
+            // Hide sidebar overlay smoothly to reveal the dashboard
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation {
+                    isSidebarPresented = false
+                }
             }
-            .buttonStyle(.plain)
+        }) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(location.name)
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        
+                    Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                // Home Toggle Button
+                Button(action: {
+                    appState.setAsHome(location: location)
+                }) {
+                    Image(systemName: appState.isHome(location: location) ? "house.fill" : "house")
+                        .foregroundColor(appState.isHome(location: location) ? Color(red: 236/255, green: 104/255, blue: 90/255) : .gray)
+                        .font(.title3)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            )
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        )
-        // Row Tap Gesture
-        .onTapGesture {
-            // Close sidebar FIRST so the dashboard is back in view
-            withAnimation {
-                isSidebarPresented = false
-            }
-            // Then select the location on next run loop — dashboard will be active to respond
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                appState.selectLocation(coordinate: location.coordinate, name: location.name)
-            }
-        }
+        .buttonStyle(.plain)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
     }

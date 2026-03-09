@@ -1,9 +1,18 @@
 import SwiftUI
 
 struct DashboardView: View {
-    @StateObject private var viewModel = DashboardViewModel(appState: AppState.shared)
+    @EnvironmentObject var appState: AppState
     @State private var isSidebarPresented = false
     @State private var isSearchPresented = false
+    
+    // Computed helpers that delegate to appState
+    private var isCurrentLocationHome: Bool {
+        appState.homeLocation?.name == appState.currentLocationName
+    }
+    
+    private var isCurrentLocationFavorite: Bool {
+        appState.isFavorite(name: appState.currentLocationName)
+    }
     
     var body: some View {
         NavigationStack {
@@ -32,10 +41,10 @@ struct DashboardView: View {
                             Spacer()
                             
                             HStack(spacing: 4) {
-                                Image(systemName: viewModel.isCurrentLocationHome ? "house.fill" : "location.fill")
+                                Image(systemName: isCurrentLocationHome ? "house.fill" : "location.fill")
                                     .font(.subheadline)
                                     .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
-                                Text(viewModel.currentLocationName)
+                                Text(appState.currentLocationName)
                                     .font(.headline)
                                     .fontWeight(.bold)
                                     .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
@@ -44,22 +53,24 @@ struct DashboardView: View {
                             .contextMenu {
                                 // Toggle Favorite
                                 Button {
-                                    viewModel.toggleFavorite()
+                                    appState.toggleFavorite()
                                 } label: {
                                     Label(
-                                        viewModel.isCurrentLocationFavorite ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti",
-                                        systemImage: viewModel.isCurrentLocationFavorite ? "star.slash" : "star"
+                                        isCurrentLocationFavorite ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti",
+                                        systemImage: isCurrentLocationFavorite ? "star.slash" : "star"
                                     )
                                 }
                                 
                                 // Set as Home (only when it's already a favorite)
-                                if viewModel.isCurrentLocationFavorite {
+                                if isCurrentLocationFavorite {
                                     Button {
-                                        viewModel.setCurrentAsHome()
+                                        if let fav = appState.favoriteLocations.first(where: { $0.name == appState.currentLocationName }) {
+                                            appState.setAsHome(location: fav)
+                                        }
                                     } label: {
                                         Label(
-                                            viewModel.isCurrentLocationHome ? "Rimuovi come Casa" : "Imposta come Casa",
-                                            systemImage: viewModel.isCurrentLocationHome ? "house.slash" : "house"
+                                            isCurrentLocationHome ? "Rimuovi come Casa" : "Imposta come Casa",
+                                            systemImage: isCurrentLocationHome ? "house.slash" : "house"
                                         )
                                     }
                                 }
@@ -86,18 +97,17 @@ struct DashboardView: View {
                         .padding(.horizontal, 24)
                         .padding(.top, 10)
                         
-                        switch viewModel.state {
+                        switch appState.weatherState {
                         case .idle:
                             VStack {
                                 Text("Waiting for location...")
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.gray)
                                     .padding(.top, 50)
                                 
                                 Button("Use Default Location") {
-                                    AppState.shared.requestLocation()
+                                    appState.requestLocation()
                                 }
                                 .buttonStyle(.bordered)
-                                .tint(.white)
                                 .padding(.top, 10)
                             }
                                 
@@ -107,7 +117,7 @@ struct DashboardView: View {
                                     .scaleEffect(1.3)
                                     .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
                                 
-                                Text(viewModel.currentLocationName)
+                                Text(appState.currentLocationName)
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.black)
                                 
@@ -141,9 +151,11 @@ struct DashboardView: View {
                                     .foregroundColor(.yellow)
                                 Text(error.localizedDescription)
                                     .multilineTextAlignment(.center)
-                                    .foregroundColor(.white)
-                                Button("Retry") {
-                                    viewModel.refresh()
+                                    .foregroundColor(.black)
+                                Button("Riprova") {
+                                    if let location = appState.currentLocation {
+                                        appState.fetchWeather(for: location)
+                                    }
                                 }
                                 .buttonStyle(.borderedProminent)
                             }
@@ -156,7 +168,9 @@ struct DashboardView: View {
                     .padding(.bottom, 50)
                 }
                 .refreshable {
-                    viewModel.refresh()
+                    if let location = appState.currentLocation {
+                        appState.fetchWeather(for: location)
+                    }
                 }
                 
                 // Sidebar Overlay
@@ -191,4 +205,5 @@ struct DashboardView: View {
 
 #Preview {
     DashboardView()
+        .environmentObject(AppState.shared)
 }
