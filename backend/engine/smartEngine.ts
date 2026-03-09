@@ -257,7 +257,39 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		};
 	});
 
-	const sourceWithHourly = validForecasts.find(f => f.hourly && f.hourly.length > 0);
+	// 5b. Hourly Aggregation (merge from all sources by time slot)
+	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[] }>();
+	validForecasts.forEach(f => {
+		if (f.hourly && Array.isArray(f.hourly)) {
+			f.hourly.forEach(h => {
+				// Normalize time key to YYYY-MM-DDTHH:00 for consistent grouping
+				const timeKey = h.time.slice(0, 13) + ':00';
+				if (!hourlyMap.has(timeKey)) {
+					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [] });
+				}
+				const entry = hourlyMap.get(timeKey)!;
+				if (h.temp != null) entry.temps.push(h.temp);
+				if (h.precipitation_prob != null) entry.probs.push(h.precipitation_prob);
+				entry.codes.push(h.condition_code);
+			});
+		}
+	});
+
+	const aggregatedHourly = Array.from(hourlyMap.entries())
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([time, data]) => {
+			const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
+			const codeCounts: Record<string, number> = {};
+			data.codes.forEach(c => codeCounts[c] = (codeCounts[c] || 0) + 1);
+			const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+			return {
+				time,
+				temp: avgSimple(data.temps) ?? 0,
+				precipitation_prob: avgSimple(data.probs) ?? 0,
+				condition_code: bestCode,
+				condition_text: bestCode.toUpperCase()
+			};
+		});
 
 	// Prefer astronomy source with real moon_phase over calculated/unknown
 	const sourceWithAstronomy =
@@ -295,7 +327,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			air_quality: sourceWithAirQuality?.air_quality ?? null,
 		},
 		daily: aggregatedDaily,
-		hourly: sourceWithHourly?.hourly || [],
+		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy
 	};
 

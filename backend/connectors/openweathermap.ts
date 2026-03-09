@@ -62,8 +62,8 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 				condition_text: d.codes[Math.floor(d.codes.length / 2)] ?? null,
 			}));
 
-			// Hourly from first 24 slots (72 hours at 3h intervals)
-			hourly = forecastData.list.slice(0, 24).map((slot: any) => ({
+			// Hourly from all available slots (~5 days at 3h intervals)
+			hourly = forecastData.list.map((slot: any) => ({
 				time: new Date(slot.dt * 1000).toISOString(),
 				temp: slot.main.temp,
 				precipitation_prob: (slot.pop ?? 0) * 100,

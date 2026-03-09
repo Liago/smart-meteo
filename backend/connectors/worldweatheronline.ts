@@ -36,25 +36,30 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			condition_text: d.hourly && d.hourly[0] && d.hourly[0].weatherDesc ? d.hourly[0].weatherDesc[0].value : ''
 		})) : [];
 
-		// Map Hourly (from the first day, if available)
-		let hourly = [];
-		if (data.weather && data.weather[0] && data.weather[0].hourly) {
-			// WWO hourly is in 'time' string '0', '100', '200' etc.
-			// We need to construct full ISO string.
-			const dateStr = data.weather[0].date; // YYYY-MM-DD
-			hourly = data.weather[0].hourly.map((h: any) => {
-				const timeStr = (h.time || '0').padStart(4, '0'); // '200' -> '0200'
-				const hours = timeStr.slice(0, 2);
-				const minutes = timeStr.slice(2);
-				const isoTime = `${dateStr}T${hours}:${minutes}:00`;
+		// Map Hourly from ALL forecast days
+		let hourly: any[] = [];
+		if (data.weather) {
+			data.weather.forEach((day: any) => {
+				if (day.hourly) {
+					// WWO hourly is in 'time' string '0', '100', '200' etc.
+					// We need to construct full ISO string.
+					const dateStr = day.date; // YYYY-MM-DD
+					const dayHourly = day.hourly.map((h: any) => {
+						const timeStr = (h.time || '0').padStart(4, '0'); // '200' -> '0200'
+						const hours = timeStr.slice(0, 2);
+						const minutes = timeStr.slice(2);
+						const isoTime = `${dateStr}T${hours}:${minutes}:00`;
 
-				return {
-					time: isoTime,
-					temp: Number(h.tempC),
-					precipitation_prob: Number(h.chanceofrain),
-					condition_code: h.weatherCode,
-					condition_text: h.weatherDesc && h.weatherDesc[0] ? h.weatherDesc[0].value : ''
-				};
+						return {
+							time: isoTime,
+							temp: Number(h.tempC),
+							precipitation_prob: Number(h.chanceofrain),
+							condition_code: h.weatherCode,
+							condition_text: h.weatherDesc && h.weatherDesc[0] ? h.weatherDesc[0].value : ''
+						};
+					});
+					hourly.push(...dayHourly);
+				}
 			});
 		}
 

@@ -61,8 +61,9 @@ struct DailyForecastView: View {
     
     private func hourlyForDay(_ dateString: String) -> [HourlyForecast] {
         guard let hourly = hourly else { return [] }
-        // Simple string matching for YYYY-MM-DD as hourly time usually starts with date
-        return hourly.filter { $0.time.hasPrefix(dateString) }
+        // Match hours for this day (handles both "2026-03-10T10:00" and "2026-03-10T10:00:00Z" formats)
+        let datePrefix = String(dateString.prefix(10)) // normalize to YYYY-MM-DD
+        return hourly.filter { $0.time.hasPrefix(datePrefix) }
     }
 }
 

@@ -60,16 +60,21 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			condition_text: day.day.condition.text,
 		})) ?? [];
 
-		// Map hourly forecasts from today's forecast
+		// Map hourly forecasts from ALL forecast days
 		let hourly: HourlyForecast[] = [];
-		if (data.forecast?.forecastday?.[0]?.hour) {
-			hourly = data.forecast.forecastday[0].hour.map((h: any) => ({
-				time: h.time,
-				temp: h.temp_c,
-				precipitation_prob: h.chance_of_rain,
-				condition_code: normalizeCondition(h.condition.text),
-				condition_text: h.condition.text,
-			}));
+		if (data.forecast?.forecastday) {
+			data.forecast.forecastday.forEach((day: any) => {
+				if (day.hour) {
+					const dayHourly = day.hour.map((h: any) => ({
+						time: h.time,
+						temp: h.temp_c,
+						precipitation_prob: h.chance_of_rain,
+						condition_code: normalizeCondition(h.condition.text),
+						condition_text: h.condition.text,
+					}));
+					hourly.push(...dayHourly);
+				}
+			});
 		}
 
 		// Map astronomy

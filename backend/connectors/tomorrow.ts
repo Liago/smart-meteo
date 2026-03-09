@@ -107,9 +107,9 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 				}));
 			}
 
-			// Map hourly forecasts (first 24 hours)
+			// Map hourly forecasts (all available hours)
 			if (forecastData.timelines?.hourly) {
-				hourly = forecastData.timelines.hourly.slice(0, 24).map((h: any) => ({
+				hourly = forecastData.timelines.hourly.map((h: any) => ({
 					time: h.time,
 					temp: h.values.temperature,
 					precipitation_prob: h.values.precipitationProbability ?? null,
