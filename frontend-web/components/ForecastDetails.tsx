@@ -146,13 +146,9 @@ export default function ForecastDetails({ data, daily, hourly, astronomy }: Fore
 																{(() => {
 																	if (!hourly) return <div className="text-center text-white/40 py-4">Dati orari non disponibili</div>;
 
-																	const dayStart = new Date(day.date).setHours(0, 0, 0, 0);
-																	const dayEnd = new Date(day.date).setHours(23, 59, 59, 999);
-
-																	const dayHourly = hourly.filter(h => {
-																		const t = new Date(h.time).getTime();
-																		return t >= dayStart && t <= dayEnd;
-																	});
+																	// Use string prefix matching (robust across timezones)
+																	const datePrefix = day.date.slice(0, 10);
+																	const dayHourly = hourly.filter(h => h.time.startsWith(datePrefix));
 
 																	if (dayHourly.length === 0) {
 																		return <div className="text-center text-white/40 py-4">Dati orari non disponibili per questa data</div>;

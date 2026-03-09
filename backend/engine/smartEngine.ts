@@ -263,7 +263,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		if (f.hourly && Array.isArray(f.hourly)) {
 			f.hourly.forEach(h => {
 				// Normalize time key to YYYY-MM-DDTHH:00 for consistent grouping
-				const timeKey = h.time.slice(0, 13) + ':00';
+				// Replace space with T (WeatherAPI uses "2026-03-10 14:00" format)
+				const normalizedTime = h.time.replace(' ', 'T');
+				const timeKey = normalizedTime.slice(0, 13) + ':00';
 				if (!hourlyMap.has(timeKey)) {
 					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [] });
 				}
