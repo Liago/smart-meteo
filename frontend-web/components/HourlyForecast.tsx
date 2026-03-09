@@ -75,9 +75,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		// 3. Calculate Geometry
 		if (filtered.length < 2) return null;
 
-		const minTime = filtered[0].time;
-		const maxTime = filtered[filtered.length - 1].time;
-		const duration = maxTime - minTime;
+
 
 		// Get min/max temps for scaling Y-axis
 		// Interpolate temp for 'sun' events based on neighbors? 
@@ -108,18 +106,16 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		const maxTemp = Math.max(...temps) + 2;
 		const tempRange = maxTemp - minTemp || 1;
 
-		const width = filtered.length * 80; // Estimated width
+		const minSpacing = 80; // Minimum px between points
+		const width = Math.max(filtered.length * minSpacing, 300); // Min 300px width
 		const height = 200; // Increased to fit icons
 		const paddingX = 40;
 		const paddingTop = 80;  // Space for icons
 		const paddingBottom = 40; // Space for labels
 
 		const points = itemsWithTemp.map((item, index) => {
-			// X coordinate based on time linear placement, but let's just do equidistant steps if it's hourly?
-			// Actually mix of hourly and specific sun times requires time-based mapping.
-			const x = paddingX + ((item.time - minTime) / duration) * (width - 2 * paddingX);
-			// Y coordinate: higher temp -> lower Y value (SVG coords)
-			// const y = height - paddingY - ((item.temp - minTemp) / tempRange) * (height - 2 * paddingY);
+			// Use equidistant spacing to prevent foreignObject overlap
+			const x = paddingX + (index / Math.max(itemsWithTemp.length - 1, 1)) * (width - 2 * paddingX);
 			const usableHeight = height - paddingTop - paddingBottom;
 			const y = height - paddingBottom - ((item.temp - minTemp) / tempRange) * usableHeight;
 
