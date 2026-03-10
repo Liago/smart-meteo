@@ -559,31 +559,33 @@ Params: key=KEY, q={lat},{lon}, format=json, num_of_days=7, fx=yes, cc=yes, mca=
 
 ## Raccomandazioni Prioritarie
 
+> **Aggiornamento 2026-03-10:** Le raccomandazioni #1-#9 sono state implementate (vedi `CHANGELOG_API_IMPROVEMENTS.md`). Rimangono aperte le #10-#14 e alcuni gap residui documentati in `PROJECT_STATUS_SUMMARY.md`.
+
 ### Alta Priorità (Bug / Incoerenze)
 
-| # | Problema | File | Impatto |
-|---|----------|------|---------|
-| 1 | `wind_speed` Weatherstack non convertito da km/h a m/s | `connectors/weatherstack.ts` | Errore nei valori aggregati |
-| 2 | `weatherCode` Tomorrow.io non tradotto | `connectors/tomorrow.ts` | Condizione sempre `unknown` |
-| 3 | `pressure` Meteostat non estratto | `connectors/meteostat.ts` | Dato perso |
-| 4 | Solo 2 fonti contribuiscono al daily forecast (da 8 disponibili) | `engine/smartEngine.ts` | Qualità previsioni ridotta |
+| # | Problema | File | Impatto | Stato |
+|---|----------|------|---------|-------|
+| 1 | `wind_speed` Weatherstack non convertito da km/h a m/s | `connectors/weatherstack.ts` | Errore nei valori aggregati | **RISOLTO** |
+| 2 | `weatherCode` Tomorrow.io non tradotto | `connectors/tomorrow.ts` | Condizione sempre `unknown` | **RISOLTO** |
+| 3 | `pressure` Meteostat non estratto | `connectors/meteostat.ts` | Dato perso | **RISOLTO** |
+| 4 | Solo 2 fonti contribuiscono al daily forecast (da 8 disponibili) | `engine/smartEngine.ts` | Qualità previsioni ridotta | **RISOLTO** (ora 6 fonti) |
 
 ### Media Priorità (Funzionalità mancanti)
 
-| # | Miglioramento | Beneficio |
-|---|---------------|-----------|
-| 5 | Aggiungere UV Index da Open-Meteo (già richiesto, non estratto) | Dato salute |
-| 6 | Usare `moon_phase` da WWO invece del calcolo locale | Accuratezza |
-| 7 | Estrarre inquinanti AQI dettagliati da WeatherAPI | Dashboard qualità aria |
-| 8 | Aggiungere visibilità da Open-Meteo e WeatherAPI | Condizioni nebbia |
-| 9 | Usare endpoint `/forecast` di OWM, WeatherAPI, AccuWeather | Daily/hourly da più fonti |
+| # | Miglioramento | Beneficio | Stato |
+|---|---------------|-----------|-------|
+| 5 | Aggiungere UV Index da Open-Meteo (già richiesto, non estratto) | Dato salute | **RISOLTO** (Open-Meteo + WeatherAPI + AccuWeather) |
+| 6 | Usare `moon_phase` da WWO invece del calcolo locale | Accuratezza | **RISOLTO** (preferenza API, fallback locale) |
+| 7 | Estrarre inquinanti AQI dettagliati da WeatherAPI | Dashboard qualità aria | **RISOLTO** (PM2.5, PM10, NO2, O3, CO, SO2) |
+| 8 | Aggiungere visibilità da Open-Meteo e WeatherAPI | Condizioni nebbia | **PARZIALE** (OWM + AccuWeather + WeatherAPI; Open-Meteo non estratto) |
+| 9 | Usare endpoint `/forecast` di OWM, WeatherAPI, AccuWeather | Daily/hourly da più fonti | **RISOLTO** (Tomorrow.io, OWM, AccuWeather, WeatherAPI) |
 
 ### Bassa Priorità (Nice-to-have)
 
-| # | Miglioramento |
-|---|---------------|
-| 10 | Cloud cover da più fonti per condition_code più accurato |
-| 11 | Moonrise/moonset da WWO |
-| 12 | Dew point diretto da API invece di calcolo Magnus |
-| 13 | Migrazione Weatherstack a HTTPS (richiede piano Paid) |
-| 14 | Considerare sostituzione Meteostat (dati storici, non previsioni, peso già 0.8) |
+| # | Miglioramento | Stato |
+|---|---------------|-------|
+| 10 | Cloud cover da più fonti per condition_code più accurato | **PARZIALE** (Open-Meteo + WeatherAPI) |
+| 11 | Moonrise/moonset da WWO | Aperto |
+| 12 | Dew point diretto da API invece di calcolo Magnus | Aperto |
+| 13 | Migrazione Weatherstack a HTTPS (richiede piano Paid) | Aperto |
+| 14 | Considerare sostituzione Meteostat (dati storici, non previsioni, peso già 0.8) | Aperto |

@@ -2,7 +2,7 @@
 
 > Basato su: `docs/AUDIT_API_DATA_SOURCES.md`
 > Data: 2026-03-07
-> Stato: Bozza
+> Stato: **Completato** (implementazione terminata il 2026-03-07, verificata il 2026-03-10)
 
 ---
 
