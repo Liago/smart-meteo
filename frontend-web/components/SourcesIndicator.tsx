@@ -8,7 +8,7 @@ interface SourcesIndicatorProps {
 
 const sourceColors: Record<string, string> = {
   'tomorrow.io': 'bg-blue-500',
-  'meteomatics': 'bg-purple-500',
+  'open-meteo': 'bg-purple-500',
   'openweathermap': 'bg-orange-500',
   'weatherapi': 'bg-green-500',
   'accuweather': 'bg-red-500',
@@ -16,7 +16,7 @@ const sourceColors: Record<string, string> = {
 
 const sourceNames: Record<string, string> = {
   'tomorrow.io': 'Tomorrow.io',
-  'meteomatics': 'Meteomatics',
+  'open-meteo': 'Open-Meteo',
   'openweathermap': 'OpenWeather',
   'weatherapi': 'WeatherAPI',
   'accuweather': 'AccuWeather',
