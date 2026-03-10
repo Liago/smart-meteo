@@ -62,7 +62,7 @@ export async function logAccuracyDeviations(
     // on temperature deviation currently, to keep weights simple.
     // Or we log everything. For engine simplicity, an "overall_temp" metric is good.
 
-    const consensusTemp = smartForecast.temp;
+    const consensusTemp = smartForecast.current?.temperature;
     if (consensusTemp == null) return;
 
     for (const raw of rawForecasts) {
