@@ -12,16 +12,25 @@ struct DynamicBackground: View {
             
             // Particle Effect (Optional)
             if shouldShowParticles(for: condition) {
-                // Placeholder for SpriteKit scene initialization
-                // SpriteView(scene: weatherScene(for: condition))
-                //    .ignoresSafeArea()
+                SpriteView(scene: createScene(for: condition), options: [.allowsTransparency])
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
         }
     }
     
+    private func createScene(for condition: String) -> SKScene {
+        let scene = WeatherParticleScene()
+        scene.condition = condition
+        scene.size = UIScreen.main.bounds.size
+        scene.scaleMode = .resizeFill
+        scene.backgroundColor = .clear
+        return scene
+    }
+    
     private func shouldShowParticles(for condition: String) -> Bool {
         let c = condition.lowercased()
-        return c.contains("rain") || c.contains("snow")
+        return c.contains("rain") || c.contains("snow") || c.contains("storm")
     }
 }
 

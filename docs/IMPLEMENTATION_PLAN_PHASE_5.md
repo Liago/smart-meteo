@@ -482,6 +482,7 @@ const dynamicWeight = baseWeight * (1 / (1 + sourceMAE));
 
 ### 5D.3 — SpriteKit Particle Effects iOS (Punto 14)
 
+**Stato:** ✅ Implementato — aggiunto WeatherParticleScene e SpriteView in DynamicBackground
 **Impatto:** UI più immersiva con animazioni meteo
 **Effort:** Medio
 **File:** `frontend-ios/smart-meteo/smart-meteo/UI/Common/DynamicBackground.swift`
