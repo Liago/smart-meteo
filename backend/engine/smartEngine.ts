@@ -6,7 +6,7 @@ import { fetchFromAccuWeather } from '../connectors/accuweather';
 import { fetchFromWWO } from '../connectors/worldweatheronline';
 import { fetchFromWeatherstack } from '../connectors/weatherstack';
 import { fetchFromMeteostat } from '../connectors/meteostat';
-import { UnifiedForecast } from '../utils/formatter';
+import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { WeatherConditionWeights, AirQualityDetail } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
@@ -226,6 +226,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	});
 
+	const aggCloudCover = avg(aggregation.cloud_cover);
+	bestCondition = normalizeConditionWithCloudCover(bestCondition, aggCloudCover);
+
 	// 5. Daily & Hourly Aggregation
 	const dailyMap = new Map<string, any>();
 	validForecasts.forEach(f => {
@@ -328,7 +331,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_text: bestCondition.toUpperCase(),
 			uv_index: avg(aggregation.uv_index),
 			visibility: avg(aggregation.visibility),
-			cloud_cover: avg(aggregation.cloud_cover),
+			cloud_cover: aggCloudCover,
 			air_quality: sourceWithAirQuality?.air_quality ?? null,
 		},
 		daily: aggregatedDaily,

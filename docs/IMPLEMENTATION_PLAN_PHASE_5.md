@@ -520,6 +520,7 @@ if shouldShowParticles() {
 
 ### 5D.4 — Cloud Cover per Condition Code (Punto 15)
 
+**Stato:** ✅ Implementato — aggiunto `normalizeConditionWithCloudCover` e aggregato in `smartEngine`
 **Impatto:** Condizioni meteo più accurate basate sulla copertura nuvolosa
 **Effort:** Basso
 **File:** `backend/utils/formatter.ts`, `backend/engine/smartEngine.ts`

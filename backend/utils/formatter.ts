@@ -17,6 +17,30 @@ export function normalizeCondition(text: string | null | undefined): string {
 }
 
 /**
+ * Adjusts the condition code based on the aggregated cloud cover percentage.
+ */
+export function normalizeConditionWithCloudCover(
+	condition: string,
+	cloudCover: number | null
+): string {
+	if (cloudCover === null) return condition;
+
+	// Se condizione generica e copertura bassa → clear
+	if ((condition === 'unknown' || condition === 'cloudy') && cloudCover < 25) {
+		return 'clear';
+	}
+	// Se condizione clear ma copertura alta → cloudy
+	if (condition === 'clear' && cloudCover > 75) {
+		return 'cloudy';
+	}
+	// Se condizione clear e copertura media → cloudy
+	if (condition === 'clear' && cloudCover > 30) {
+		return 'cloudy';
+	}
+	return condition;
+}
+
+/**
  * Standard Unified Forecast Object
  */
 export class UnifiedForecast implements UnifiedForecastData {
