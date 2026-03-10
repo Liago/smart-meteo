@@ -42,7 +42,11 @@ struct ForecastCurrent: Codable {
     let windDirectionLabel: String?
     let aqi: Double?
     let pressure: Double?
-    
+    let uvIndex: Double?
+    let visibility: Double?       // km
+    let cloudCover: Double?       // percentuale 0-100
+    let airQuality: AirQualityDetail?
+
     enum CodingKeys: String, CodingKey {
         case temperature
         case feelsLike = "feels_like"
@@ -51,13 +55,17 @@ struct ForecastCurrent: Codable {
         case precipitationProb = "precipitation_prob"
         case condition
         case conditionText = "condition_text"
-        
+
         // New keys
         case dewPoint = "dew_point"
         case windGust = "wind_gust"
         case windDirectionLabel = "wind_direction_label"
         case aqi
         case pressure
+        case uvIndex = "uv_index"
+        case visibility
+        case cloudCover = "cloud_cover"
+        case airQuality = "air_quality"
     }
 }
 
@@ -70,7 +78,8 @@ struct DailyForecast: Codable, Identifiable {
     let precipitationProb: Double?
     let conditionCode: String
     let conditionText: String?
-    
+    let uvIndexMax: Double?
+
     enum CodingKeys: String, CodingKey {
         case date
         case tempMax = "temp_max"
@@ -78,6 +87,7 @@ struct DailyForecast: Codable, Identifiable {
         case precipitationProb = "precipitation_prob"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
+        case uvIndexMax = "uv_index_max"
     }
 }
 
@@ -104,10 +114,31 @@ struct AstronomyData: Codable {
     let sunrise: String
     let sunset: String
     let moonPhase: String?
-    
+    let moonrise: String?
+    let moonset: String?
+
     enum CodingKeys: String, CodingKey {
         case sunrise
         case sunset
         case moonPhase = "moon_phase"
+        case moonrise
+        case moonset
+    }
+}
+
+// MARK: - Air Quality Detail
+struct AirQualityDetail: Codable {
+    let aqiUsEpa: Double?
+    let pm25: Double?
+    let pm10: Double?
+    let no2: Double?
+    let o3: Double?
+    let co: Double?
+    let so2: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case aqiUsEpa = "aqi_us_epa"
+        case pm25 = "pm2_5"
+        case pm10, no2, o3, co, so2
     }
 }

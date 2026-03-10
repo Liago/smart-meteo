@@ -92,6 +92,67 @@ struct CurrentWeatherView: View {
                         )
                     }
                     .frame(maxWidth: .infinity)
+
+                    // Seconda riga: UV, Pressione/Visibilità, Nuvole/PM2.5
+                    HStack(spacing: 20) {
+                        // UV Index -> Livello UV
+                        FlipWeatherDetail(
+                            icon: "sun.max.fill",
+                            mainValue: current.uvIndex != nil ? String(format: "%.0f", current.uvIndex!) : "--",
+                            mainLabel: "UV Index",
+                            altValue: current.uvIndex != nil ? uvLabel(current.uvIndex!) : "--",
+                            altLabel: "Livello UV",
+                            altIcon: "sun.max.trianglebadge.exclamationmark",
+                            accentColor: current.uvIndex != nil ? uvColor(current.uvIndex!) : nil
+                        )
+
+                        // Pressione -> Visibilità
+                        FlipWeatherDetail(
+                            icon: "gauge.medium",
+                            mainValue: current.pressure != nil ? "\(Int(current.pressure!))" : "--",
+                            mainLabel: "Pressione",
+                            altValue: current.visibility != nil ? String(format: "%.1f km", current.visibility!) : "--",
+                            altLabel: "Visibilità",
+                            altIcon: "eye.fill"
+                        )
+
+                        // Nuvole -> PM2.5
+                        FlipWeatherDetail(
+                            icon: "cloud.fill",
+                            mainValue: current.cloudCover != nil ? "\(Int(current.cloudCover!))%" : "--",
+                            mainLabel: "Nuvole",
+                            altValue: current.airQuality?.pm25 != nil ? String(format: "%.1f", current.airQuality!.pm25!) : "--",
+                            altLabel: "PM2.5",
+                            altIcon: "aqi.medium"
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    // Dettaglio Qualità dell'Aria
+                    if let aq = current.airQuality {
+                        VStack(spacing: 8) {
+                            Text("QUALITÀ DELL'ARIA")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.gray)
+                                .tracking(1)
+
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                AQIDetailItem(label: "PM2.5", value: aq.pm25, unit: "µg/m³")
+                                AQIDetailItem(label: "PM10", value: aq.pm10, unit: "µg/m³")
+                                AQIDetailItem(label: "NO₂", value: aq.no2, unit: "µg/m³")
+                                AQIDetailItem(label: "O₃", value: aq.o3, unit: "µg/m³")
+                                AQIDetailItem(label: "CO", value: aq.co, unit: "µg/m³")
+                                AQIDetailItem(label: "SO₂", value: aq.so2, unit: "µg/m³")
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white)
+                                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
+                        )
+                        .padding(.horizontal, 4)
+                    }
                     
                     // Sun Arc Section
                     if astronomy != nil {
@@ -265,6 +326,26 @@ struct CurrentWeatherView: View {
         guard let aqi = aqi else { return "--" }
         return "\(Int(aqi))"
     }
+
+    private func uvLabel(_ uv: Double) -> String {
+        switch uv {
+        case ...2: return "Basso"
+        case ...5: return "Moderato"
+        case ...7: return "Alto"
+        case ...10: return "Molto Alto"
+        default: return "Estremo"
+        }
+    }
+
+    private func uvColor(_ uv: Double) -> Color {
+        switch uv {
+        case ...2: return .green
+        case ...5: return .yellow
+        case ...7: return .orange
+        case ...10: return .red
+        default: return .purple
+        }
+    }
     
     // MARK: - Sun helpers
     
@@ -310,13 +391,28 @@ struct FlipWeatherDetail: View {
     let icon: String
     let mainValue: String
     let mainLabel: String
-    
+
     let altValue: String
     let altLabel: String
     let altIcon: String
-    
+    var accentColor: Color? = nil
+
     @State private var isFlipped = false
-    
+
+    private var iconColor: Color {
+        if isFlipped, let accent = accentColor {
+            return accent
+        }
+        return Color(red: 0.2, green: 0.2, blue: 0.2)
+    }
+
+    private var valueColor: Color {
+        if isFlipped, let accent = accentColor {
+            return accent
+        }
+        return Color(red: 0.2, green: 0.2, blue: 0.2)
+    }
+
     var body: some View {
         Button(action: {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
@@ -327,11 +423,11 @@ struct FlipWeatherDetail: View {
                  if isFlipped {
                      Image(systemName: altIcon)
                          .font(.system(size: 20))
-                         .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                         .foregroundColor(iconColor)
                          .transition(.scale.combined(with: .opacity))
                      Text(altValue)
                          .font(.system(size: 16, weight: .bold))
-                         .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                         .foregroundColor(valueColor)
                          .transition(.scale.combined(with: .opacity))
                      Text(altLabel)
                          .font(.caption)
@@ -340,7 +436,7 @@ struct FlipWeatherDetail: View {
                  } else {
                      Image(systemName: icon)
                          .font(.system(size: 20))
-                         .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                         .foregroundColor(iconColor)
                          .transition(.scale.combined(with: .opacity))
                      Text(mainValue)
                          .font(.system(size: 16, weight: .bold))
@@ -353,9 +449,30 @@ struct FlipWeatherDetail: View {
                  }
             }
             .frame(minWidth: 80)
-            .contentShape(Rectangle()) // Make tappable area consistent
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct AQIDetailItem: View {
+    let label: String
+    let value: Double?
+    let unit: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.gray)
+                .tracking(0.5)
+            Text(value != nil ? String(format: "%.1f", value!) : "--")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+            Text(unit)
+                .font(.system(size: 9))
+                .foregroundColor(.gray)
+        }
     }
 }
 
@@ -375,18 +492,25 @@ struct FlipWeatherDetail: View {
             windGust: 20,
             windDirectionLabel: "NW",
             aqi: 2,
-            pressure: 1013
+            pressure: 1013,
+            uvIndex: 6,
+            visibility: 10.5,
+            cloudCover: 25,
+            airQuality: AirQualityDetail(aqiUsEpa: 2, pm25: 12.3, pm10: 20.1, no2: 15.0, o3: 40.0, co: 200.0, so2: 5.0)
         ), today: DailyForecast(
             date: "2026-03-02",
             tempMax: 30,
             tempMin: 8,
             precipitationProb: 0,
             conditionCode: "0",
-            conditionText: "Clear"
+            conditionText: "Clear",
+            uvIndexMax: 8
         ), astronomy: AstronomyData(
             sunrise: "2026-03-02T06:45:00Z",
             sunset: "2026-03-02T18:10:00Z",
-            moonPhase: "Waxing Gibbous"
+            moonPhase: "Waxing Gibbous",
+            moonrise: nil,
+            moonset: nil
         ))
     }
 }
