@@ -88,45 +88,48 @@
 
 I nuovi campi introdotti nella fase API Improvements non sono ancora presenti nell'app iOS:
 
-| Campo | Backend | Web | iOS |
-|-------|:-------:|:---:|:---:|
-| `uv_index` | ✅ | ✅ | ❌ |
-| `visibility` | ✅ | ✅ | ❌ |
-| `cloud_cover` | ✅ | ✅ | ❌ |
-| `air_quality` (dettaglio) | ✅ | ✅ | ❌ |
-| `uv_index_max` (daily) | ✅ | ✅ | ❌ |
+| Campo | Backend | Web | iOS | Piano |
+|-------|:-------:|:---:|:---:|:-----:|
+| `uv_index` | ✅ | ✅ | ❌ | → Fase 5B |
+| `visibility` | ✅ | ✅ | ❌ | → Fase 5B |
+| `cloud_cover` | ✅ | ✅ | ❌ | → Fase 5B |
+| `air_quality` (dettaglio) | ✅ | ✅ | ❌ | → Fase 5B |
+| `uv_index_max` (daily) | ✅ | ✅ | ❌ | → Fase 5B |
 
-**File da aggiornare:**
-- `Models/Forecast.swift` — aggiungere campi a `ForecastCurrent` e `DailyForecast`
-- `UI/Features/Dashboard/CurrentWeatherView.swift` — aggiungere card UV, Visibilita, Nuvole
+> **→ Pianificato in `IMPLEMENTATION_PLAN_PHASE_5.md` — Fase 5B**
 
 ### 3.2 Backend — Estrazione campi incompleta per connettore
 
 Non tutti i connettori estraggono tutti i campi disponibili:
 
-| Campo | Tomorrow.io | Open-Meteo | OWM | AccuWeather | WeatherAPI | Weatherstack | Meteostat | WWO |
-|-------|:-----------:|:----------:|:---:|:-----------:|:----------:|:------------:|:---------:|:---:|
-| uv_index | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| visibility | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| cloud_cover | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| hourly forecast | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Campo | Tomorrow.io | Open-Meteo | OWM | AccuWeather | WeatherAPI | Weatherstack | Meteostat | WWO | Piano |
+|-------|:-----------:|:----------:|:---:|:-----------:|:----------:|:------------:|:---------:|:---:|:-----:|
+| uv_index | ❌ → 5A | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | Fase 5A.2 |
+| visibility | ❌ → 5A | ❌ → 5A | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | Fase 5A.1, 5A.2 |
+| cloud_cover | ❌ → 5A | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | Fase 5A.2 |
+| hourly forecast | ✅ | ✅ | ✅ | ❌ → 5A | ✅ | ❌ | ❌ | ✅ | Fase 5A.3 |
 
 > I campi marcati ❌ sono **disponibili nell'API** ma non estratti dal connettore (vedi `AUDIT_API_DATA_SOURCES.md` per dettaglio).
+> **→ Pianificato in `IMPLEMENTATION_PLAN_PHASE_5.md` — Fase 5A**
 
 ### 3.3 Testing
 
-| Area | Stato |
-|------|-------|
-| Frontend web unit test | ✅ 23 test (3 suite) |
-| Frontend web E2E (Playwright) | ❌ Non implementato |
-| Backend unit/integration test | ❌ Non implementato |
-| iOS unit test | ❌ Non implementato |
-| Lighthouse performance audit | ❌ Non eseguito |
+| Area | Stato | Piano |
+|------|-------|:-----:|
+| Frontend web unit test | ✅ 23 test (3 suite) | Espansione in TODO_TESTING |
+| Frontend web E2E (Playwright) | ❌ Non implementato | → TODO_TESTING §3 |
+| Backend unit/integration test | ❌ Non implementato | → TODO_TESTING §2 |
+| iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
+| Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5 |
+
+> **→ Pianificato in `TODO_TESTING.md` e `VALUTAZIONI_TECNICHE.md`**
 
 ### 3.4 Database
 
 - Migration 013 (`full_data JSONB`) creata ma **da verificare se eseguita** su Supabase
 - La tabella `sources` ha 5 seed (migration 010) ma il sistema usa 8 connettori — i 3 aggiuntivi (Weatherstack, Meteostat, WWO) potrebbero non essere presenti nel DB
+
+> **→ Pianificato in `IMPLEMENTATION_PLAN_PHASE_5.md` — Fase 5C**
 
 ---
 
@@ -134,40 +137,40 @@ Non tutti i connettori estraggono tutti i campi disponibili:
 
 ### Alta Priorita
 
-| # | Miglioramento | Impatto | Effort |
-|---|---------------|---------|--------|
-| 1 | **iOS: aggiungere uv_index, visibility, cloud_cover, air_quality** a Forecast.swift e CurrentWeatherView | Parita funzionale web/iOS | Basso |
-| 2 | **Open-Meteo: estrarre visibility** (disponibile, non richiesto nei params) | +1 fonte per aggregazione visibilita | Basso |
-| 3 | **Tomorrow.io: estrarre uv_index** dall'endpoint forecast | +1 fonte per aggregazione UV | Basso |
-| 4 | **Eseguire migration 013** su Supabase (se non fatto) | Cache funzionante | Basso |
-| 5 | **Verificare seed sources** nel DB (Weatherstack, Meteostat, WWO) | Coerenza DB/backend | Basso |
+| # | Miglioramento | Impatto | Effort | Documento |
+|---|---------------|---------|--------|-----------|
+| 1 | **iOS: aggiungere uv_index, visibility, cloud_cover, air_quality** a Forecast.swift e CurrentWeatherView | Parita funzionale web/iOS | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5B |
+| 2 | **Open-Meteo: estrarre visibility** (disponibile, non richiesto nei params) | +1 fonte per aggregazione visibilita | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5A.1 |
+| 3 | **Tomorrow.io: estrarre uv_index** dall'endpoint forecast | +1 fonte per aggregazione UV | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5A.2 |
+| 4 | **Eseguire migration 013** su Supabase (se non fatto) | Cache funzionante | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5C.1 |
+| 5 | **Verificare seed sources** nel DB (Weatherstack, Meteostat, WWO) | Coerenza DB/backend | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5C.2 |
 
 ### Media Priorita
 
-| # | Miglioramento | Impatto | Effort |
-|---|---------------|---------|--------|
-| 6 | **Test E2E con Playwright** per frontend web | Qualita/regressione | Medio |
-| 7 | **Algoritmo V2 AI-driven** per pesi dinamici basati su accuratezza storica | Previsioni piu precise | Alto |
-| 8 | **Widget iOS** per Home Screen (Step 3.7 della Fase 3) | UX mobile | Medio |
-| 9 | **AccuWeather: aggiungere hourly forecast** (12h endpoint disponibile) | +1 fonte hourly | Basso |
-| 10 | **Dew point diretto da API** invece di calcolo Magnus | Accuratezza dew point | Basso |
-| 11 | **Backend test suite** (unit + integration per connettori e engine) | Affidabilita | Medio |
-| 12 | **Dettaglio inquinanti AQI** nell'UI iOS (PM2.5, NO2, O3) | Parita con web | Basso |
+| # | Miglioramento | Impatto | Effort | Documento |
+|---|---------------|---------|--------|-----------|
+| 6 | **Test E2E con Playwright** per frontend web | Qualita/regressione | Medio | `TODO_TESTING.md` §3 |
+| 7 | **Algoritmo V2 AI-driven** per pesi dinamici basati su accuratezza storica | Previsioni piu precise | Alto | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.1 |
+| 8 | **Widget iOS** per Home Screen (Step 3.7 della Fase 3) | UX mobile | Medio | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.2 |
+| 9 | **AccuWeather: aggiungere hourly forecast** (12h endpoint disponibile) | +1 fonte hourly | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5A.3 |
+| 10 | **Dew point diretto da API** invece di calcolo Magnus | Accuratezza dew point | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5A.4 |
+| 11 | **Backend test suite** (unit + integration per connettori e engine) | Affidabilita | Medio | `TODO_TESTING.md` §2 |
+| 12 | **Dettaglio inquinanti AQI** nell'UI iOS (PM2.5, NO2, O3) | Parita con web | Basso | `IMPLEMENTATION_PLAN_PHASE_5.md` §5B.4 |
 
 ### Bassa Priorita
 
-| # | Miglioramento | Note |
-|---|---------------|------|
-| 13 | Weatherstack: migrazione a HTTPS | Richiede piano Paid |
-| 14 | SpriteKit particle effects per DynamicBackground iOS | Scaffold presente, da completare |
-| 15 | Cloud cover per migliorare accuratezza `condition_code` | `normalizeConditionWithCloudCover` pianificato ma non implementato |
-| 16 | Moonrise/moonset da WWO | Dati disponibili, non estratti |
-| 17 | Apple WeatherKit integration | Menzionato come opzionale nell'IMPLEMENTATION_PLAN |
-| 18 | Lighthouse performance audit | Da eseguire post-deploy |
-| 19 | Valutare sostituzione/declassamento Meteostat | Fornisce solo dati storici, non previsioni |
-| 20 | iOS: test unitari per ViewModel e Service | Nessun test presente |
-| 21 | Haptic feedback iOS | Menzionato in PHASE_3, non implementato |
-| 22 | Notifiche push per allerte meteo | Non pianificato, possibile evoluzione |
+| # | Miglioramento | Note | Documento |
+|---|---------------|------|-----------|
+| 13 | Weatherstack: migrazione a HTTPS | Richiede piano Paid | `VALUTAZIONI_TECNICHE.md` §1 |
+| 14 | SpriteKit particle effects per DynamicBackground iOS | Scaffold presente, da completare | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.3 |
+| 15 | Cloud cover per migliorare accuratezza `condition_code` | `normalizeConditionWithCloudCover` pianificato ma non implementato | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.4 |
+| 16 | Moonrise/moonset da WWO | Dati disponibili, non estratti | `IMPLEMENTATION_PLAN_PHASE_5.md` §5A.5 |
+| 17 | Apple WeatherKit integration | Menzionato come opzionale nell'IMPLEMENTATION_PLAN | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.5 |
+| 18 | Lighthouse performance audit | Da eseguire post-deploy | `VALUTAZIONI_TECNICHE.md` §2 |
+| 19 | Valutare sostituzione/declassamento Meteostat | Fornisce solo dati storici, non previsioni | `VALUTAZIONI_TECNICHE.md` §3 |
+| 20 | iOS: test unitari per ViewModel e Service | Nessun test presente | `VALUTAZIONI_TECNICHE.md` §4 |
+| 21 | Haptic feedback iOS | Menzionato in PHASE_3, non implementato | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.6 |
+| 22 | Notifiche push per allerte meteo | Non pianificato, possibile evoluzione | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.7 |
 
 ---
 
@@ -183,3 +186,6 @@ Non tutti i connettori estraggono tutti i campi disponibili:
 | `IMPLEMENTATION_API_IMPROVEMENTS.md` | Piano tecnico dettagliato delle migliorie API |
 | `CHANGELOG_API_IMPROVEMENTS.md` | Log delle modifiche implementate per le 4 fasi API |
 | `BACKEND_DB_INTEGRATION.md` | Documentazione integrazione Supabase |
+| **`IMPLEMENTATION_PLAN_PHASE_5.md`** | **Piano Fase 5: completamento gap (5A-5C) + funzionalita avanzate (5D)** |
+| **`TODO_TESTING.md`** | **Roadmap testing: backend unit/integration, E2E Playwright, copertura web, Lighthouse** |
+| **`VALUTAZIONI_TECNICHE.md`** | **Valutazioni pendenti: Weatherstack HTTPS, Lighthouse, Meteostat, strategia test iOS** |
