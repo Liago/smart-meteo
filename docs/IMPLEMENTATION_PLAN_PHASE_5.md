@@ -557,6 +557,7 @@ function normalizeConditionWithCloudCover(
 
 ### 5D.5 — Apple WeatherKit Integration (Punto 17)
 
+**Stato:** ✅ Implementato — Creata migrazione DB (016) e connettore per generazione JWT. In attesa configurazione chiavi ambiente.
 **Impatto:** +1 fonte forecast di alta qualità (dati Apple/TWC)
 **Effort:** Alto
 **File:** Nuovo `backend/connectors/weatherkit.ts`
