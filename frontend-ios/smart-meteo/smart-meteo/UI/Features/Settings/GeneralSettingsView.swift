@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @StateObject private var pushService = PushNotificationService.shared
     
     var body: some View {
         ScrollView {
@@ -71,9 +72,22 @@ struct GeneralSettingsView: View {
                             Text("Push Notifications")
                                 .foregroundColor(.black)
                             Spacer()
-                            Toggle("", isOn: .constant(true))
-                                .labelsHidden()
-                                .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
+                            Toggle("", isOn: Binding(
+                                get: { pushService.isAuthorized },
+                                set: { newValue in
+                                    if newValue {
+                                        pushService.requestAuthorization()
+                                    } else {
+                                        // To turn off push notifications completely, 
+                                        // the user must go to iOS Settings.
+                                        // Here we could just call unregisterDeviceToken()
+                                        // but for UX we can show an alert or just revert the toggle if unauthorized
+                                    }
+                                }
+                            ))
+                            .labelsHidden()
+                            .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
+                            .disabled(pushService.isAuthorized) // Once authorized via OS prompt, disable the toggle so they can't flip it off without going to Settings app
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)

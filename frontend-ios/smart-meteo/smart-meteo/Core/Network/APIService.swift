@@ -49,4 +49,31 @@ class APIService {
             throw error
         }
     }
+    
+    struct EmptyResponse: Decodable {}
+    
+    func subscribeToAlerts(deviceToken: String, lat: Double, lon: Double, locationName: String?) async throws {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/api/alerts/subscribe") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+            "deviceToken": deviceToken,
+            "lat": lat,
+            "lon": lon,
+            "locationName": locationName ?? "",
+            "platform": "ios"
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.requestFailed
+        }
+    }
 }

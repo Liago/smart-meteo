@@ -621,6 +621,7 @@ enum HapticManager {
 
 ### 5D.7 — Notifiche Push per Allerte Meteo (Punto 22)
 
+**Stato:** ✅ Implementato — Creata migrazione DB, backend APNs integrato, token register frontend aggiunto via UIApplicationDelegateAdaptor.
 **Impatto:** Utenti avvisati di cambiamenti meteo significativi
 **Effort:** Alto
 **File:** Nuovo endpoint backend, nuova tabella DB, integrazione APNs iOS
