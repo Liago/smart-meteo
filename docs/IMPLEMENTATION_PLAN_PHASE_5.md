@@ -426,6 +426,7 @@ SELECT id, name, weight, active FROM sources ORDER BY weight DESC;
 
 ### 5D.1 — Algoritmo V2 AI-driven (Punto 6)
 
+**Stato:** ✅ Implementato — Creata migrazione per `source_accuracy` e logic nel backend per ricalcolo e penalità basata su MAE.
 **Impatto:** Previsioni più precise grazie a pesi dinamici basati sull'accuratezza storica
 **Effort:** Alto
 **File:** `backend/engine/smartEngine.ts`, nuova migration, nuovo endpoint

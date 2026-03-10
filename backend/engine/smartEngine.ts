@@ -10,6 +10,7 @@ import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/form
 import { WeatherConditionWeights, AirQualityDetail } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
+import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -112,8 +113,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
-	// 3. Fetch from External
+	// 3. Fetch from External & Load Accuracies
 	const activeSources = sources.filter(s => s.active);
+	const accuracyMapPromise = getAccuracyMap();
 
 	const fetchPromises = activeSources.map(async s => {
 		const fetcher = SOURCE_FETCHERS[s.id];
@@ -184,8 +186,16 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		conditions: {}
 	};
 
+	const accuracyMap = await accuracyMapPromise;
+
 	validForecasts.forEach(f => {
-		const weight = SOURCE_WEIGHTS[f.source] || 1.0;
+		const baseWeight = SOURCE_WEIGHTS[f.source] || 1.0;
+		// Use dynamic weight if accuracy data is available for this source
+		const sourceAccuracy = accuracyMap[f.source];
+		const mae = sourceAccuracy ? (sourceAccuracy['temperature'] || 0) : 0;
+		// Formula: base_weight * (1 / (1 + MAE))
+		const weight = baseWeight * (1 / (1 + mae));
+
 		const pushValue = (key: keyof Omit<AggregationData, 'conditions'>, val: number | null | undefined) => {
 			if (val !== null && val !== undefined) {
 				aggregation[key].push({ val, weight });
@@ -360,6 +370,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		});
 		if (smartError) console.error('Error saving smart forecast:', smartError);
 	}
+
+	// 7. Log Deviations for AI Accuracy
+	logAccuracyDeviations(result, validForecasts);
 
 	return result;
 }
