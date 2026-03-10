@@ -36,6 +36,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	precipitation_intensity: number | null;
 	aqi: number | null;
 	pressure: number | null;
+	dew_point: number | null;
 	uv_index: number | null;
 	visibility: number | null;
 	cloud_cover: number | null;
@@ -64,6 +65,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.precipitation_intensity = data.precipitation_intensity ?? null;
 		this.aqi = data.aqi ?? null;
 		this.pressure = data.pressure ?? null;
+		this.dew_point = typeof data.dew_point === 'number' ? Number(data.dew_point.toFixed(1)) : null;
 		this.uv_index = data.uv_index ?? null;
 		this.visibility = data.visibility ?? null;
 		this.cloud_cover = data.cloud_cover ?? null;

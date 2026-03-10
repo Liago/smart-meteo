@@ -117,6 +117,7 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			uv_index: current.uv ?? null,
 			visibility: current.vis_km ?? null,
 			cloud_cover: current.cloud ?? null,
+			dew_point: current.dewpoint_c ?? null,
 			air_quality: airQuality,
 			daily: daily,
 			hourly: hourly,

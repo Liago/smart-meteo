@@ -50,6 +50,10 @@ interface TomorrowValues {
 	weatherCode: number;
 	precipitationProbability: number;
 	pressureSurfaceLevel: number;
+	uvIndex?: number;
+	visibility?: number;       // km
+	cloudCover?: number;       // 0-100
+	dewPoint?: number;
 }
 
 interface TomorrowResponse {
@@ -104,6 +108,7 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 					precipitation_prob: day.values.precipitationProbabilityMax ?? null,
 					condition_code: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
 					condition_text: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
+					uv_index_max: day.values.uvIndexMax ?? day.values.uvIndex ?? null,
 				}));
 			}
 
@@ -136,6 +141,10 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 			condition_code: tomorrowCodeToText(values.weatherCode),
 			precipitation_prob: values.precipitationProbability,
 			pressure: values.pressureSurfaceLevel ?? null,
+			uv_index: values.uvIndex ?? null,
+			visibility: values.visibility ?? null,
+			cloud_cover: values.cloudCover ?? null,
+			dew_point: values.dewPoint ?? null,
 			daily: daily,
 			hourly: hourly
 		});

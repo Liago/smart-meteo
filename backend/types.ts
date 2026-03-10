@@ -20,6 +20,8 @@ export interface AstronomyData {
 	sunrise: string;
 	sunset: string;
 	moon_phase: string;
+	moonrise?: string;
+	moonset?: string;
 }
 
 export interface AirQualityDetail {
@@ -49,6 +51,7 @@ export interface UnifiedForecastData {
 	precipitation_intensity?: number | null;
 	aqi: number | null;
 	pressure: number | null;
+	dew_point?: number | null;
 	uv_index?: number | null;
 	visibility?: number | null;        // km
 	cloud_cover?: number | null;       // %

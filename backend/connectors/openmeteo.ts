@@ -8,8 +8,8 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 		const params = {
 			latitude: lat,
 			longitude: lon,
-			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,cloud_cover',
-			hourly: 'temperature_2m,precipitation_probability,weather_code',
+			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,cloud_cover,visibility,dew_point_2m',
+			hourly: 'temperature_2m,precipitation_probability,weather_code,visibility',
 			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max',
 			timezone: 'auto'
 		};
@@ -76,7 +76,8 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			pressure: current.pressure_msl,
 			uv_index: current.uv_index ?? null,
 			cloud_cover: current.cloud_cover ?? null,
-			visibility: null, // Open-Meteo current doesn't include visibility by default
+			visibility: current.visibility != null ? current.visibility / 1000 : null, // Open-Meteo returns meters, convert to km
+			dew_point: current.dew_point_2m ?? null,
 			daily: dailyForecasts,
 			hourly: hourlyForecasts,
 			astronomy: astronomy

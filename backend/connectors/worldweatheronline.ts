@@ -63,8 +63,8 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			});
 		}
 
-		// Map Astronomy
-		let astronomy: { sunrise: string; sunset: string } | undefined = undefined;
+		// Map Astronomy (sunrise, sunset, moonrise, moonset, moon_phase)
+		let astronomy: { sunrise: string; sunset: string; moon_phase: string; moonrise?: string; moonset?: string } | undefined = undefined;
 		const astro = data.weather[0].astronomy[0];
 		const toISO = (timeStr: string) => {
 			if (!timeStr) return '';
@@ -89,7 +89,15 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 		const sunset = toISO(astro.sunset);
 
 		if (sunrise && sunset) {
-			astronomy = { sunrise, sunset };
+			const moonrise = astro.moonrise ? toISO(astro.moonrise) : undefined;
+			const moonset = astro.moonset ? toISO(astro.moonset) : undefined;
+			astronomy = {
+				sunrise,
+				sunset,
+				moon_phase: astro.moon_phase || 'unknown',
+				...(moonrise ? { moonrise } : {}),
+				...(moonset ? { moonset } : {}),
+			};
 		}
 
 		// Prepare data object to avoid undefined issue with exactOptionalPropertyTypes

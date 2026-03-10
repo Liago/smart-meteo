@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { UnifiedForecast } from '../utils/formatter';
 import { normalizeCondition } from '../utils/formatter';
-import { DailyForecast, AstronomyData } from '../types';
+import { DailyForecast, HourlyForecast, AstronomyData } from '../types';
 
 const BASE_URL = 'http://dataservice.accuweather.com';
 
@@ -44,12 +44,15 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 		const locationKey = await getLocationKey(lat, lon, apiKey);
 		if (!locationKey) return null;
 
-		// Fetch current conditions + 5-day forecast in parallel
-		const [currentRes, forecastRes] = await Promise.allSettled([
+		// Fetch current conditions + 5-day forecast + 12h hourly in parallel
+		const [currentRes, forecastRes, hourlyRes] = await Promise.allSettled([
 			axios.get(`${BASE_URL}/currentconditions/v1/${locationKey}`, {
 				params: { apikey: apiKey, details: 'true' }
 			}),
 			axios.get(`${BASE_URL}/forecasts/v1/daily/5day/${locationKey}`, {
+				params: { apikey: apiKey, metric: true, details: true }
+			}),
+			axios.get(`${BASE_URL}/forecasts/v1/hourly/12hour/${locationKey}`, {
 				params: { apikey: apiKey, metric: true, details: true }
 			})
 		]);
@@ -63,8 +66,9 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 		const data = currentRes.value.data[0];
 		if (!data) return null;
 
-		// Parse 5-day forecast if available
+		// Parse 5-day forecast and 12h hourly if available
 		let daily: DailyForecast[] = [];
+		let hourly: HourlyForecast[] = [];
 		let astronomy: AstronomyData | undefined;
 
 		if (forecastRes.status === 'fulfilled') {
@@ -94,6 +98,22 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 			console.warn('AccuWeather forecast failed, using current only:', (forecastRes as PromiseRejectedResult).reason?.message);
 		}
 
+		// Parse 12h hourly forecast
+		if (hourlyRes.status === 'fulfilled') {
+			const hourlyData = hourlyRes.value.data;
+			if (Array.isArray(hourlyData)) {
+				hourly = hourlyData.map((h: any) => ({
+					time: h.DateTime,
+					temp: h.Temperature?.Value ?? 0,
+					precipitation_prob: h.PrecipitationProbability ?? 0,
+					condition_code: normalizeCondition(h.IconPhrase),
+					condition_text: h.IconPhrase ?? null,
+				}));
+			}
+		} else {
+			console.warn('AccuWeather hourly failed:', (hourlyRes as PromiseRejectedResult).reason?.message);
+		}
+
 		const forecastPayload: any = {
 			source: 'accuweather',
 			lat: lat,
@@ -111,6 +131,7 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 			visibility: data.Visibility?.Metric?.Value ?? null, // already in km
 			uv_index: data.UVIndex ?? null,
 			daily: daily,
+			hourly: hourly,
 		};
 
 		if (astronomy) {

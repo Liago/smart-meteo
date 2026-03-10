@@ -46,6 +46,7 @@ interface AggregationData {
 	uv_index: { val: number; weight: number }[];
 	visibility: { val: number; weight: number }[];
 	cloud_cover: { val: number; weight: number }[];
+	dew_point: { val: number; weight: number }[];
 	conditions: { [key: string]: number };
 }
 
@@ -179,6 +180,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		uv_index: [],
 		visibility: [],
 		cloud_cover: [],
+		dew_point: [],
 		conditions: {}
 	};
 
@@ -201,6 +203,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('uv_index', f.uv_index);
 		pushValue('visibility', f.visibility);
 		pushValue('cloud_cover', f.cloud_cover);
+		pushValue('dew_point', f.dew_point);
 
 		const code = f.condition_code || 'unknown';
 		if (!aggregation.conditions[code]) aggregation.conditions[code] = 0;
@@ -318,7 +321,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			wind_direction_label: aggWindDir !== null ? degreesToCompass(aggWindDir) : null,
 			wind_gust: avg(aggregation.wind_gust),
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
-			dew_point: (aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null,
+			dew_point: avg(aggregation.dew_point) ?? ((aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null),
 			aqi: avg(aggregation.aqi),
 			pressure: avg(aggregation.pressure),
 			condition: bestCondition,
