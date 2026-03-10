@@ -1,7 +1,8 @@
 # Piano di Implementazione — Fase 5: Completamento e Miglioramenti
 
 > **Data:** 2026-03-10
-> **Stato:** Da implementare
+> **Ultimo aggiornamento:** 2026-03-10
+> **Stato:** Fase 5A ✅ | Fase 5B ✅ | Fase 5C ✅ (da verificare esecuzione su Supabase) | Fase 5D: Da implementare
 > **Scopo:** Colmare i gap identificati e implementare le migliorie prioritarie su backend, iOS e database
 
 ---
@@ -24,10 +25,10 @@ Questa fase copre i gap identificati nel `PROJECT_STATUS_SUMMARY.md` (escluso il
 
 | Sotto-fase | Contenuto | Priorità | Dipendenze |
 |------------|-----------|----------|------------|
-| **5A** | Estrazione campi mancanti dai connector backend | Alta | Nessuna |
-| **5B** | iOS: nuovi campi API + card UV/Visibilità/AQI | Alta | 5A (dati disponibili nell'API) |
-| **5C** | Verifiche database (migration 013, seed sources) | Alta | Nessuna (parallelizzabile con 5A) |
-| **5D** | Funzionalità avanzate (Widget, AI, SpriteKit, ecc.) | Media/Bassa | 5A, 5B, 5C completate |
+| **5A** | Estrazione campi mancanti dai connector backend | Alta | Nessuna | ✅ Completata |
+| **5B** | iOS: nuovi campi API + card UV/Visibilità/AQI | Alta | 5A (dati disponibili nell'API) | ✅ Completata |
+| **5C** | Verifiche database (migration 013, seed sources) | Alta | Nessuna (parallelizzabile con 5A) | ✅ Verificata (esecuzione DB da confermare) |
+| **5D** | Funzionalità avanzate (Widget, AI, SpriteKit, ecc.) | Media/Bassa | 5A, 5B, 5C completate | ⏳ Da implementare |
 
 ### Punti coperti
 
@@ -56,12 +57,12 @@ Questa fase copre i gap identificati nel `PROJECT_STATUS_SUMMARY.md` (escluso il
 
 ---
 
-## 2. Fase 5A — Estrazione Dati Mancanti Backend
+## 2. Fase 5A — Estrazione Dati Mancanti Backend ✅
 
-### 5A.1 — Open-Meteo: Estrazione Visibility
+### 5A.1 — Open-Meteo: Estrazione Visibility ✅
 
 **File:** `backend/connectors/openmeteo.ts`
-**Problema:** Il parametro `visibility` è supportato dall'API Open-Meteo ma non viene richiesto nei params correnti. La riga del return ha `visibility: null`.
+**Stato:** ✅ Implementato — aggiunto `visibility` e `dew_point_2m` ai params current e hourly, conversione m→km
 **Soluzione:**
 
 1. Aggiungere `visibility` alla stringa dei parametri `current`:
@@ -86,10 +87,10 @@ visibility: current.visibility != null ? current.visibility / 1000 : null,
 
 ---
 
-### 5A.2 — Tomorrow.io: Estrazione UV Index, Visibility, Cloud Cover
+### 5A.2 — Tomorrow.io: Estrazione UV Index, Visibility, Cloud Cover ✅
 
 **File:** `backend/connectors/tomorrow.ts`
-**Problema:** L'API realtime di Tomorrow.io restituisce `uvIndex`, `visibility`, `cloudCover` ma l'interfaccia `TomorrowValues` non li include e il return li ignora.
+**Stato:** ✅ Implementato — aggiunto `uvIndex`, `visibility`, `cloudCover`, `dewPoint` a `TomorrowValues` e al return. Aggiunto `uv_index_max` al daily mapping.
 **Soluzione:**
 
 1. Estendere l'interfaccia `TomorrowValues`:
@@ -114,10 +115,10 @@ cloud_cover: values.cloudCover ?? null,
 
 ---
 
-### 5A.3 — AccuWeather: Aggiunta Hourly Forecast
+### 5A.3 — AccuWeather: Aggiunta Hourly Forecast ✅
 
 **File:** `backend/connectors/accuweather.ts`
-**Problema:** Il connector fetcha solo `currentconditions` e `daily/5day`, nessun dato hourly. L'API AccuWeather offre un endpoint 12h hourly.
+**Stato:** ✅ Implementato — aggiunto endpoint `12hour` in `Promise.allSettled`, mapping in `HourlyForecast[]`, `normalizeCondition` per `IconPhrase`.
 **Soluzione:**
 
 1. Aggiungere chiamata parallela all'endpoint hourly:
@@ -143,10 +144,10 @@ hourly: hourlyData.map((h: any) => ({
 
 ---
 
-### 5A.4 — Dew Point Diretto da API
+### 5A.4 — Dew Point Diretto da API ✅
 
 **File principali:** `backend/types.ts`, `backend/utils/formatter.ts`, `backend/engine/smartEngine.ts`, connector `openmeteo.ts`, `tomorrow.ts`, `weatherapi.ts`
-**Problema:** Il dew point è calcolato post-aggregazione con la formula di Magnus. Diversi connector hanno il valore reale disponibile ma non lo estraggono.
+**Stato:** ✅ Implementato — `dew_point` aggiunto a `UnifiedForecastData`, `UnifiedForecast`, e 3 connector (Open-Meteo: `dew_point_2m`, Tomorrow: `dewPoint`, WeatherAPI: `dewpoint_c`). Smart Engine aggrega con media pesata e fallback Magnus.
 **Soluzione:**
 
 1. Aggiungere `dew_point` a `UnifiedForecastData` in `types.ts`:
@@ -163,10 +164,10 @@ dew_point?: number | null;
 
 ---
 
-### 5A.5 — Moonrise/Moonset da WWO
+### 5A.5 — Moonrise/Moonset da WWO ✅
 
 **File:** `backend/connectors/worldweatheronline.ts`, `backend/types.ts`
-**Problema:** Il connector WWO estrae già `sunrise`, `sunset`, `moon_phase` da `astronomy[0]`, ma non `moonrise` e `moonset` che sono disponibili nella stessa struttura dati.
+**Stato:** ✅ Implementato — `moonrise` e `moonset` aggiunti a `AstronomyData` in `types.ts` e estratti dal connector WWO con conversione formato ISO.
 **Soluzione:**
 
 1. Aggiungere a `AstronomyData` in `types.ts`:
@@ -190,12 +191,12 @@ astronomy: {
 
 ---
 
-## 3. Fase 5B — iOS: Campi Mancanti e Nuove Card
+## 3. Fase 5B — iOS: Campi Mancanti e Nuove Card ✅
 
-### 5B.1 — Aggiornamento Modello Forecast.swift
+### 5B.1 — Aggiornamento Modello Forecast.swift ✅
 
 **File:** `frontend-ios/smart-meteo/smart-meteo/Models/Forecast.swift`
-**Problema:** I campi `uv_index`, `visibility`, `cloud_cover`, `air_quality` non sono presenti nel modello Swift. Il backend li restituisce ma iOS li ignora.
+**Stato:** ✅ Implementato — Aggiunti `uvIndex`, `visibility`, `cloudCover`, `airQuality` a `ForecastCurrent`; `uvIndexMax` a `DailyForecast`; `moonrise`/`moonset` a `AstronomyData`; nuova struct `AirQualityDetail`.
 **Soluzione:**
 
 1. Creare struct `AirQualityDetail`:
@@ -232,10 +233,10 @@ let uvIndexMax: Double?    // CodingKey: "uv_index_max"
 
 ---
 
-### 5B.2 — Helper UV Index in Swift
+### 5B.2 — Helper UV Index in Swift ✅
 
-**File:** `frontend-ios/smart-meteo/smart-meteo/Models/Forecast.swift` (o utility dedicata)
-**Problema:** Mancano le funzioni helper per etichette e colori UV in italiano (presenti nel web in `weather-utils.ts`).
+**File:** `frontend-ios/smart-meteo/smart-meteo/UI/Features/Dashboard/CurrentWeatherView.swift`
+**Stato:** ✅ Implementato — Funzioni `uvLabel(_:)` e `uvColor(_:)` con scala italiana (Basso/Moderato/Alto/Molto Alto/Estremo) e colori corrispondenti.
 **Soluzione:**
 
 ```swift
@@ -275,10 +276,10 @@ func aqiLabel(_ aqi: Double) -> String {
 
 ---
 
-### 5B.3 — Nuove Card in CurrentWeatherView
+### 5B.3 — Nuove Card in CurrentWeatherView ✅
 
 **File:** `frontend-ios/smart-meteo/smart-meteo/UI/Features/Dashboard/CurrentWeatherView.swift`
-**Problema:** La vista mostra solo 3 FlipWeatherDetail (Wind/Gust, Humidity/DewPoint, Rain/AQI). Mancano UV, Visibilità, Nuvole, dettaglio AQI — presenti nel web come seconda riga di card flippabili.
+**Stato:** ✅ Implementato — Seconda riga di 3 `FlipWeatherDetail`: UV Index/Livello UV (con colore dinamico), Pressione/Visibilità, Nuvole/PM2.5. `FlipWeatherDetail` esteso con `accentColor` opzionale.
 **Soluzione:**
 
 Aggiungere una seconda riga di 3 `FlipWeatherDetail` nella sezione `showMore`:
@@ -332,10 +333,10 @@ HStack(spacing: 12) {
 
 ---
 
-### 5B.4 — Dettaglio Inquinanti AQI (Punto 10 + 12)
+### 5B.4 — Dettaglio Inquinanti AQI (Punto 10 + 12) ✅
 
 **File:** `frontend-ios/smart-meteo/smart-meteo/UI/Features/Dashboard/CurrentWeatherView.swift`
-**Problema:** Il web mostra dettaglio PM2.5, PM10, NO2, O3, CO, SO2 quando disponibile. iOS mostra solo AQI generico.
+**Stato:** ✅ Implementato — Nuova sezione "QUALITÀ DELL'ARIA" con `LazyVGrid` 3 colonne mostrante PM2.5, PM10, NO₂, O₃, CO, SO₂. Visibile solo quando `airQuality != nil`. Nuovo componente `AQIDetailItem`.
 **Soluzione:**
 
 Aggiungere una sezione espandibile sotto le card, visibile solo quando `airQuality != nil`:
@@ -363,9 +364,9 @@ if let aq = current.airQuality {
 
 ---
 
-## 4. Fase 5C — Database e Verifiche
+## 4. Fase 5C — Database e Verifiche ✅
 
-### 5C.1 — Eseguire Migration 013
+### 5C.1 — Eseguire Migration 013 ✅ (file presente, da verificare esecuzione su Supabase Dashboard)
 
 **File:** `supabase/migrations/013_smart_forecast_full_data.sql`
 **Contenuto migration:**
@@ -394,10 +395,10 @@ SELECT indexname FROM pg_indexes WHERE tablename = 'smart_forecasts';
 
 ---
 
-### 5C.2 — Verificare Seed Sources
+### 5C.2 — Verificare Seed Sources ✅
 
 **File:** `supabase/migrations/010_seed_sources.sql`, `supabase/migrations/012_seed_sources_update.sql`
-**Problema:** Il backend usa 8 connettori. Verificare che tutti siano presenti nel DB.
+**Stato:** ✅ Verificato — Migration 010 (5 fonti) + 012 (3 fonti aggiuntive con `ON CONFLICT`) coprono tutte 8 le fonti del backend. Da confermare esecuzione su Supabase.
 
 **Azioni:**
 1. Query di verifica:
