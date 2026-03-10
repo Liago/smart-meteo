@@ -1,17 +1,36 @@
 import SwiftUI
 
+private func precipitationColor(for prob: Double) -> Color {
+    if prob >= 60 {
+        return Color(red: 236/255, green: 104/255, blue: 90/255)
+    } else if prob >= 30 {
+        return Color.blue
+    } else {
+        return Color.blue.opacity(0.7)
+    }
+}
+
 struct HourlyForecastView: View {
     let hourly: [HourlyForecast]
     let astronomy: AstronomyData?
     let current: ForecastCurrent?
     
     // MARK: - Processed Data
+    struct DayPeriod: Identifiable {
+        let id = UUID()
+        let label: String
+        let xStart: CGFloat
+        let xEnd: CGFloat
+        let maxPrecipProb: Double
+    }
+
     struct ChartData {
         let items: [TimelineItem]
         let minTemp: Double
         let maxTemp: Double
         let width: CGFloat
         let height: CGFloat
+        let periods: [DayPeriod]
     }
     
     enum TimelineItemType {
@@ -34,6 +53,7 @@ struct HourlyForecastView: View {
     }
     
     @State private var chartData: ChartData?
+    @State private var expandedPeriod: String?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -54,16 +74,60 @@ struct HourlyForecastView: View {
             if let data = chartData {
                 ScrollView(.horizontal, showsIndicators: false) {
                     ZStack(alignment: .topLeading) {
+                        // Vertical dividers (background)
+                        ForEach(data.periods) { period in
+                            Rectangle()
+                                .fill(Color.black.opacity(0.08))
+                                .frame(width: 1, height: data.height)
+                                .position(x: period.xStart + 8, y: data.height / 2)
+                        }
+                        .allowsHitTesting(false)
+
                         // Chart Background (Line & Fill)
                         ChartPath(data: data)
                             .frame(width: data.width, height: data.height)
-                        
+                            .allowsHitTesting(false)
+
                         // Points & Labels
                         ForEach(Array(data.items.enumerated()), id: \.element.id) { index, item in
-                            ChartPointView(item: item, index: index, total: data.items.count, data: data)
+                            let showPrecip = itemInExpandedPeriod(index: index, item: item, data: data)
+                            ChartPointView(item: item, index: index, total: data.items.count, data: data, showHourlyPrecip: showPrecip)
+                        }
+                        .allowsHitTesting(false)
+
+                        // Section Headers (on top for tap handling)
+                        ForEach(data.periods) { period in
+                            let isExpanded = expandedPeriod == period.label
+
+                            VStack(spacing: 3) {
+                                Text(period.label)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(isExpanded ? Color.blue : .black)
+                                if period.maxPrecipProb > 0 {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "drop.fill")
+                                            .font(.system(size: 9, weight: .bold))
+                                        Text("\(Int(period.maxPrecipProb))%")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(precipitationColor(for: period.maxPrecipProb))
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    expandedPeriod = isExpanded ? nil : period.label
+                                }
+                            }
+                            .position(
+                                x: (period.xStart + period.xEnd) / 2 + 8,
+                                y: Layout.sectionHeaderHeight / 2 + 4
+                            )
                         }
                     }
-                    .frame(width: data.width, height: data.height + 40) // Extra space for top labels if needed
+                    .frame(width: data.width, height: data.height + 20)
                     .padding(.horizontal, 8)
                 }
             } else {
@@ -79,6 +143,13 @@ struct HourlyForecastView: View {
         .onChange(of: hourly.count) { _ in processData() }
     }
     
+    private func itemInExpandedPeriod(index: Int, item: TimelineItem, data: ChartData) -> Bool {
+        guard let expanded = expandedPeriod else { return false }
+        guard let period = data.periods.first(where: { $0.label == expanded }) else { return false }
+        let x = CGFloat(index) * 80 + 40
+        return x >= period.xStart && x <= period.xEnd
+    }
+
     private func extractTime(from isoDateStr: String) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -157,6 +228,10 @@ struct HourlyForecastView: View {
         // Weather Items
         let weatherItems = hourly.compactMap { h -> TimelineItem? in
             guard let date = parseDate(h.time) else { return nil }
+            // Debug: log precipitazione per verificare dati dall'API
+            if let prob = h.precipitationProb, prob > 0 {
+                print("[HourlyForecast] \(h.time) — precipitationProb: \(prob)%")
+            }
             return TimelineItem(time: date, type: .weather(h), temp: h.temp)
         }
         
@@ -241,9 +316,44 @@ struct HourlyForecastView: View {
         let maxTemp = (temps.max() ?? 0) + 2
         
         let width = CGFloat(items.count * 80)
-        let height: CGFloat = 250
-        
-        self.chartData = ChartData(items: items, minTemp: minTemp, maxTemp: maxTemp, width: width, height: height)
+        let height: CGFloat = 280
+
+        // Calcola le sezioni della giornata (Notte, Mattina, Pomeriggio, Sera)
+        let cal2 = Calendar.current
+        struct PeriodBucket {
+            let label: String
+            let hourRange: Range<Int>
+            var indices: [Int] = []
+            var maxPrecip: Double = 0
+        }
+        var buckets = [
+            PeriodBucket(label: "Notte", hourRange: 0..<6),
+            PeriodBucket(label: "Mattina", hourRange: 6..<12),
+            PeriodBucket(label: "Pomeriggio", hourRange: 12..<18),
+            PeriodBucket(label: "Sera", hourRange: 18..<24)
+        ]
+
+        for (idx, item) in items.enumerated() {
+            let hour = cal2.component(.hour, from: item.time)
+            for b in 0..<buckets.count {
+                if buckets[b].hourRange.contains(hour) {
+                    buckets[b].indices.append(idx)
+                    if case .weather(let h) = item.type, let prob = h.precipitationProb {
+                        buckets[b].maxPrecip = max(buckets[b].maxPrecip, prob)
+                    }
+                    break
+                }
+            }
+        }
+
+        let periods: [DayPeriod] = buckets.compactMap { bucket in
+            guard let first = bucket.indices.first, let last = bucket.indices.last else { return nil }
+            let xStart = CGFloat(first) * 80
+            let xEnd = CGFloat(last) * 80 + 80
+            return DayPeriod(label: bucket.label, xStart: xStart, xEnd: xEnd, maxPrecipProb: bucket.maxPrecip)
+        }
+
+        self.chartData = ChartData(items: items, minTemp: minTemp, maxTemp: maxTemp, width: width, height: height, periods: periods)
     }
     
     private func generateDailyDescription() -> String {
@@ -374,12 +484,13 @@ struct HourlyForecastView: View {
     }
 }
 
-    // MARK: - Subviews
-    private struct Layout {
-        static let topPadding: CGFloat = 80
-        static let bottomPadding: CGFloat = 40
-        static let totalPadding: CGFloat = topPadding + bottomPadding
-    }
+// MARK: - Subviews
+private struct Layout {
+    static let sectionHeaderHeight: CGFloat = 45
+    static let topPadding: CGFloat = 80 + sectionHeaderHeight
+    static let bottomPadding: CGFloat = 50
+    static let totalPadding: CGFloat = topPadding + bottomPadding
+}
 
 struct ChartPath: View {
     let data: HourlyForecastView.ChartData
@@ -433,7 +544,8 @@ struct ChartPointView: View {
     let index: Int
     let total: Int
     let data: HourlyForecastView.ChartData
-    
+    var showHourlyPrecip: Bool = false
+
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
@@ -450,18 +562,6 @@ struct ChartPointView: View {
             ZStack {
                 // Info Group (Icon & Temp) - Above
                 VStack(spacing: 4) {
-                    if case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "drop.fill").font(.system(size: 8, weight: .bold))
-                            Text("\(Int(prob))%")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(.gray)
-                    } else if case .weather(_) = item.type {
-                        // Empty space to keep vertical alignment consistent
-                        Text(" ").font(.system(size: 10, weight: .bold))
-                    }
-                    
                     switch item.type {
                     case .weather(let h):
                         Image(systemName: iconName(for: h.conditionCode))
@@ -493,16 +593,23 @@ struct ChartPointView: View {
                     .overlay(Circle().stroke(Color.black, lineWidth: 2))
                     .position(x: x, y: y)
                 
-                // Time - Always at the bottom
+                // Time & optional hourly precip - Below
                 VStack(spacing: 2) {
                     if index == 0 {
                         Text("Ora")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red accent for "Now"
+                            .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
                     } else {
                         Text(formatTime(item.time))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.gray)
+                    }
+
+                    if showHourlyPrecip, case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
+                        Text("\(Int(prob))%")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(precipitationColor(for: prob))
+                            .transition(.opacity)
                     }
                 }
                 .frame(width: 80)
