@@ -14,6 +14,15 @@ export interface WeatherSource {
 // In-memory source registry (will be backed by Supabase in the future)
 const sources: WeatherSource[] = [
 	{
+		id: 'apple_weatherkit',
+		name: 'Apple WeatherKit',
+		weight: 1.2,
+		active: false, // Default false until keys are provided
+		description: 'Dati ufficiali forniti da Apple',
+		lastError: null,
+		lastResponseMs: 0
+	},
+	{
 		id: 'tomorrow.io',
 		name: 'Tomorrow.io',
 		weight: 1.2,

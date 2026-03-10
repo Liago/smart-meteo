@@ -6,6 +6,7 @@ import { fetchFromAccuWeather } from '../connectors/accuweather';
 import { fetchFromWWO } from '../connectors/worldweatheronline';
 import { fetchFromWeatherstack } from '../connectors/weatherstack';
 import { fetchFromMeteostat } from '../connectors/meteostat';
+import { fetchFromWeatherKit } from '../connectors/weatherkit';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { WeatherConditionWeights, AirQualityDetail } from '../types';
 import { sources } from '../routes/sources';
@@ -20,7 +21,8 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'accuweather': 1.1,
 	'worldweatheronline': 1.0,
 	'weatherstack': 0.9,
-	'meteostat': 0.8
+	'meteostat': 0.8,
+	'apple_weatherkit': 1.2
 };
 
 const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
@@ -31,7 +33,8 @@ const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<Unif
 	'accuweather': fetchFromAccuWeather,
 	'worldweatheronline': fetchFromWWO,
 	'weatherstack': fetchFromWeatherstack,
-	'meteostat': fetchFromMeteostat
+	'meteostat': fetchFromMeteostat,
+	'apple_weatherkit': fetchFromWeatherKit
 };
 
 interface AggregationData {
