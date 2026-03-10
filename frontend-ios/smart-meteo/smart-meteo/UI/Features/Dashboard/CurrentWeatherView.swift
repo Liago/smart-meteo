@@ -415,6 +415,7 @@ struct FlipWeatherDetail: View {
 
     var body: some View {
         Button(action: {
+            HapticManager.light()
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 isFlipped.toggle()
             }

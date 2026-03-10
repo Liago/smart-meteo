@@ -21,7 +21,10 @@ struct SourcesView: View {
                                 Spacer()
                                 Toggle("", isOn: Binding(
                                     get: { source.active },
-                                    set: { _ in appState.toggleSource(source.id) }
+                                    set: { _ in
+                                        HapticManager.light()
+                                        appState.toggleSource(source.id)
+                                    }
                                 ))
                                 .labelsHidden()
                                 .tint(Color(red: 236/255, green: 104/255, blue: 90/255))

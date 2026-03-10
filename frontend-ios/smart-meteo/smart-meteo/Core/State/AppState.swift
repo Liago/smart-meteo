@@ -12,6 +12,13 @@ class AppState: ObservableObject {
     @Published var currentUser: UserProfile?
     @Published var isAuthenticated: Bool = false
     
+    // Preferences State
+    @Published var isHapticEnabled: Bool = UserDefaults.standard.object(forKey: "isHapticEnabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(isHapticEnabled, forKey: "isHapticEnabled")
+        }
+    }
+    
     // Weather Data State
     @Published var selectedTab: Int = 0
     @Published var weatherSources: [WeatherSource] = WeatherSource.defaults

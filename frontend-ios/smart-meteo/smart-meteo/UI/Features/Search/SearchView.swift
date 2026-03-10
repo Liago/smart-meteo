@@ -128,6 +128,7 @@ struct SearchView: View {
                             LazyVStack(spacing: 8) {
                                 ForEach(viewModel.results, id: \.self) { result in
                                     Button {
+                                        HapticManager.selection()
                                         viewModel.selectLocation(result) {
                                             dismiss()
                                         }

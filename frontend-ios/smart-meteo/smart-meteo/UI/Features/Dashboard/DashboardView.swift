@@ -53,6 +53,7 @@ struct DashboardView: View {
                             .contextMenu {
                                 // Toggle Favorite
                                 Button {
+                                    HapticManager.selection()
                                     appState.toggleFavorite()
                                 } label: {
                                     Label(
@@ -64,6 +65,7 @@ struct DashboardView: View {
                                 // Set as Home (only when it's already a favorite)
                                 if isCurrentLocationFavorite {
                                     Button {
+                                        HapticManager.selection()
                                         if let fav = appState.favoriteLocations.first(where: { $0.name == appState.currentLocationName }) {
                                             appState.setAsHome(location: fav)
                                         }
@@ -168,6 +170,7 @@ struct DashboardView: View {
                     .padding(.bottom, 50)
                 }
                 .refreshable {
+                    HapticManager.medium()
                     if let location = appState.currentLocation {
                         appState.fetchWeather(for: location)
                     }

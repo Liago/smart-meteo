@@ -58,7 +58,7 @@ struct SettingsView: View {
                         .toggleStyle(SwitchToggleStyle(tint: .blue))
                         .foregroundColor(.white)
                     
-                    Toggle("Haptic Feedback", isOn: .constant(true))
+                    Toggle("Haptic Feedback", isOn: $appState.isHapticEnabled)
                         .toggleStyle(SwitchToggleStyle(tint: .blue))
                         .foregroundColor(.white)
                 }

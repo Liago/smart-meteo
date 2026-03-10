@@ -581,6 +581,7 @@ function normalizeConditionWithCloudCover(
 
 ### 5D.6 — Haptic Feedback iOS (Punto 21)
 
+**Stato:** ✅ Implementato — creato HapticManager e integrato nella UI
 **Impatto:** UX tattile migliorata
 **Effort:** Basso
 **File:** Nuovo `frontend-ios/smart-meteo/smart-meteo/UI/Common/HapticManager.swift`, vari file UI
