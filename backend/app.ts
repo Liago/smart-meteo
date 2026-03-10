@@ -2,12 +2,17 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getSmartForecast } from './engine/smartEngine';
+import { initializeAPNs } from './services/apns';
 import sourcesRouter from './routes/sources';
+import { alertsRouter } from './routes/alerts';
 import { requireAuth } from './middleware/auth';
 
 dotenv.config();
 
 const app = express();
+
+// Initialize APNs provider
+initializeAPNs();
 
 // --- CORS Configuration ---
 // Frontend (Vercel) e Backend (Netlify) sono su domini diversi.
@@ -44,6 +49,9 @@ app.get('/', (req: Request, res: Response) => {
 			'GET /api/forecast?lat=&lon=',
 			'GET /api/sources',
 			'PATCH /api/sources/:id',
+			'POST /api/alerts/subscribe',
+			'POST /api/alerts/unsubscribe',
+			'POST /api/alerts/test-push'
 		],
 	});
 });
@@ -53,6 +61,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/sources', sourcesRouter);
+app.use('/api/alerts', alertsRouter);
 
 app.get('/api/forecast', async (req: Request, res: Response) => {
 	const lat = req.query.lat as string;

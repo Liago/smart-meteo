@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		53AE60042F607B5400AB1A69 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53AE60032F607B5300AB1A69 /* WidgetKit.framework */; };
+		53AE60062F607B5400AB1A69 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53AE60052F607B5400AB1A69 /* SwiftUI.framework */; };
+		53AE60152F607B5700AB1A69 /* SmartMedeoWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 53AE60012F607B5300AB1A69 /* SmartMedeoWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		53FD864B2F3B91CA0066A14B /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 53FD864A2F3B91CA0066A14B /* Auth */; };
 		53FD864D2F3B91CA0066A14B /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 53FD864C2F3B91CA0066A14B /* Functions */; };
 		53FD864F2F3B91CA0066A14B /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 53FD864E2F3B91CA0066A14B /* PostgREST */; };
@@ -15,11 +18,46 @@
 		53FD86552F3B91CA0066A14B /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 53FD86542F3B91CA0066A14B /* Supabase */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		53AE60132F607B5700AB1A69 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 53FD85FE2F3B907D0066A14B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 53AE60002F607B5300AB1A69;
+			remoteInfo = SmartMedeoWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		53AE601A2F607B5700AB1A69 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				53AE60152F607B5700AB1A69 /* SmartMedeoWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		53AE60012F607B5300AB1A69 /* SmartMedeoWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SmartMedeoWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		53AE60032F607B5300AB1A69 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		53AE60052F607B5400AB1A69 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		53AE601C2F607BBF00AB1A69 /* SmartMedeoWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SmartMedeoWidgetExtension.entitlements; sourceTree = "<group>"; };
 		53FD86062F3B907D0066A14B /* smart-meteo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "smart-meteo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		53AE60192F607B5700AB1A69 /* Exceptions for "SmartMedeoWidget" folder in "SmartMedeoWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 53AE60002F607B5300AB1A69 /* SmartMedeoWidgetExtension */;
+		};
 		53FD86572F3B92810066A14B /* Exceptions for "smart-meteo" folder in "smart-meteo" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -30,6 +68,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		53AE60072F607B5400AB1A69 /* SmartMedeoWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				53AE60192F607B5700AB1A69 /* Exceptions for "SmartMedeoWidget" folder in "SmartMedeoWidgetExtension" target */,
+			);
+			path = SmartMedeoWidget;
+			sourceTree = "<group>";
+		};
 		53FD86082F3B907D0066A14B /* smart-meteo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -41,6 +87,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		53AE5FFE2F607B5300AB1A69 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53AE60062F607B5400AB1A69 /* SwiftUI.framework in Frameworks */,
+				53AE60042F607B5400AB1A69 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		53FD86032F3B907D0066A14B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -57,10 +112,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		53AE60022F607B5300AB1A69 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				53AE60032F607B5300AB1A69 /* WidgetKit.framework */,
+				53AE60052F607B5400AB1A69 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		53FD85FD2F3B907D0066A14B = {
 			isa = PBXGroup;
 			children = (
+				53AE601C2F607BBF00AB1A69 /* SmartMedeoWidgetExtension.entitlements */,
 				53FD86082F3B907D0066A14B /* smart-meteo */,
+				53AE60072F607B5400AB1A69 /* SmartMedeoWidget */,
+				53AE60022F607B5300AB1A69 /* Frameworks */,
 				53FD86072F3B907D0066A14B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -69,6 +136,7 @@
 			isa = PBXGroup;
 			children = (
 				53FD86062F3B907D0066A14B /* smart-meteo.app */,
+				53AE60012F607B5300AB1A69 /* SmartMedeoWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,6 +144,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		53AE60002F607B5300AB1A69 /* SmartMedeoWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53AE60162F607B5700AB1A69 /* Build configuration list for PBXNativeTarget "SmartMedeoWidgetExtension" */;
+			buildPhases = (
+				53AE5FFD2F607B5300AB1A69 /* Sources */,
+				53AE5FFE2F607B5300AB1A69 /* Frameworks */,
+				53AE5FFF2F607B5300AB1A69 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				53AE60072F607B5400AB1A69 /* SmartMedeoWidget */,
+			);
+			name = SmartMedeoWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = SmartMedeoWidgetExtension;
+			productReference = 53AE60012F607B5300AB1A69 /* SmartMedeoWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		53FD86052F3B907D0066A14B /* smart-meteo */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 53FD86112F3B907F0066A14B /* Build configuration list for PBXNativeTarget "smart-meteo" */;
@@ -83,10 +173,12 @@
 				53FD86022F3B907D0066A14B /* Sources */,
 				53FD86032F3B907D0066A14B /* Frameworks */,
 				53FD86042F3B907D0066A14B /* Resources */,
+				53AE601A2F607B5700AB1A69 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				53AE60142F607B5700AB1A69 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				53FD86082F3B907D0066A14B /* smart-meteo */,
@@ -111,9 +203,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					53AE60002F607B5300AB1A69 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					53FD86052F3B907D0066A14B = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -137,11 +232,19 @@
 			projectRoot = "";
 			targets = (
 				53FD86052F3B907D0066A14B /* smart-meteo */,
+				53AE60002F607B5300AB1A69 /* SmartMedeoWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		53AE5FFF2F607B5300AB1A69 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		53FD86042F3B907D0066A14B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -152,6 +255,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		53AE5FFD2F607B5300AB1A69 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		53FD86022F3B907D0066A14B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -161,7 +271,77 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		53AE60142F607B5700AB1A69 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 53AE60002F607B5300AB1A69 /* SmartMedeoWidgetExtension */;
+			targetProxy = 53AE60132F607B5700AB1A69 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		53AE60172F607B5700AB1A69 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SmartMedeoWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4WE7VKWWKA;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SmartMedeoWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SmartMedeoWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "liagosoft.smart-meteo.SmartMedeoWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		53AE60182F607B5700AB1A69 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SmartMedeoWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4WE7VKWWKA;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SmartMedeoWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SmartMedeoWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "liagosoft.smart-meteo.SmartMedeoWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		53FD860F2F3B907F0066A14B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -288,6 +468,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "smart-meteo/smart-meteo.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4WE7VKWWKA;
@@ -296,7 +477,7 @@
 				INFOPLIST_FILE = "smart-meteo/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Smart Meteo";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per mostrarti il meteo locale";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Smart Meteo needs your location to provide accurate local weather forecasts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -327,6 +508,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "smart-meteo/smart-meteo.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4WE7VKWWKA;
@@ -335,7 +517,7 @@
 				INFOPLIST_FILE = "smart-meteo/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Smart Meteo";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per mostrarti il meteo locale";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Smart Meteo needs your location to provide accurate local weather forecasts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -364,6 +546,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		53AE60162F607B5700AB1A69 /* Build configuration list for PBXNativeTarget "SmartMedeoWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53AE60172F607B5700AB1A69 /* Debug */,
+				53AE60182F607B5700AB1A69 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		53FD86012F3B907D0066A14B /* Build configuration list for PBXProject "smart-meteo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

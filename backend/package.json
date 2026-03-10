@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@parse/node-apn": "^7.1.0",
     "@supabase/supabase-js": "^2.95.3",
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.13.4",
