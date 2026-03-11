@@ -1,4 +1,6 @@
 import Foundation
+import Combine
+import CoreLocation
 import UIKit
 import UserNotifications
 
@@ -40,12 +42,12 @@ class PushNotificationService: NSObject, ObservableObject, UNUserNotificationCen
     
     // Inoltra il token al backend
     func registerDeviceTokenWithBackend(token: String) {
-        Task {
+        Task { @MainActor in
             // Prendiamo lat e lon dell'utente dallo stato corrente, oppure lasciamo 0 in attesa del primo fix GPS
-            let lat = AppState.shared.location?.coordinate.latitude ?? 0.0
-            let lon = AppState.shared.location?.coordinate.longitude ?? 0.0
-            let locationName = AppState.shared.locationName
-            
+            let lat = AppState.shared.currentLocation?.coordinate.latitude ?? 0.0
+            let lon = AppState.shared.currentLocation?.coordinate.longitude ?? 0.0
+            let locationName = AppState.shared.currentLocationName
+
             do {
                 try await APIService.shared.subscribeToAlerts(deviceToken: token, lat: lat, lon: lon, locationName: locationName)
                 print("Successfully registered device token with backend: \(token)")
