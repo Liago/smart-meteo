@@ -299,7 +299,7 @@ struct CurrentWeatherView: View {
         .onAppear {
             calculateSunPosition()
         }
-        .onChange(of: astronomy?.sunrise) { _ in calculateSunPosition() }
+        .onChange(of: astronomy?.sunrise) { calculateSunPosition() }
     }
     
     private func iconName(for code: String) -> String {
@@ -503,6 +503,7 @@ struct AQIDetailItem: View {
             windSpeed: 12,
             precipitationProb: 0.1,
             condition: "clear",
+            conditionCode: "0",
             conditionText: "Sunny",
             dewPoint: 18,
             windGust: 20,

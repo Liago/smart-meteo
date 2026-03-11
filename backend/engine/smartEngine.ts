@@ -246,14 +246,28 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		return Number((weightedSum / totalWeight).toFixed(1));
 	};
 
+	const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
+
 	let bestCondition = 'unknown';
 	let maxScore = -1;
+	
+	const numericScores: Record<string, number> = {};
+	const stringScores: Record<string, number> = {};
+
 	Object.entries(aggregation.conditions).forEach(([code, score]) => {
-		if (score > maxScore) {
-			maxScore = score;
-			bestCondition = code;
-		}
+		if (isNumericCondition(code)) numericScores[code] = score;
+		else stringScores[code] = score;
 	});
+
+	if (Object.keys(numericScores).length > 0) {
+		Object.entries(numericScores).forEach(([code, score]) => {
+			if (score > maxScore) { maxScore = score; bestCondition = code; }
+		});
+	} else {
+		Object.entries(stringScores).forEach(([code, score]) => {
+			if (score > maxScore) { maxScore = score; bestCondition = code; }
+		});
+	}
 
 	const aggCloudCover = avg(aggregation.cloud_cover);
 	const rawBestCondition = bestCondition; // Preserve WMO code before normalization
@@ -279,8 +293,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 7).map(date => {
 		const data = dailyMap.get(date)!;
 		const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
+		const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
+		const numericCodes = data.codes.filter(isNumericCondition);
+		const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
+
 		const codeCounts: Record<string, number> = {};
-		data.codes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
+		targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
 		const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
 
 		return {
@@ -317,8 +335,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([time, data]) => {
 			const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
+			const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
+			const numericCodes = data.codes.filter(isNumericCondition);
+			const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
+
 			const codeCounts: Record<string, number> = {};
-			data.codes.forEach(c => codeCounts[c] = (codeCounts[c] || 0) + 1);
+			targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
 			const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
 			return {
 				time,
