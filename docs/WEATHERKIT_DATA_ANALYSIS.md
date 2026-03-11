@@ -65,7 +65,7 @@
 
 ## 2. Dataset WeatherKit NON Richiesti
 
-### 2.1 — `weatherAlerts` ⭐ ALTA PRIORITÀ
+### 2.1 — `weatherAlerts` ✅ IMPLEMENTATO
 
 **Cosa fornisce:** Allerte meteo governative ufficiali emesse da enti come Protezione Civile, NOAA, Met Office, ecc.
 
@@ -102,15 +102,31 @@
 - `effectiveTime` / `expireTime`: finestra temporale dell'allerta
 - `eventSource`: ente emittente
 
-**Perché è importante:**
-Il sistema push notifications (`backend/routes/alerts.ts` + `backend/services/apns.ts`) è già implementato con subscribe/unsubscribe e invio APNs, ma **manca la logica automatica di trigger**. Attualmente ha solo un endpoint di test manuale (`/alerts/test-push`). Le `weatherAlerts` di Apple fornirebbero allerte ufficiali già pronte, eliminando la necessità di creare una logica euristica personalizzata per decidere quando inviare notifiche.
+**Implementazione completata (2026-03-11):**
 
-**Implementazione suggerita:**
-1. Aggiungere `weatherAlerts` ai dataSets nella URL del connettore
-2. Creare un nuovo campo `alerts` nel return del connettore
-3. Nello Smart Engine o in un servizio dedicato, confrontare le allerte con le sottoscrizioni in `alert_subscriptions`
-4. Inviare push notification automatiche agli utenti iscritti nella zona dell'allerta
-5. Salvare le allerte inviate nella tabella `weather_alerts` per evitare duplicati
+1. ✅ **Tipo `WeatherAlert`** aggiunto in `backend/types.ts`
+2. ✅ **Connettore WeatherKit** aggiornato — `weatherAlerts` aggiunto ai dataSets, nuova funzione `fetchFromWeatherKitWithAlerts()` in `backend/connectors/weatherkit.ts`
+3. ✅ **Servizio `alertProcessor`** creato in `backend/services/alertProcessor.ts` — confronta allerte con sottoscrizioni per area geografica (~50km), invia push APNs, deduplicazione tramite `external_alert_id`
+4. ✅ **Smart Engine** integrato — chiama `fetchFromWeatherKitWithAlerts()` per WeatherKit, processa allerte in modo asincrono (non blocca la risposta forecast), include allerte attive nella risposta API
+5. ✅ **Migrazione DB** `018_weather_alerts_enhancement.sql` — aggiunge `external_alert_id`, `area_name`, `event_source`, `effective_time`, `expire_time` alla tabella `weather_alerts`, con indici per deduplicazione e query geografiche
+6. ✅ **Endpoint `GET /api/alerts/active?lat=&lon=`** — restituisce allerte attive (non scadute) deduplicate per area
+7. ✅ **CORS** aggiornato con metodo POST per gli endpoint alerts
+
+**Flusso automatico:**
+```
+Forecast request → Smart Engine → WeatherKit API (con weatherAlerts)
+                                      ↓
+                              Allerte ricevute?
+                                      ↓ sì
+                          alertProcessor (async)
+                              ↓              ↓
+                    Trova sottoscrizioni   Deduplicazione
+                    nella zona (~50km)    via external_alert_id
+                              ↓
+                    Invia push APNs
+                              ↓
+                    Salva in weather_alerts
+```
 
 ---
 
@@ -176,14 +192,14 @@ Attualmente l'aggregazione hourly usa solo `temp`, `precipitation_prob` e `condi
 
 ## 4. Riepilogo Priorità
 
-| # | Miglioramento | Impatto | Effort | Priorità |
-|---|---------------|---------|--------|----------|
-| 1 | **`weatherAlerts`** → Push notifications automatiche | Alto | Medio | ⭐ Alta |
-| 2 | **`uv_index_max`** nell'aggregazione daily | Basso | Basso | Media |
-| 3 | **`forecastNextHour`** → Notifiche precipitazioni imminenti | Medio | Medio | Media |
-| 4 | **Hourly arricchiti** (humidity, wind, UV per ora) | Medio | Medio | Bassa |
-| 5 | **Daily arricchiti** (precipitationAmount, snowfall, windMax) | Basso | Basso | Bassa |
+| # | Miglioramento | Impatto | Effort | Stato |
+|---|---------------|---------|--------|-------|
+| 1 | **`weatherAlerts`** → Push notifications automatiche | Alto | Medio | ✅ Completato |
+| 2 | **`uv_index_max`** nell'aggregazione daily | Basso | Basso | Da fare |
+| 3 | **`forecastNextHour`** → Notifiche precipitazioni imminenti | Medio | Medio | Da fare |
+| 4 | **Hourly arricchiti** (humidity, wind, UV per ora) | Medio | Medio | Da fare |
+| 5 | **Daily arricchiti** (precipitationAmount, snowfall, windMax) | Basso | Basso | Da fare |
 
 ---
 
-> **Raccomandazione:** Implementare il punto 1 (`weatherAlerts`) come priorità — completa il cerchio tra WeatherKit e il sistema push già implementato, trasformando le notifiche da manuali ad automatiche con dati ufficiali.
+> **Prossimo passo:** Implementare il punto 2 (`uv_index_max`) — effort basso, richiede solo modifiche all'aggregazione daily nello Smart Engine.

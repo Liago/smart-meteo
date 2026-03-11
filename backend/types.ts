@@ -62,6 +62,23 @@ export interface UnifiedForecastData {
 	astronomy?: AstronomyData;
 }
 
+export interface WeatherAlert {
+	id: string;
+	areaId?: string;
+	areaName?: string;
+	certainty: 'observed' | 'likely' | 'possible' | 'unlikely' | string;
+	countryCode?: string;
+	description: string;
+	effectiveTime: string;
+	expireTime: string;
+	issuedTime?: string;
+	eventSource?: string;
+	severity: 'minor' | 'moderate' | 'severe' | 'extreme' | string;
+	source?: string;
+	urgency?: 'immediate' | 'expected' | 'future' | string;
+	detailsUrl?: string;
+}
+
 export interface WeatherConditionWeights {
 	[key: string]: number;
 }

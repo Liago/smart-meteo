@@ -6,12 +6,13 @@ import { fetchFromAccuWeather } from '../connectors/accuweather';
 import { fetchFromWWO } from '../connectors/worldweatheronline';
 import { fetchFromWeatherstack } from '../connectors/weatherstack';
 import { fetchFromMeteostat } from '../connectors/meteostat';
-import { fetchFromWeatherKit } from '../connectors/weatherkit';
+import { fetchFromWeatherKit, fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
-import { WeatherConditionWeights, AirQualityDetail } from '../types';
+import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
 import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
+import { processWeatherAlerts } from '../services/alertProcessor';
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -120,12 +121,27 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const activeSources = sources.filter(s => s.active);
 	const accuracyMapPromise = getAccuracyMap();
 
+	// Raccoglie le allerte WeatherKit durante il fetch
+	let weatherKitAlerts: WeatherAlert[] = [];
+
 	const fetchPromises = activeSources.map(async s => {
-		const fetcher = SOURCE_FETCHERS[s.id];
-		if (!fetcher) return null;
 		const start = Date.now();
 		try {
-			const result = await fetcher(lat, lon);
+			let result: UnifiedForecast | null = null;
+
+			// Per WeatherKit, usa la variante con allerte
+			if (s.id === 'apple_weatherkit') {
+				const wkResult = await fetchFromWeatherKitWithAlerts(lat, lon);
+				if (wkResult) {
+					result = wkResult.forecast;
+					weatherKitAlerts = wkResult.alerts;
+				}
+			} else {
+				const fetcher = SOURCE_FETCHERS[s.id];
+				if (!fetcher) return null;
+				result = await fetcher(lat, lon);
+			}
+
 			s.lastResponseMs = Date.now() - start;
 			s.lastError = null;
 
@@ -349,7 +365,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		},
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
-		astronomy: sourceWithAstronomy?.astronomy
+		astronomy: sourceWithAstronomy?.astronomy,
+		alerts: weatherKitAlerts.filter(a => !a.expireTime || new Date(a.expireTime) > new Date())
 	};
 
 	// 6. Save Aggregated Result to DB
@@ -376,6 +393,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	// 7. Log Deviations for AI Accuracy
 	logAccuracyDeviations(result, validForecasts);
+
+	// 8. Process Weather Alerts (async, non-blocking)
+	if (weatherKitAlerts.length > 0) {
+		console.log(`Processing ${weatherKitAlerts.length} weather alert(s) from WeatherKit`);
+		processWeatherAlerts(weatherKitAlerts, lat, lon).catch(err =>
+			console.error('Error processing weather alerts:', err.message)
+		);
+	}
 
 	return result;
 }

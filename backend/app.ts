@@ -30,7 +30,7 @@ if (process.env.FRONTEND_URL) {
 
 app.use(cors({
 	origin: true, // Reflect request origin (or use '*' for public)
-	methods: ['GET', 'PATCH', 'OPTIONS'],
+	methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
 	credentials: true,
 	maxAge: 86400,
@@ -51,6 +51,7 @@ app.get('/', (req: Request, res: Response) => {
 			'PATCH /api/sources/:id',
 			'POST /api/alerts/subscribe',
 			'POST /api/alerts/unsubscribe',
+			'GET /api/alerts/active?lat=&lon=',
 			'POST /api/alerts/test-push'
 		],
 	});

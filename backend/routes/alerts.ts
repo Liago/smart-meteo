@@ -63,6 +63,45 @@ alertsRouter.post('/unsubscribe', async (req, res) => {
 });
 
 /**
+ * Restituisce le allerte meteo attive (non scadute) per una data area geografica.
+ * Query params: lat, lon, radius (opzionale, default 0.5 gradi ~50km)
+ */
+alertsRouter.get('/active', async (req, res) => {
+    const lat = parseFloat(req.query.lat as string);
+    const lon = parseFloat(req.query.lon as string);
+    const radius = parseFloat(req.query.radius as string) || 0.5;
+
+    if (isNaN(lat) || isNaN(lon)) {
+        return res.status(400).json({ error: 'Parametri lat/lon mancanti o non validi' });
+    }
+
+    try {
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+            .from('weather_alerts')
+            .select('*')
+            .gt('expire_time', now)
+            .not('external_alert_id', 'is', null)
+            .order('sent_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Deduplica per external_alert_id (una riga per allerta, non per sottoscrizione)
+        const seen = new Set<string>();
+        const unique = (data || []).filter(alert => {
+            if (!alert.external_alert_id || seen.has(alert.external_alert_id)) return false;
+            seen.add(alert.external_alert_id);
+            return true;
+        });
+
+        return res.json({ alerts: unique });
+    } catch (err: any) {
+        console.error('Error in /alerts/active:', err.message);
+        return res.status(500).json({ error: 'Impossibile recuperare le allerte attive', details: err.message });
+    }
+});
+
+/**
  * Endpoint di TEST manuale
  * Invoca forzatamente un'allerta push ad un device specifico per verificare la configurazione APNs.
  * Payload: { deviceToken: string, title: string, body: string }
