@@ -1,7 +1,7 @@
 # Riepilogo Stato Progetto — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-03-10
+> **Ultimo aggiornamento:** 2026-03-11
 > **Scopo:** Riepilogo dello stato di implementazione, gap identificati e migliorie future
 
 ---
@@ -10,21 +10,21 @@
 
 | Fase | Descrizione | Completamento | Note |
 |------|-------------|:------------:|------|
-| **Fase 1** | Backend Core (connettori, Smart Engine, API, DB) | **100%** | 8 connettori attivi, engine con media pesata + voting |
+| **Fase 1** | Backend Core (connettori, Smart Engine, API, DB) | **100%** | 9 connettori attivi (incl. Apple WeatherKit), engine con media pesata + voting |
 | **Fase 2** | Frontend Web MVP (Next.js, Glassmorphism, SWR) | **~95%** | Mancano: test E2E Playwright, audit Lighthouse |
 | **Fase 3** | iOS App (SwiftUI, MVVM, Supabase) | **~98%** | Manca: Widget iOS |
 | **API Improvements** | Bug fix + espansione fonti + nuovi campi | **~98%** | Backend 100%, Web 100%, iOS ~95% |
 | **Fase 5A** | Estrazione campi mancanti backend | **100%** | visibility, uvIndex, cloudCover, dewPoint, moonrise/moonset, hourly AccuWeather |
 | **Fase 5B** | iOS: nuovi campi API + card UV/AQI | **100%** | Modello aggiornato, 6 card flippabili, dettaglio AQI |
 | **Fase 5C** | Verifiche database | **100%** | Migration 013 + seed 8 fonti verificati (esecuzione DB da confermare) |
-| **Fase 5D** | Funzionalità avanzate | **0%** | Widget, AI engine, SpriteKit, WeatherKit, Haptic, Push — da implementare |
+| **Fase 5D** | Funzionalità avanzate | **100%** | AI engine V2, Widget iOS, SpriteKit, WeatherKit (live), Haptic, Push — tutti implementati |
 
 ---
 
 ## 2. Cosa e stato fatto
 
 ### Fase 1 — Backend Core
-- 8 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack, Meteostat, WWO
+- 9 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack, Meteostat, WWO, Apple WeatherKit
 - Smart Engine V1 con aggregazione pesata (pesi da 0.8 a 1.2)
 - API Express: `/api/forecast`, `/api/sources`, `/api/health`
 - Database Supabase con 12 migration, RLS, trigger, funzioni utility
@@ -85,7 +85,7 @@
 - Funzioni helper `getUvLabel()` e `getUvColor()` con scala italiana
 - Cache engine: salva/restituisce `full_data` completo
 
-### Fase 5 — Completamento e Miglioramenti (5A + 5B + 5C completate)
+### Fase 5 — Completamento e Miglioramenti (5A + 5B + 5C + 5D completate)
 
 **Fase 5A — Estrazione Dati Mancanti Backend:**
 - Open-Meteo: aggiunta `visibility` (m→km) e `dew_point_2m` ai params current/hourly
@@ -103,6 +103,15 @@
 
 **Fase 5C — Database:**
 - Migration 013 e seed sources (010+012) verificati nel file system — esecuzione su Supabase da confermare
+
+**Fase 5D — Funzionalità Avanzate:**
+- 5D.1: Algoritmo V2 AI-driven con pesi dinamici basati su accuratezza storica (MAE), tabella `source_accuracy`, penalità automatica
+- 5D.2: Widget iOS (WidgetKit) con SmartMedeoWidgetExtension per Home Screen
+- 5D.3: SpriteKit particle effects in DynamicBackground (pioggia, neve, temporale)
+- 5D.4: Cloud cover per condition_code — `normalizeConditionWithCloudCover` nel Smart Engine
+- 5D.5: Apple WeatherKit — 9ª fonte meteo, connettore JWT, peso 1.2, verificato LIVE su Netlify
+- 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
+- 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
 ---
 
@@ -166,8 +175,8 @@
 | # | Miglioramento | Stato | Effort | Documento |
 |---|---------------|:-----:|--------|-----------|
 | 6 | **Test E2E con Playwright** per frontend web | ⏳ | Medio | `TODO_TESTING.md` §3 |
-| 7 | **Algoritmo V2 AI-driven** per pesi dinamici | ⏳ | Alto | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.1 |
-| 8 | **Widget iOS** per Home Screen | ⏳ | Medio | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.2 |
+| 7 | **Algoritmo V2 AI-driven** per pesi dinamici | ✅ | Alto | Fase 5D.1 |
+| 8 | **Widget iOS** per Home Screen | ✅ | Medio | Fase 5D.2 |
 | 9 | **AccuWeather: hourly forecast** (12h) | ✅ | Basso | Fase 5A.3 |
 | 10 | **Dew point diretto da API** (3 fonti + fallback Magnus) | ✅ | Basso | Fase 5A.4 |
 | 11 | **Backend test suite** | ⏳ | Medio | `TODO_TESTING.md` §2 |
@@ -178,15 +187,15 @@
 | # | Miglioramento | Stato | Documento |
 |---|---------------|:-----:|-----------|
 | 13 | Weatherstack: migrazione a HTTPS | ⏳ | `VALUTAZIONI_TECNICHE.md` §1 |
-| 14 | SpriteKit particle effects iOS | ⏳ | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.3 |
-| 15 | Cloud cover per accuratezza `condition_code` | ⏳ | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.4 |
+| 14 | SpriteKit particle effects iOS | ✅ | Fase 5D.3 |
+| 15 | Cloud cover per accuratezza `condition_code` | ✅ | Fase 5D.4 |
 | 16 | Moonrise/moonset da WWO | ✅ | Fase 5A.5 |
-| 17 | Apple WeatherKit integration | ⏳ | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.5 |
+| 17 | Apple WeatherKit integration | ✅ | Fase 5D.5 — live con peso 1.2 |
 | 18 | Lighthouse performance audit | ⏳ | `VALUTAZIONI_TECNICHE.md` §2 |
 | 19 | Valutare sostituzione/declassamento Meteostat | ⏳ | `VALUTAZIONI_TECNICHE.md` §3 |
 | 20 | iOS: test unitari per ViewModel e Service | ⏳ | `VALUTAZIONI_TECNICHE.md` §4 |
-| 21 | Haptic feedback iOS | ⏳ | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.6 |
-| 22 | Notifiche push per allerte meteo | ⏳ | `IMPLEMENTATION_PLAN_PHASE_5.md` §5D.7 |
+| 21 | Haptic feedback iOS | ✅ | Fase 5D.6 |
+| 22 | Notifiche push per allerte meteo | ✅ | Fase 5D.7 |
 
 ---
 

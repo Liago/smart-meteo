@@ -1,8 +1,8 @@
 # Piano di Implementazione — Fase 5: Completamento e Miglioramenti
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-03-10
-> **Stato:** Fase 5A ✅ | Fase 5B ✅ | Fase 5C ✅ (da verificare esecuzione su Supabase) | Fase 5D: Da implementare
+> **Ultimo aggiornamento:** 2026-03-11
+> **Stato:** Fase 5A ✅ | Fase 5B ✅ | Fase 5C ✅ | Fase 5D ✅
 > **Scopo:** Colmare i gap identificati e implementare le migliorie prioritarie su backend, iOS e database
 
 ---
@@ -28,7 +28,7 @@ Questa fase copre i gap identificati nel `PROJECT_STATUS_SUMMARY.md` (escluso il
 | **5A** | Estrazione campi mancanti dai connector backend | Alta | Nessuna | ✅ Completata |
 | **5B** | iOS: nuovi campi API + card UV/Visibilità/AQI | Alta | 5A (dati disponibili nell'API) | ✅ Completata |
 | **5C** | Verifiche database (migration 013, seed sources) | Alta | Nessuna (parallelizzabile con 5A) | ✅ Verificata (esecuzione DB da confermare) |
-| **5D** | Funzionalità avanzate (Widget, AI, SpriteKit, ecc.) | Media/Bassa | 5A, 5B, 5C completate | ⏳ Da implementare |
+| **5D** | Funzionalità avanzate (Widget, AI, SpriteKit, ecc.) | Media/Bassa | 5A, 5B, 5C completate | ✅ Completata |
 
 ### Punti coperti
 
@@ -557,7 +557,7 @@ function normalizeConditionWithCloudCover(
 
 ### 5D.5 — Apple WeatherKit Integration (Punto 17)
 
-**Stato:** ✅ Implementato — Creata migrazione DB (016) e connettore per generazione JWT. In attesa configurazione chiavi ambiente.
+**Stato:** ✅ Implementato e LIVE — Connettore attivo, chiavi configurate, WeatherKit partecipa all'aggregazione smart come 9ª fonte (peso 1.2).
 **Impatto:** +1 fonte forecast di alta qualità (dati Apple/TWC)
 **Effort:** Alto
 **File:** Nuovo `backend/connectors/weatherkit.ts`
