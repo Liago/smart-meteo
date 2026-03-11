@@ -179,7 +179,7 @@ struct SunWindCard: View {
         .onAppear {
             calculateSunPosition()
         }
-        .onChange(of: astronomy?.sunrise) { _ in calculateSunPosition() }
+        .onChange(of: astronomy?.sunrise) { calculateSunPosition() }
     }
     
     // Helper for robust date parsing

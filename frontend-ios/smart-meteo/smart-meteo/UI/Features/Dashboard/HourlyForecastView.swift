@@ -140,7 +140,7 @@ struct HourlyForecastView: View {
         .onAppear {
             processData()
         }
-        .onChange(of: hourly.count) { _ in processData() }
+        .onChange(of: hourly.count) { processData() }
     }
     
     private func itemInExpandedPeriod(index: Int, item: TimelineItem, data: ChartData) -> Bool {
