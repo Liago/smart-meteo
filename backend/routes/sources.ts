@@ -17,7 +17,7 @@ const sources: WeatherSource[] = [
 		id: 'apple_weatherkit',
 		name: 'Apple WeatherKit',
 		weight: 1.2,
-		active: false, // Default false until keys are provided
+		active: true,
 		description: 'Dati ufficiali forniti da Apple',
 		lastError: null,
 		lastResponseMs: 0
