@@ -256,6 +256,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	});
 
 	const aggCloudCover = avg(aggregation.cloud_cover);
+	const rawBestCondition = bestCondition; // Preserve WMO code before normalization
 	bestCondition = normalizeConditionWithCloudCover(bestCondition, aggCloudCover);
 
 	// 5. Daily & Hourly Aggregation
@@ -357,6 +358,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			aqi: avg(aggregation.aqi),
 			pressure: avg(aggregation.pressure),
 			condition: bestCondition,
+			condition_code: rawBestCondition,
 			condition_text: bestCondition.toUpperCase(),
 			uv_index: avg(aggregation.uv_index),
 			visibility: avg(aggregation.visibility),

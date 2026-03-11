@@ -1,6 +1,9 @@
 -- Migration 017: Push Notifications Tables
 -- Tabelle per memorizzare i token dei dispositivi per le allerte meteo e lo storico degli invii
 
+-- Estensione per auto-update di updated_at
+CREATE EXTENSION IF NOT EXISTS moddatetime SCHEMA extensions;
+
 CREATE TABLE IF NOT EXISTS alert_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- Opzionale: lega il token all'utente loggato se presente
@@ -18,7 +21,7 @@ CREATE TABLE IF NOT EXISTS alert_subscriptions (
 -- Trigger per auto-timestamp
 CREATE TRIGGER handle_updated_at_alert_subscriptions 
     BEFORE UPDATE ON alert_subscriptions 
-    FOR EACH ROW EXECUTE PROCEDURE moddatetime (updated_at);
+    FOR EACH ROW EXECUTE PROCEDURE extensions.moddatetime (updated_at);
 
 CREATE TABLE IF NOT EXISTS weather_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

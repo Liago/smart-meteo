@@ -25,6 +25,8 @@ struct SmartMeteoApp: App {
                 .task {
                     // Check push notification status on launch
                     PushNotificationService.shared.checkStatus()
+                    // Richiedi il permesso per le notifiche push al primo avvio
+                    PushNotificationService.shared.requestAuthorization()
                 }
         }
     }

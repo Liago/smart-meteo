@@ -17,7 +17,7 @@ struct CurrentWeatherView: View {
             
             HStack(alignment: .center, spacing: 24) {
                 // Large Icon
-                Image(systemName: iconName(for: current.condition))
+                Image(systemName: iconName(for: current.conditionCode ?? current.condition))
                     .renderingMode(.template) // Change from .original to .template to tint it
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -302,12 +302,27 @@ struct CurrentWeatherView: View {
         .onChange(of: astronomy?.sunrise) { _ in calculateSunPosition() }
     }
     
-    private func iconName(for condition: String) -> String {
-        switch condition.lowercased() {
+    private func iconName(for code: String) -> String {
+        // Try WMO numeric codes first (same logic as HourlyForecastView)
+        if let c = Int(code) {
+            switch c {
+            case 0: return "sun.max.fill"
+            case 1, 2: return "cloud.sun.fill"
+            case 3: return "cloud.fill"
+            case 45, 48: return "cloud.fog.fill"
+            case 51, 53, 55, 56, 57: return "cloud.drizzle.fill"
+            case 61, 63, 65, 66, 67, 80, 81: return "cloud.rain.fill"
+            case 71, 73, 75, 77, 85, 86: return "snowflake"
+            case 82, 95, 96, 99: return "cloud.bolt.rain.fill"
+            default: return "cloud.sun.fill"
+            }
+        }
+        // Fallback: normalized condition strings
+        switch code.lowercased() {
         case "clear": return "sun.max.fill"
         case "cloudy": return "cloud.fill"
         case "rain": return "cloud.rain.fill"
-        case "snow": return "cloud.snow.fill"
+        case "snow": return "snowflake"
         case "storm": return "cloud.bolt.rain.fill"
         case "fog": return "cloud.fog.fill"
         default: return "cloud.sun.fill"

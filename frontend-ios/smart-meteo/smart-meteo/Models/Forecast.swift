@@ -34,6 +34,7 @@ struct ForecastCurrent: Codable {
     let windSpeed: Double?
     let precipitationProb: Double
     let condition: String
+    let conditionCode: String?
     let conditionText: String
     
     // New fields
@@ -54,6 +55,7 @@ struct ForecastCurrent: Codable {
         case windSpeed = "wind_speed"
         case precipitationProb = "precipitation_prob"
         case condition
+        case conditionCode = "condition_code"
         case conditionText = "condition_text"
 
         // New keys
