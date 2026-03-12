@@ -5,6 +5,7 @@ struct DailyForecastView: View {
     let hourly: [HourlyForecast]?
     
     @State private var expandedDate: String?
+    @State private var showLegend = false
     
     // Date formatter for display (e.g., "Mon 12")
     private let dayFormatter: DateFormatter = {
@@ -30,13 +31,32 @@ struct DailyForecastView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Prossimi Giorni")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundColor(.black)
-                .padding(.bottom, 4)
+            HStack(alignment: .center, spacing: 8) {
+                Text("Prossimi Giorni")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(.black)
+
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showLegend.toggle()
+                    }
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+
+                Spacer()
+            }
+            .padding(.bottom, 4)
             
-            // Exclude today since it's already shown in the detail above
-            let nextDays = daily.dropFirst()
+            // Exclude today since it's already shown in the hourly forecast above
+            let today = {
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd"
+                return f.string(from: Date())
+            }()
+            let nextDays = daily.filter { !$0.date.hasPrefix(today) }
             
             VStack(spacing: 12) {
                 ForEach(Array(nextDays), id: \.date) { day in
@@ -57,8 +77,28 @@ struct DailyForecastView: View {
                 }
             }
         }
+        .overlay {
+            if showLegend {
+                // Transparent tap target to dismiss
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showLegend = false
+                        }
+                    }
+
+                TemperatureBarLegend {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showLegend = false
+                    }
+                }
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
     }
-    
+
     private func hourlyForDay(_ dateString: String) -> [HourlyForecast] {
         guard let hourly = hourly else { return [] }
         // Match hours for this day (handles both "2026-03-10T10:00" and "2026-03-10T10:00:00Z" formats)
@@ -157,11 +197,11 @@ struct DailyRow: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Expanded Content
+            // Expanded Content — show chart only if enough hourly data (≥6h)
             if isExpanded {
-                if !hourly.isEmpty {
+                if hourly.count >= 6 {
                     WeatherChartView(hourly: hourly)
-                        .frame(height: 180) // Constrain height for the scrollview inside
+                        .frame(height: 180)
                         .padding(.horizontal, 4)
                         .padding(.bottom, 10)
                 } else {
@@ -212,6 +252,65 @@ struct DailyRow: View {
 }
 
 
+
+// MARK: - Temperature Bar Legend Tooltip
+
+struct TemperatureBarLegend: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Legenda barra temperatura")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.gray.opacity(0.5))
+                }
+            }
+
+            // Gradient sample
+            VStack(alignment: .leading, spacing: 6) {
+                Capsule()
+                    .fill(LinearGradient(
+                        colors: [.cyan, .yellow, .orange],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ))
+                    .frame(height: 6)
+
+                HStack {
+                    Text("Freddo")
+                        .foregroundColor(.cyan)
+                    Spacer()
+                    Text("Mite")
+                        .foregroundColor(.yellow)
+                    Spacer()
+                    Text("Caldo")
+                        .foregroundColor(.orange)
+                }
+                .font(.system(size: 11, weight: .medium))
+            }
+
+            Text("La posizione e la lunghezza della barra colorata indicano l'escursione termica della giornata rispetto alla scala complessiva.")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(width: 260)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        )
+    }
+}
+
+// MARK: - Temperature Bar
 
 struct TemperatureBar: View {
     let min: Double
