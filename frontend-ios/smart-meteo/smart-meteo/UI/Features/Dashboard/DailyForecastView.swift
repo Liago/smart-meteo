@@ -50,13 +50,18 @@ struct DailyForecastView: View {
             }
             .padding(.bottom, 4)
             
-            // Exclude today since it's already shown in the hourly forecast above
-            let today = {
-                let f = DateFormatter()
-                f.dateFormat = "yyyy-MM-dd"
-                return f.string(from: Date())
+            // Exclude today (and any past dates) since today is shown in the hourly forecast above
+            let nextDays: [DailyForecast] = {
+                let fmt = DateFormatter()
+                fmt.dateFormat = "yyyy-MM-dd"
+                fmt.timeZone = TimeZone(identifier: "UTC")
+                let cal = Calendar.current
+                let startOfTomorrow = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: Date())!)
+                return daily.filter { day in
+                    guard let date = fmt.date(from: String(day.date.prefix(10))) else { return true }
+                    return date >= startOfTomorrow
+                }
             }()
-            let nextDays = daily.filter { !$0.date.hasPrefix(today) }
             
             VStack(spacing: 12) {
                 ForEach(Array(nextDays), id: \.date) { day in
@@ -113,6 +118,8 @@ struct DailyRow: View {
     let hourly: [HourlyForecast]
     let onTap: () -> Void
     
+    private var hasEnoughHourly: Bool { hourly.count >= 6 }
+
     private var displayDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -130,7 +137,7 @@ struct DailyRow: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            Button(action: onTap) {
+            Button(action: { if hasEnoughHourly { onTap() } }) {
                 HStack(spacing: 12) {
                     // Date and Rain Probability
                     VStack(alignment: .center, spacing: 2) {
@@ -186,11 +193,13 @@ struct DailyRow: View {
                         }
                     }
                     
-                    // Chevron
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.gray.opacity(0.6))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    // Chevron (only when hourly drill-down is available)
+                    if hasEnoughHourly {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.gray.opacity(0.6))
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
                 }
                 .padding(.vertical, 12)
                 .padding(.horizontal, 12)
