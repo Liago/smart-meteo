@@ -118,6 +118,7 @@ struct AstronomyData: Codable {
     let moonPhase: String?
     let moonrise: String?
     let moonset: String?
+    let moonIllumination: Int?
 
     enum CodingKeys: String, CodingKey {
         case sunrise
@@ -125,6 +126,7 @@ struct AstronomyData: Codable {
         case moonPhase = "moon_phase"
         case moonrise
         case moonset
+        case moonIllumination = "moon_illumination"
     }
 }
 

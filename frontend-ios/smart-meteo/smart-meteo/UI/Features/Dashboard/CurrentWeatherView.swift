@@ -490,8 +490,13 @@ private func computeMoonData(astronomy: AstronomyData?) -> MoonData {
     let age = moonAge(for: Date())
     let synodicMonth = 29.5305882
 
-    // Illumination: 0% at new moon (age=0), 100% at full moon (age≈14.76)
-    let illumination = Int(round((1 - cos(age / synodicMonth * 2 * .pi)) / 2 * 100))
+    // Illumination: use backend value if available, otherwise calculate
+    let illumination: Int
+    if let backendIllum = astronomy?.moonIllumination {
+        illumination = backendIllum
+    } else {
+        illumination = Int(round((1 - cos(age / synodicMonth * 2 * .pi)) / 2 * 100))
+    }
 
     // Days to next full moon (age ≈ 14.76 at full)
     let fullMoonAge = synodicMonth / 2.0
@@ -712,8 +717,9 @@ struct AirQualityBalloon: View {
             sunrise: "2026-03-02T06:45:00Z",
             sunset: "2026-03-02T18:10:00Z",
             moonPhase: "Waxing Gibbous",
-            moonrise: nil,
-            moonset: nil
+            moonrise: "2026-03-02T04:00:00",
+            moonset: "2026-03-02T12:04:00",
+            moonIllumination: 35
         ))
     }
 }

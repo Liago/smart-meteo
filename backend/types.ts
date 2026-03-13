@@ -22,6 +22,7 @@ export interface AstronomyData {
 	moon_phase: string;
 	moonrise?: string;
 	moonset?: string;
+	moon_illumination?: number;
 }
 
 export interface AirQualityDetail {

@@ -90,6 +90,7 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 				moon_phase: astro.moon_phase ?? 'unknown',
 				...(moonriseTime ? { moonrise: `${dateStr}T${moonriseTime}:00` } : {}),
 				...(moonsetTime ? { moonset: `${dateStr}T${moonsetTime}:00` } : {}),
+				...(astro.moon_illumination != null ? { moon_illumination: Number(astro.moon_illumination) } : {}),
 			};
 		}
 

@@ -357,12 +357,20 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		validForecasts.find(f => f.astronomy && f.astronomy.moon_phase !== 'unknown' && f.astronomy.moon_phase !== '') ??
 		validForecasts.find(f => f.astronomy);
 
-	// Merge moonrise/moonset from another source if the primary doesn't have them
-	if (sourceWithAstronomy?.astronomy && !sourceWithAstronomy.astronomy.moonrise) {
-		const moonSource = validForecasts.find(f => f.astronomy?.moonrise || f.astronomy?.moonset);
-		if (moonSource?.astronomy) {
-			if (moonSource.astronomy.moonrise) sourceWithAstronomy.astronomy.moonrise = moonSource.astronomy.moonrise;
-			if (moonSource.astronomy.moonset) sourceWithAstronomy.astronomy.moonset = moonSource.astronomy.moonset;
+	// Merge moon data from other sources if the primary doesn't have them
+	if (sourceWithAstronomy?.astronomy) {
+		if (!sourceWithAstronomy.astronomy.moonrise) {
+			const moonSource = validForecasts.find(f => f.astronomy?.moonrise || f.astronomy?.moonset);
+			if (moonSource?.astronomy) {
+				if (moonSource.astronomy.moonrise) sourceWithAstronomy.astronomy.moonrise = moonSource.astronomy.moonrise;
+				if (moonSource.astronomy.moonset) sourceWithAstronomy.astronomy.moonset = moonSource.astronomy.moonset;
+			}
+		}
+		if (sourceWithAstronomy.astronomy.moon_illumination == null) {
+			const illumSource = validForecasts.find(f => f.astronomy?.moon_illumination != null);
+			if (illumSource?.astronomy?.moon_illumination != null) {
+				sourceWithAstronomy.astronomy.moon_illumination = illumSource.astronomy.moon_illumination;
+			}
 		}
 	}
 
