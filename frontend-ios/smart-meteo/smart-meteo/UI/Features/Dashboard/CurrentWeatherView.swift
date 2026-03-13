@@ -331,6 +331,9 @@ struct CurrentWeatherView: View {
         if let d = isoFormatter.date(from: str) { return d }
         
         let simpleFormatter = DateFormatter()
+        simpleFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let d = simpleFormatter.date(from: str) { return d }
+
         simpleFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
         return simpleFormatter.date(from: str)
     }
