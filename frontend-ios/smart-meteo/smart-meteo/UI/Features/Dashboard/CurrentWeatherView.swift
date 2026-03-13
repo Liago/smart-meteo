@@ -4,8 +4,9 @@ struct CurrentWeatherView: View {
     let current: ForecastCurrent
     let today: DailyForecast?
     let astronomy: AstronomyData?
-    
+
     @State private var showMore = false
+    @State private var showAirQuality = false
     @State private var sunProgress: Double = 0.0
     
     var body: some View {
@@ -70,7 +71,7 @@ struct CurrentWeatherView: View {
                             altLabel: current.windDirectionLabel != nil ? "Raffica \(current.windDirectionLabel!)" : "Raffica",
                             altIcon: "wind"
                         )
-                        
+
                         // Humidity -> Dew Point
                         FlipWeatherDetail(
                             icon: "humidity",
@@ -80,20 +81,20 @@ struct CurrentWeatherView: View {
                             altLabel: "Punto rugiada",
                             altIcon: "drop.triangle"
                         )
-                        
-                        // Rain -> AQI
+
+                        // Pioggia -> Nuvole
                         FlipWeatherDetail(
                             icon: "drop.fill",
                             mainValue: "\(Int(current.precipitationProb))%",
                             mainLabel: "Pioggia",
-                            altValue: aqiValue(current.aqi),
-                            altLabel: "AQI",
-                            altIcon: "aqi.medium"
+                            altValue: current.cloudCover != nil ? "\(Int(current.cloudCover!))%" : "--",
+                            altLabel: "Nuvole",
+                            altIcon: "cloud.fill"
                         )
                     }
                     .frame(maxWidth: .infinity)
 
-                    // Seconda riga: UV, Pressione/Visibilità, Nuvole/PM2.5
+                    // Seconda riga: UV, Pressione/Visibilità, AQI/PM2.5
                     HStack(spacing: 20) {
                         // UV Index -> Livello UV
                         FlipWeatherDetail(
@@ -116,43 +117,32 @@ struct CurrentWeatherView: View {
                             altIcon: "eye.fill"
                         )
 
-                        // Nuvole -> PM2.5
-                        FlipWeatherDetail(
-                            icon: "cloud.fill",
-                            mainValue: current.cloudCover != nil ? "\(Int(current.cloudCover!))%" : "--",
-                            mainLabel: "Nuvole",
-                            altValue: current.airQuality?.pm25 != nil ? String(format: "%.1f", current.airQuality!.pm25!) : "--",
-                            altLabel: "PM2.5",
-                            altIcon: "aqi.medium"
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
+                        // AQI -> PM2.5 (con info icon per dettaglio qualità aria)
+                        ZStack(alignment: .topTrailing) {
+                            FlipWeatherDetail(
+                                icon: "aqi.medium",
+                                mainValue: aqiValue(current.aqi),
+                                mainLabel: "AQI",
+                                altValue: current.airQuality?.pm25 != nil ? String(format: "%.1f", current.airQuality!.pm25!) : "--",
+                                altLabel: "PM2.5",
+                                altIcon: "aqi.medium"
+                            )
 
-                    // Dettaglio Qualità dell'Aria
-                    if let aq = current.airQuality {
-                        VStack(spacing: 8) {
-                            Text("QUALITÀ DELL'ARIA")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.gray)
-                                .tracking(1)
-
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                                AQIDetailItem(label: "PM2.5", value: aq.pm25, unit: "µg/m³")
-                                AQIDetailItem(label: "PM10", value: aq.pm10, unit: "µg/m³")
-                                AQIDetailItem(label: "NO₂", value: aq.no2, unit: "µg/m³")
-                                AQIDetailItem(label: "O₃", value: aq.o3, unit: "µg/m³")
-                                AQIDetailItem(label: "CO", value: aq.co, unit: "µg/m³")
-                                AQIDetailItem(label: "SO₂", value: aq.so2, unit: "µg/m³")
+                            if current.airQuality != nil {
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        showAirQuality.toggle()
+                                    }
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.gray)
+                                }
+                                .offset(x: 4, y: -2)
                             }
                         }
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white)
-                                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
-                        )
-                        .padding(.horizontal, 4)
                     }
+                    .frame(maxWidth: .infinity)
                     
                     // Sun Arc Section
                     if astronomy != nil {
@@ -228,60 +218,9 @@ struct CurrentWeatherView: View {
                             .frame(height: 130)
                             
                             Divider()
-                            
-                            // Wind & Pressure Row
-                            HStack {
-                                // Wind
-                                HStack(spacing: 10) {
-                                    Image(systemName: "wind")
-                                        .font(.title3)
-                                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("VENTO")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.gray)
-                                            .tracking(1)
-                                        
-                                        HStack(alignment: .lastTextBaseline, spacing: 4) {
-                                            Text("\(Int(round((current.windSpeed ?? 0) * 3.6)))")
-                                                .font(.system(size: 18, weight: .bold))
-                                                .foregroundColor(.black)
-                                            Text("km/h")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                            Text("• \(current.windDirectionLabel ?? "--")")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                        }
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                // Pressure
-                                HStack(spacing: 10) {
-                                    Image(systemName: "gauge.medium")
-                                        .font(.title3)
-                                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                                    
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("BAROMETRO")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.gray)
-                                            .tracking(1)
-                                        
-                                        HStack(alignment: .lastTextBaseline, spacing: 4) {
-                                            Text("\(Int(round(current.pressure ?? 0)))")
-                                                .font(.system(size: 18, weight: .bold))
-                                                .foregroundColor(.black)
-                                            Text("mBar")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                        }
-                                    }
-                                }
-                            }
+
+                            // Moon Section
+                            MoonInfoSection(astronomy: astronomy)
                         }
                         .padding(16)
                         .background(
@@ -296,6 +235,25 @@ struct CurrentWeatherView: View {
             }
         }
         .padding()
+        .overlay {
+            if showAirQuality, let aq = current.airQuality {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showAirQuality = false
+                        }
+                    }
+
+                AirQualityBalloon(airQuality: aq) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showAirQuality = false
+                    }
+                }
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
         .onAppear {
             calculateSunPosition()
         }
@@ -489,6 +447,234 @@ struct AQIDetailItem: View {
                 .font(.system(size: 9))
                 .foregroundColor(.gray)
         }
+    }
+}
+
+// MARK: - Moon Calculations
+
+private struct MoonData {
+    let phaseName: String
+    let phaseIcon: String
+    let illumination: Int
+    let daysToFullMoon: Int
+    let moonrise: String?
+    let moonset: String?
+}
+
+/// Calculates the moon's synodic age (days since last new moon) for a given date.
+/// Returns a value from 0 to ~29.53.
+private func moonAge(for date: Date) -> Double {
+    let calendar = Calendar.current
+    let year = Double(calendar.component(.year, from: date))
+    let month = Double(calendar.component(.month, from: date))
+    let day = Double(calendar.component(.day, from: date))
+    let hour = Double(calendar.component(.hour, from: date))
+
+    var y = year
+    var m = month
+    if m < 3 {
+        y -= 1
+        m += 12
+    }
+    m += 1
+
+    let c = 365.25 * y
+    let e = 30.6 * m
+    let jd = c + e + day + (hour / 24.0) - 694039.09
+    let synodicMonth = 29.5305882
+    let age = jd.truncatingRemainder(dividingBy: synodicMonth)
+    return age < 0 ? age + synodicMonth : age
+}
+
+private func computeMoonData(astronomy: AstronomyData?) -> MoonData {
+    let age = moonAge(for: Date())
+    let synodicMonth = 29.5305882
+
+    // Illumination: 0% at new moon (age=0), 100% at full moon (age≈14.76)
+    let illumination = Int(round((1 - cos(age / synodicMonth * 2 * .pi)) / 2 * 100))
+
+    // Days to next full moon (age ≈ 14.76 at full)
+    let fullMoonAge = synodicMonth / 2.0
+    let daysToFull: Int
+    if age <= fullMoonAge {
+        daysToFull = Int(round(fullMoonAge - age))
+    } else {
+        daysToFull = Int(round(synodicMonth - age + fullMoonAge))
+    }
+
+    // Phase name and SF Symbol icon
+    let phase: Int = {
+        let p = Int(round(age / synodicMonth * 8)) % 8
+        return p
+    }()
+
+    let (name, icon): (String, String) = {
+        switch phase {
+        case 0: return ("Luna Nuova", "moonphase.new.moon")
+        case 1: return ("Luna Crescente", "moonphase.waxing.crescent")
+        case 2: return ("Primo Quarto", "moonphase.first.quarter")
+        case 3: return ("Gibbosa Crescente", "moonphase.waxing.gibbous")
+        case 4: return ("Luna Piena", "moonphase.full.moon")
+        case 5: return ("Gibbosa Calante", "moonphase.waning.gibbous")
+        case 6: return ("Ultimo Quarto", "moonphase.last.quarter")
+        case 7: return ("Luna Calante", "moonphase.waning.crescent")
+        default: return ("Luna Nuova", "moonphase.new.moon")
+        }
+    }()
+
+    return MoonData(
+        phaseName: name,
+        phaseIcon: icon,
+        illumination: illumination,
+        daysToFullMoon: daysToFull,
+        moonrise: astronomy?.moonrise,
+        moonset: astronomy?.moonset
+    )
+}
+
+// MARK: - Moon Info Section
+
+private struct MoonInfoSection: View {
+    let astronomy: AstronomyData?
+
+    var body: some View {
+        let moon = computeMoonData(astronomy: astronomy)
+
+        HStack(spacing: 16) {
+            // Left: Moon data rows
+            VStack(alignment: .leading, spacing: 10) {
+                // Phase header
+                HStack(spacing: 6) {
+                    Image(systemName: moon.phaseIcon)
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                    Text(moon.phaseName.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.gray)
+                        .tracking(1)
+                }
+
+                // Illumination
+                MoonDataRow(label: "Illuminazione", value: "\(moon.illumination)%")
+
+                if let moonrise = moon.moonrise {
+                    MoonDataRow(label: "Luna \u{2191}", value: formatMoonTime(moonrise))
+                }
+
+                if let moonset = moon.moonset {
+                    MoonDataRow(label: "Luna \u{2193}", value: formatMoonTime(moonset))
+                }
+
+                if moon.daysToFullMoon == 0 {
+                    MoonDataRow(label: "Luna piena", value: "Oggi")
+                } else {
+                    MoonDataRow(label: "Prossima luna piena", value: "\(moon.daysToFullMoon) giorni")
+                }
+            }
+
+            Spacer()
+
+            // Right: Moon phase visual
+            Image(systemName: moon.phaseIcon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 60, height: 60)
+                .foregroundStyle(
+                    .linearGradient(
+                        colors: [Color(red: 0.6, green: 0.65, blue: 0.75), Color(red: 0.4, green: 0.45, blue: 0.55)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        }
+    }
+
+    private func formatMoonTime(_ iso: String) -> String {
+        // Try ISO8601 parsing
+        let formatters: [ISO8601DateFormatter] = [
+            {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return f
+            }(),
+            {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime]
+                return f
+            }()
+        ]
+        for formatter in formatters {
+            if let date = formatter.date(from: iso) {
+                let df = DateFormatter()
+                df.dateFormat = "HH:mm"
+                return df.string(from: date)
+            }
+        }
+        // Fallback: extract HH:mm from string
+        if iso.contains("T") {
+            let parts = iso.split(separator: "T")
+            if parts.count > 1 {
+                return String(parts[1].prefix(5))
+            }
+        }
+        return iso
+    }
+}
+
+private struct MoonDataRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.black)
+        }
+    }
+}
+
+// MARK: - Air Quality Balloon
+
+struct AirQualityBalloon: View {
+    let airQuality: AirQualityDetail
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Qualità dell'aria")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.gray.opacity(0.5))
+                }
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                AQIDetailItem(label: "PM2.5", value: airQuality.pm25, unit: "µg/m³")
+                AQIDetailItem(label: "PM10", value: airQuality.pm10, unit: "µg/m³")
+                AQIDetailItem(label: "NO₂", value: airQuality.no2, unit: "µg/m³")
+                AQIDetailItem(label: "O₃", value: airQuality.o3, unit: "µg/m³")
+                AQIDetailItem(label: "CO", value: airQuality.co, unit: "µg/m³")
+                AQIDetailItem(label: "SO₂", value: airQuality.so2, unit: "µg/m³")
+            }
+        }
+        .padding(14)
+        .frame(width: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        )
     }
 }
 
