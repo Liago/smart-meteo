@@ -81,10 +81,15 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 		let astronomy: AstronomyData | undefined;
 		const astro = data.forecast?.forecastday?.[0]?.astro;
 		if (astro) {
+			const dateStr = data.forecast.forecastday[0].date;
+			const moonriseTime = astro.moonrise ? convertTo24h(astro.moonrise) : null;
+			const moonsetTime = astro.moonset ? convertTo24h(astro.moonset) : null;
 			astronomy = {
-				sunrise: `${data.forecast.forecastday[0].date}T${convertTo24h(astro.sunrise)}:00`,
-				sunset: `${data.forecast.forecastday[0].date}T${convertTo24h(astro.sunset)}:00`,
+				sunrise: `${dateStr}T${convertTo24h(astro.sunrise)}:00`,
+				sunset: `${dateStr}T${convertTo24h(astro.sunset)}:00`,
 				moon_phase: astro.moon_phase ?? 'unknown',
+				...(moonriseTime ? { moonrise: `${dateStr}T${moonriseTime}:00` } : {}),
+				...(moonsetTime ? { moonset: `${dateStr}T${moonsetTime}:00` } : {}),
 			};
 		}
 

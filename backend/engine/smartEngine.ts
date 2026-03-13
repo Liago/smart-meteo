@@ -351,10 +351,20 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			};
 		});
 
-	// Prefer astronomy source with real moon_phase over calculated/unknown
+	// Prefer astronomy source with moonrise/moonset, then real moon_phase, then any
 	const sourceWithAstronomy =
+		validForecasts.find(f => f.astronomy && (f.astronomy.moonrise || f.astronomy.moonset)) ??
 		validForecasts.find(f => f.astronomy && f.astronomy.moon_phase !== 'unknown' && f.astronomy.moon_phase !== '') ??
 		validForecasts.find(f => f.astronomy);
+
+	// Merge moonrise/moonset from another source if the primary doesn't have them
+	if (sourceWithAstronomy?.astronomy && !sourceWithAstronomy.astronomy.moonrise) {
+		const moonSource = validForecasts.find(f => f.astronomy?.moonrise || f.astronomy?.moonset);
+		if (moonSource?.astronomy) {
+			if (moonSource.astronomy.moonrise) sourceWithAstronomy.astronomy.moonrise = moonSource.astronomy.moonrise;
+			if (moonSource.astronomy.moonset) sourceWithAstronomy.astronomy.moonset = moonSource.astronomy.moonset;
+		}
+	}
 
 	// Find air_quality detail (only WeatherAPI provides this)
 	const sourceWithAirQuality = validForecasts.find(f => f.air_quality);
