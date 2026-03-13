@@ -82,7 +82,7 @@ struct DailyForecastView: View {
                 }
             }
         }
-        .overlay {
+        .overlay(alignment: .top) {
             if showLegend {
                 // Transparent tap target to dismiss
                 Color.clear
@@ -99,6 +99,7 @@ struct DailyForecastView: View {
                         showLegend = false
                     }
                 }
+                .padding(.top, 44)
                 .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
         }

@@ -101,14 +101,14 @@ struct HourlyForecastView: View {
 
                             VStack(spacing: 3) {
                                 Text(period.label)
-                                    .font(.system(size: 13, weight: .bold))
+                                    .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(isExpanded ? Color.blue : .black)
                                 if period.maxPrecipProb > 0 {
                                     HStack(spacing: 2) {
                                         Image(systemName: "drop.fill")
-                                            .font(.system(size: 9, weight: .bold))
-                                        Text("\(Int(period.maxPrecipProb))%")
                                             .font(.system(size: 11, weight: .bold))
+                                        Text("\(Int(period.maxPrecipProb))%")
+                                            .font(.system(size: 14, weight: .bold))
                                     }
                                     .foregroundColor(precipitationColor(for: period.maxPrecipProb))
                                 }
@@ -597,17 +597,17 @@ struct ChartPointView: View {
                 VStack(spacing: 2) {
                     if index == 0 {
                         Text("Ora")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255))
                     } else {
                         Text(formatTime(item.time))
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.gray)
                     }
 
                     if showHourlyPrecip, case .weather(let h) = item.type, let prob = h.precipitationProb, prob > 0 {
                         Text("\(Int(prob))%")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(precipitationColor(for: prob))
                             .transition(.opacity)
                     }
