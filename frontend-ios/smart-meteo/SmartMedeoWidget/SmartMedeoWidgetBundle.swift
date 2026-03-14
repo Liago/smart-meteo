@@ -1,18 +1,12 @@
-//
-//  SmartMedeoWidgetBundle.swift
-//  SmartMedeoWidget
-//
-//  Created by Andrea Zampierolo on 10/03/26.
-//
-
 import WidgetKit
 import SwiftUI
 
 @main
 struct SmartMedeoWidgetBundle: WidgetBundle {
     var body: some Widget {
-        SmartMedeoWidget()
-        SmartMedeoWidgetControl()
+        SmartMedeoWidget()           // Meteo attuale (small + medium)
+        HourlyForecastWidget()       // Previsioni orarie (medium)
+        WeeklyForecastWidget()       // Previsioni settimanali (medium + large)
         SmartMedeoWidgetLiveActivity()
     }
 }
