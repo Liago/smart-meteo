@@ -52,6 +52,25 @@ class APIService {
     
     struct EmptyResponse: Decodable {}
     
+    // Recupera le allerte attive per una posizione
+    func fetchActiveAlerts(lat: Double, lon: Double) async throws -> [WeatherAlert] {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/api/alerts/active?lat=\(lat)&lon=\(lon)") else {
+            throw APIError.invalidURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.requestFailed
+        }
+
+        struct AlertsResponse: Decodable {
+            let alerts: [WeatherAlert]
+        }
+
+        let decoded = try JSONDecoder().decode(AlertsResponse.self, from: data)
+        return decoded.alerts
+    }
+
     func subscribeToAlerts(deviceToken: String, lat: Double, lon: Double, locationName: String?) async throws {
         guard let url = URL(string: "\(AppConfig.apiBaseURL)/api/alerts/subscribe") else {
             throw APIError.invalidURL

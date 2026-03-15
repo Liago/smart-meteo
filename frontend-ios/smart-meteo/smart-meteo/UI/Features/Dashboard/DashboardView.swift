@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var isSidebarPresented = false
     @State private var isSearchPresented = false
+    @State private var isAlertsPresented = false
     
     // Computed helpers that delegate to appState
     private var isCurrentLocationHome: Bool {
@@ -80,6 +81,30 @@ struct DashboardView: View {
                             
                             Spacer()
                             
+                            // Alert Badge Button
+                            if !appState.activeAlerts.isEmpty {
+                                Button(action: { isAlertsPresented = true }) {
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.title2)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.orange)
+                                            .padding(12)
+                                            .background(Color.white)
+                                            .clipShape(Circle())
+                                            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+
+                                        // Badge con numero allerte
+                                        Text("\(appState.activeAlerts.count)")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 20, height: 20)
+                                            .background(Circle().fill(Color.red))
+                                            .offset(x: 4, y: -4)
+                                    }
+                                }
+                            }
+
                             // Settings / Sidebar Trigger
                             Button(action: {
                                 withAnimation {
@@ -202,6 +227,17 @@ struct DashboardView: View {
             SearchView()
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isAlertsPresented) {
+            WeatherAlertsView(alerts: appState.activeAlerts)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .onReceive(appState.$showAlertsModal) { show in
+            if show {
+                isAlertsPresented = true
+                appState.showAlertsModal = false
+            }
         }
     }
 }

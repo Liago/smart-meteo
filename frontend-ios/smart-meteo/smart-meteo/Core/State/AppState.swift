@@ -27,6 +27,11 @@ class AppState: ObservableObject {
     @Published var currentLocationName: String = "Locating..."
     @Published var weatherState: ViewState<ForecastResponse> = .idle
     @Published var currentLocation: CLLocation?
+
+    // Weather Alerts State
+    @Published var activeAlerts: [WeatherAlert] = []
+    @Published var showAlertsModal: Bool = false
+    @Published var selectedAlertFromPush: WeatherAlert?
     
     // Services
     private let weatherService: WeatherServiceProtocol
@@ -115,11 +120,18 @@ class AppState: ObservableObject {
                     latitude: location.coordinate.latitude,
                     longitude: location.coordinate.longitude
                 )
-                        
-                // Verify if we need to force UI update
+
                 await MainActor.run {
                     self.weatherState = .success(forecast)
+
+                    // Estrai le allerte dalla risposta forecast
+                    if let alerts = forecast.alerts, !alerts.isEmpty {
+                        self.activeAlerts = alerts.filter { $0.isActive }
+                    }
                 }
+
+                // Fetch anche le allerte dal database (potrebbe averne di più)
+                await fetchAlerts(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
             } catch {
                 await MainActor.run {
                     self.weatherState = .error(error)
@@ -299,5 +311,36 @@ extension AppState {
     
     func isHome(location: SavedLocation) -> Bool {
         return homeLocation?.id == location.id
+    }
+
+    // MARK: - Weather Alerts
+
+    func fetchAlerts(lat: Double, lon: Double) async {
+        do {
+            let alerts = try await APIService.shared.fetchActiveAlerts(lat: lat, lon: lon)
+            await MainActor.run {
+                // Unisci le allerte dal forecast e dal DB, deduplicando per id
+                var merged: [String: WeatherAlert] = [:]
+                for a in self.activeAlerts { merged[a.id] = a }
+                for a in alerts {
+                    // Il DB usa external_alert_id come campo, mappiamo
+                    merged[a.id] = a
+                }
+                self.activeAlerts = Array(merged.values).filter { $0.isActive }
+            }
+        } catch {
+            print("Failed to fetch active alerts: \(error)")
+        }
+    }
+
+    func handlePushAlert(alertId: String) {
+        // Cerca l'allerta tra quelle attive
+        if let alert = activeAlerts.first(where: { $0.id == alertId }) {
+            selectedAlertFromPush = alert
+            showAlertsModal = true
+        } else {
+            // Se non è tra quelle locali, apri comunque la modale
+            showAlertsModal = true
+        }
     }
 }

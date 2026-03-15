@@ -1,5 +1,68 @@
 import Foundation
 
+// MARK: - Weather Alert
+struct WeatherAlert: Codable, Identifiable, Equatable {
+    let id: String
+    let areaId: String?
+    let areaName: String?
+    let certainty: String?
+    let countryCode: String?
+    let description: String
+    let effectiveTime: String
+    let expireTime: String
+    let issuedTime: String?
+    let eventSource: String?
+    let severity: String
+    let source: String?
+    let urgency: String?
+    let detailsUrl: String?
+
+    static func == (lhs: WeatherAlert, rhs: WeatherAlert) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    /// Colore associato alla severity
+    var severityColor: (red: Double, green: Double, blue: Double) {
+        switch severity.lowercased() {
+        case "extreme": return (0.9, 0.1, 0.1)    // rosso
+        case "severe":  return (1.0, 0.5, 0.0)    // arancione
+        case "moderate": return (1.0, 0.8, 0.0)   // giallo
+        default:        return (0.3, 0.6, 1.0)    // azzurro
+        }
+    }
+
+    /// Icona SF Symbol per la severity
+    var severityIcon: String {
+        switch severity.lowercased() {
+        case "extreme": return "exclamationmark.triangle.fill"
+        case "severe":  return "exclamationmark.triangle.fill"
+        case "moderate": return "exclamationmark.triangle"
+        default:        return "info.circle"
+        }
+    }
+
+    /// Label italiana per la severity
+    var severityLabel: String {
+        switch severity.lowercased() {
+        case "extreme": return "Estrema"
+        case "severe":  return "Severa"
+        case "moderate": return "Moderata"
+        case "minor":   return "Lieve"
+        default:        return severity.capitalized
+        }
+    }
+
+    /// Controlla se l'allerta è ancora attiva
+    var isActive: Bool {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let expire = formatter.date(from: expireTime) ?? ISO8601DateFormatter().date(from: expireTime) else {
+            return true // Se non riesce a parsare, mostrala comunque
+        }
+        return expire > Date()
+    }
+}
+
 // MARK: - API Response
 struct ForecastResponse: Codable {
     let location: Coordinate
@@ -9,7 +72,8 @@ struct ForecastResponse: Codable {
     let daily: [DailyForecast]?
     let hourly: [HourlyForecast]?
     let astronomy: AstronomyData?
-    
+    let alerts: [WeatherAlert]?
+
     enum CodingKeys: String, CodingKey {
         case location
         case generatedAt = "generated_at"
@@ -18,6 +82,7 @@ struct ForecastResponse: Codable {
         case daily
         case hourly
         case astronomy
+        case alerts
     }
 }
 
