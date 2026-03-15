@@ -64,7 +64,45 @@ class PushNotificationService: NSObject, ObservableObject, UNUserNotificationCen
     
     // GESTIONE DELEGATE (FOREGROUND NOTIFICATIONS)
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        // Mostra notifica anche con l'app aperta
+        let userInfo = notification.request.content.userInfo
+
+        // Se è un'allerta meteo, aggiorna le allerte attive
+        if let type = userInfo["type"] as? String, type == "weather_alert" {
+            Task { @MainActor in
+                if let location = AppState.shared.currentLocation {
+                    await AppState.shared.fetchAlerts(
+                        lat: location.coordinate.latitude,
+                        lon: location.coordinate.longitude
+                    )
+                }
+            }
+        }
+
         completionHandler([.banner, .sound, .badge])
+    }
+
+    // Gestisce il tap dell'utente sulla notifica
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+
+        if let type = userInfo["type"] as? String, type == "weather_alert" {
+            Task { @MainActor in
+                // Aggiorna le allerte e apri la modale
+                if let location = AppState.shared.currentLocation {
+                    await AppState.shared.fetchAlerts(
+                        lat: location.coordinate.latitude,
+                        lon: location.coordinate.longitude
+                    )
+                }
+
+                if let alertId = userInfo["alertId"] as? String {
+                    AppState.shared.handlePushAlert(alertId: alertId)
+                } else {
+                    AppState.shared.showAlertsModal = true
+                }
+            }
+        }
+
+        completionHandler()
     }
 }
