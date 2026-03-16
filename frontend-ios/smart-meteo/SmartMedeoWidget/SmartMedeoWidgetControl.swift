@@ -1,54 +1,38 @@
-//
-//  SmartMedeoWidgetControl.swift
-//  SmartMedeoWidget
-//
-//  Created by Andrea Zampierolo on 10/03/26.
-//
-
 import AppIntents
 import SwiftUI
 import WidgetKit
 
+// Control Widget per aprire l'app Smart Meteo dal Control Center (iOS 18+)
 struct SmartMedeoWidgetControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
-            kind: "liagosoft.smart-meteo.SmartMedeoWidget",
+            kind: "com.liagosoft.smartmeteo.widget.control",
             provider: Provider()
         ) { value in
-            ControlWidgetToggle(
-                "Start Timer",
-                isOn: value,
-                action: StartTimerIntent()
-            ) { isRunning in
-                Label(isRunning ? "On" : "Off", systemImage: "timer")
+            ControlWidgetButton(action: OpenSmartMeteoIntent()) {
+                Label(value ? "Meteo" : "Meteo", systemImage: "cloud.sun.fill")
             }
         }
-        .displayName("Timer")
-        .description("A an example control that runs a timer.")
+        .displayName("Smart Meteo")
+        .description("Apri Smart Meteo per le previsioni.")
     }
 }
 
 extension SmartMedeoWidgetControl {
     struct Provider: ControlValueProvider {
-        var previewValue: Bool {
-            false
-        }
+        var previewValue: Bool { true }
 
         func currentValue() async throws -> Bool {
-            let isRunning = true // Check if the timer is running
-            return isRunning
+            true
         }
     }
 }
 
-struct StartTimerIntent: SetValueIntent {
-    static let title: LocalizedStringResource = "Start a timer"
-
-    @Parameter(title: "Timer is running")
-    var value: Bool
+struct OpenSmartMeteoIntent: AppIntent {
+    static let title: LocalizedStringResource = "Apri Smart Meteo"
+    static let openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
-        // Start / stop the timer based on `value`.
         return .result()
     }
 }

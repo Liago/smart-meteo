@@ -2,6 +2,7 @@ import SwiftUI
 import Foundation
 import Combine
 import CoreLocation
+import WidgetKit
 
 // Centralized App State
 @MainActor
@@ -128,6 +129,8 @@ class AppState: ObservableObject {
                     if let alerts = forecast.alerts, !alerts.isEmpty {
                         self.activeAlerts = alerts.filter { $0.isActive }
                     }
+                    // Condividi dati con il widget via App Group
+                    self.updateWidgetData(forecast: forecast, location: location)
                 }
 
                 // Fetch anche le allerte dal database (potrebbe averne di più)
@@ -148,6 +151,34 @@ class AppState: ObservableObject {
     /// Names that indicate reverse geocoding hasn't resolved yet (or failed).
     /// These should never be persisted as a location name.
     static let invalidLocationNames: Set<String> = ["Locating...", "Unknown Location", ""]
+
+    // MARK: - Widget Data Sharing
+
+    private static let widgetAppGroupID = "group.com.liago.smartmeteo.shared"
+
+    private func updateWidgetData(forecast: ForecastResponse, location: CLLocation) {
+        guard let defaults = UserDefaults(suiteName: Self.widgetAppGroupID) else { return }
+
+        // Salva coordinate e nome della posizione
+        defaults.set(location.coordinate.latitude, forKey: "widgetLat")
+        defaults.set(location.coordinate.longitude, forKey: "widgetLon")
+        defaults.set(currentLocationName, forKey: "widgetLocationName")
+
+        // Salva il forecast serializzato per il widget
+        if let encoded = try? JSONEncoder().encode(forecast) {
+            let wrapper: [String: Any] = [
+                "forecast": encoded,
+                "locationName": currentLocationName,
+                "fetchedAt": Date().timeIntervalSince1970
+            ]
+            defaults.set(encoded, forKey: "widgetForecastData")
+            defaults.set(currentLocationName, forKey: "widgetLocationName")
+            defaults.set(Date().timeIntervalSince1970, forKey: "widgetFetchedAt")
+        }
+
+        // Aggiorna i widget
+        WidgetCenter.shared.reloadAllTimelines()
+    }
 
     // MARK: - Helpers
     private func reverseGeocode(location: CLLocation) {
