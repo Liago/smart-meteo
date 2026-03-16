@@ -18,12 +18,7 @@ struct CurrentWeatherView: View {
             
             HStack(alignment: .center, spacing: 24) {
                 // Large Icon
-                Image(systemName: iconName(for: current.conditionCode ?? current.condition))
-                    .renderingMode(.template) // Change from .original to .template to tint it
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 100, height: 100)
-                    .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray
+                ResizableWeatherIcon(systemName: iconName(for: current.conditionCode ?? current.condition), size: 100)
                     .symbolEffect(.bounce, value: current.condition)
                 
                 VStack(alignment: .leading, spacing: 4) {

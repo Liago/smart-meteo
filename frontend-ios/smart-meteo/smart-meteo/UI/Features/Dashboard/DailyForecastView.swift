@@ -167,10 +167,7 @@ struct DailyRow: View {
                     .frame(width: 55, alignment: .center)
                     
                     // Icon
-                    Image(systemName: iconName(for: day.conditionCode))
-                        .renderingMode(.template)
-                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray
-                        .font(.title3)
+                    WeatherIcon(systemName: iconName(for: day.conditionCode), font: .title3)
                         .frame(width: 30)
                     
                     Spacer()

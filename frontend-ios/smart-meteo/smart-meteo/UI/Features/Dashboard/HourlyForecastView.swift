@@ -564,10 +564,7 @@ struct ChartPointView: View {
                 VStack(spacing: 4) {
                     switch item.type {
                     case .weather(let h):
-                        Image(systemName: iconName(for: h.conditionCode))
-                            .renderingMode(.template)
-                            .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray
-                            .font(.title2)
+                        WeatherIcon(systemName: iconName(for: h.conditionCode), font: .title2)
                         Text("\(Int(round(item.temp)))°")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.black)
