@@ -57,24 +57,30 @@ export function getAPNsHealthStatus(): { initialized: boolean; production: boole
     };
 }
 
+export interface PushResult {
+    sent: boolean;
+    reason?: string;
+    isExpiredToken?: boolean;
+}
+
 export async function sendPushNotification(
     deviceToken: string,
     title: string,
     body: string,
     payload: any = {}
-): Promise<boolean> {
+): Promise<PushResult> {
     const logPrefix = '[APNs]';
     const tokenShort = deviceToken.slice(0, 8) + '...';
 
     if (!apnProvider) {
         console.warn(`${logPrefix} Provider not initialized. Cannot send push to ${tokenShort}`);
-        return false;
+        return { sent: false, reason: 'provider_not_initialized' };
     }
 
     const topic = process.env.APNS_BUNDLE_ID;
     if (!topic) {
         console.error(`${logPrefix} Missing APNS_BUNDLE_ID env var. Cannot send push.`);
-        return false;
+        return { sent: false, reason: 'missing_bundle_id' };
     }
 
     const note = new apn.Notification();
@@ -92,18 +98,19 @@ export async function sendPushNotification(
         const result = await apnProvider.send(note, deviceToken);
         if (result.sent.length > 0) {
             console.log(`${logPrefix} Push sent OK to ${tokenShort} topic=${topic}`);
-            return true;
+            return { sent: true };
         } else if (result.failed.length > 0) {
             const failure = result.failed[0];
-            const reason = failure?.response?.reason || failure?.error || 'unknown';
+            const reason = String(failure?.response?.reason || failure?.error || 'unknown');
             const statusCode = (failure?.response as any)?.statusCode || 'N/A';
-            console.error(`${logPrefix} Push FAILED to ${tokenShort}: status=${statusCode} reason=${reason}`);
-            return false;
+            const isExpiredToken = reason === 'BadDeviceToken' || reason === 'Unregistered' || reason === 'ExpiredProviderToken';
+            console.error(`${logPrefix} Push FAILED to ${tokenShort}: status=${statusCode} reason=${reason} expiredToken=${isExpiredToken}`);
+            return { sent: false, reason, isExpiredToken };
         }
         console.warn(`${logPrefix} Push to ${tokenShort}: no sent/failed results (unexpected)`);
-        return false;
-    } catch (err) {
+        return { sent: false, reason: 'no_result' };
+    } catch (err: any) {
         console.error(`${logPrefix} Exception sending push to ${tokenShort}:`, err);
-        return false;
+        return { sent: false, reason: err.message || 'exception' };
     }
 }

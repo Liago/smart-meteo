@@ -300,40 +300,28 @@ Se `NODE_ENV` non è esattamente `"production"` su Netlify, il provider APNs usa
 
 ### Fase 5 — Monitoraggio e Osservabilità
 
-#### 5.1 Tabella log delivery
+#### 5.1 Tabella log delivery ✅ COMPLETATO
 
-**Nuova migrazione:** `supabase/migrations/019_alert_delivery_log.sql`
+**File:** `supabase/migrations/019_alert_delivery_log.sql`
 
-```sql
-CREATE TABLE alert_delivery_log (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    alert_id TEXT,
-    subscription_id UUID REFERENCES alert_subscriptions(id),
-    device_token_hash TEXT,
-    status TEXT CHECK (status IN ('sent', 'failed', 'expired_token')),
-    apns_response JSONB,
-    attempted_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_delivery_log_status ON alert_delivery_log(status);
-CREATE INDEX idx_delivery_log_attempted ON alert_delivery_log(attempted_at);
-```
+- ✅ Tabella `alert_delivery_log` con status (sent/failed/expired_token), hash token, risposta APNs
+- ✅ Indici su status, attempted_at, alert_id
+- ✅ RLS abilitato con policy per service role
+- ✅ `alertProcessor.ts` logga ogni delivery nella tabella
 
-#### 5.2 Endpoint health check allerte
+#### 5.2 Endpoint health check allerte ✅ COMPLETATO (in Fase 3)
 
 **File:** `backend/routes/alerts.ts`
 
-`GET /api/alerts/health` che restituisce:
-- Stato provider APNs (inizializzato o no)
-- Conteggio sottoscrizioni attive totali
-- Statistiche delivery ultime 24h (inviate/fallite)
-- Timestamp ultimo processing allerte
-- Stato generazione JWT WeatherKit
+- ✅ `GET /api/alerts/health` con stato APNs, conteggio sottoscrizioni, statistiche 24h
 
-#### 5.3 Pulizia token scaduti
+#### 5.3 Pulizia token scaduti ✅ COMPLETATO
 
-**File:** `backend/services/alertProcessor.ts`
+**File:** `backend/services/alertProcessor.ts`, `backend/services/apns.ts`
 
-Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscription come `enabled = false`. Attualmente i token invalidi persistono, sprecando risorse ad ogni allerta futura.
+- ✅ `sendPushNotification` restituisce `PushResult` con `isExpiredToken` flag
+- ✅ Quando APNs risponde `BadDeviceToken`, `Unregistered` o `ExpiredProviderToken`, la subscription viene disabilitata (`enabled = false`)
+- ✅ Token invalidi loggati come `expired_token` nella delivery log table
 
 ---
 
@@ -356,9 +344,9 @@ Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscripti
 | 4.2 | Web Frontend | Medio | 🟠 Medio | ✅ Componenti allerta |
 | 4.3 | Web Frontend | Basso | 🟠 Medio | ✅ Hook SWR useAlerts |
 | 4.4 | Web Frontend | Medio | 🟠 Medio | ✅ Integrazione dashboard |
-| 5.1 | Monitoraggio | Medio | 🔴 Alto | Tabella log delivery |
-| 5.2 | Monitoraggio | Basso | 🟠 Medio | Health check endpoint |
-| 5.3 | Monitoraggio | Basso | 🟠 Medio | Pulizia token scaduti |
+| 5.1 | Monitoraggio | Medio | 🔴 Alto | ✅ Tabella log delivery |
+| 5.2 | Monitoraggio | Basso | 🟠 Medio | ✅ Health check endpoint |
+| 5.3 | Monitoraggio | Basso | 🟠 Medio | ✅ Pulizia token scaduti |
 
 ---
 

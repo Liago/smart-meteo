@@ -1,6 +1,7 @@
 import { WeatherAlert } from '../types';
 import { supabase } from './supabase';
-import { sendPushNotification } from './apns';
+import { sendPushNotification, PushResult } from './apns';
+import crypto from 'crypto';
 
 /**
  * Mappa la severity di WeatherKit a quella usata nella tabella weather_alerts
@@ -57,7 +58,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 	console.log(`${logPrefix} Processing ${alerts.length} alert(s) for area ${lat},${lon}`);
 
-	let stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0 };
+	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
 
 	for (const alert of alerts) {
 		// Salta allerte scadute
@@ -143,7 +144,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 					}
 				};
 
-				const sent = await sendPushNotification(sub.device_token, title, body, payload);
+				const pushResult: PushResult = await sendPushNotification(sub.device_token, title, body, payload);
 
 				// Salva il record dell'allerta inviata
 				await supabase.from('weather_alerts').insert({
@@ -158,12 +159,36 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 					expire_time: alert.expireTime
 				});
 
-				if (sent) {
+				// Log delivery nella tabella di audit
+				const tokenHash = crypto.createHash('sha256').update(sub.device_token).digest('hex').slice(0, 16);
+				const deliveryStatus = pushResult.sent ? 'sent' : (pushResult.isExpiredToken ? 'expired_token' : 'failed');
+				await supabase.from('alert_delivery_log').insert({
+					alert_id: alert.id,
+					subscription_id: sub.id,
+					device_token_hash: tokenHash,
+					status: deliveryStatus,
+					apns_response: pushResult.reason ? { reason: pushResult.reason } : null,
+					error_reason: pushResult.reason || null,
+				}).then(({ error }) => {
+					if (error) console.warn(`${logPrefix} Failed to log delivery: ${error.message}`);
+				});
+
+				if (pushResult.sent) {
 					stats.pushSent++;
 					console.log(`${logPrefix} Push OK: alert=${alert.id} device=${sub.device_token.slice(0, 8)}... sub_lat=${sub.location_lat} sub_lon=${sub.location_lon}`);
 				} else {
 					stats.pushFailed++;
-					console.warn(`${logPrefix} Push FAILED: alert=${alert.id} device=${sub.device_token.slice(0, 8)}... sub_lat=${sub.location_lat} sub_lon=${sub.location_lon}`);
+					console.warn(`${logPrefix} Push FAILED: alert=${alert.id} device=${sub.device_token.slice(0, 8)}... reason=${pushResult.reason}`);
+
+					// Se il token è scaduto/invalido, disabilita la subscription
+					if (pushResult.isExpiredToken) {
+						console.log(`${logPrefix} Disabling subscription ${sub.id} due to expired/invalid device token`);
+						await supabase
+							.from('alert_subscriptions')
+							.update({ enabled: false })
+							.eq('id', sub.id);
+						stats.expiredTokens++;
+					}
 				}
 			}
 		} catch (err: any) {
@@ -171,5 +196,5 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 		}
 	}
 
-	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate}`);
+	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate}`);
 }
