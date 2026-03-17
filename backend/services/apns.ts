@@ -5,48 +5,75 @@ dotenv.config();
 let apnProvider: apn.Provider | null = null;
 
 export function initializeAPNs() {
+    const logPrefix = '[APNs]';
     const teamId = process.env.APNS_TEAM_ID;
     const keyId = process.env.APNS_KEY_ID;
     const privateKey = process.env.APNS_PRIVATE_KEY;
+    const bundleId = process.env.APNS_BUNDLE_ID;
+    // Usa variabile esplicita APNS_PRODUCTION se presente, altrimenti derivata da NODE_ENV
+    const isProduction = process.env.APNS_PRODUCTION === 'true' || process.env.NODE_ENV === 'production';
 
-    if (!teamId || !keyId || !privateKey) {
-        console.warn('APNs environment variables missing. Push notifications will not be sent.');
+    // Health check: verifica tutte le variabili necessarie
+    const missing: string[] = [];
+    if (!teamId) missing.push('APNS_TEAM_ID');
+    if (!keyId) missing.push('APNS_KEY_ID');
+    if (!privateKey) missing.push('APNS_PRIVATE_KEY');
+    if (!bundleId) missing.push('APNS_BUNDLE_ID');
+
+    if (missing.length > 0) {
+        console.warn(`${logPrefix} Missing env vars: ${missing.join(', ')}. Push notifications will NOT be sent.`);
         return;
     }
 
+    console.log(`${logPrefix} Config: gateway=${isProduction ? 'PRODUCTION' : 'SANDBOX'} teamId=${teamId} keyId=${keyId} bundleId=${bundleId}`);
+
     try {
-        const formattedKey = privateKey.replace(/\\n/g, '\n');
-        
+        const formattedKey = privateKey!.replace(/\\n/g, '\n');
+
         const options: apn.ProviderOptions = {
             token: {
                 key: formattedKey,
-                keyId: keyId,
-                teamId: teamId
+                keyId: keyId!,
+                teamId: teamId!
             },
-            production: process.env.NODE_ENV === 'production' // usa il gateway di DEV/Sandbox se in locale
+            production: isProduction
         };
 
         apnProvider = new apn.Provider(options);
-        console.log('APNs Provider initialized successfully.');
+        console.log(`${logPrefix} Provider initialized successfully (${isProduction ? 'production' : 'sandbox'} gateway).`);
     } catch (err) {
-        console.error('Failed to initialize APNs provider:', err);
+        console.error(`${logPrefix} Failed to initialize provider:`, err);
     }
 }
 
+/**
+ * Restituisce lo stato di salute del provider APNs
+ */
+export function getAPNsHealthStatus(): { initialized: boolean; production: boolean } {
+    const isProduction = process.env.APNS_PRODUCTION === 'true' || process.env.NODE_ENV === 'production';
+    return {
+        initialized: apnProvider !== null,
+        production: isProduction,
+    };
+}
+
 export async function sendPushNotification(
-    deviceToken: string, 
-    title: string, 
-    body: string, 
+    deviceToken: string,
+    title: string,
+    body: string,
     payload: any = {}
 ): Promise<boolean> {
+    const logPrefix = '[APNs]';
+    const tokenShort = deviceToken.slice(0, 8) + '...';
+
     if (!apnProvider) {
-        console.warn('APNs Provider not initialized. Cannot send notification.');
+        console.warn(`${logPrefix} Provider not initialized. Cannot send push to ${tokenShort}`);
         return false;
     }
 
     const topic = process.env.APNS_BUNDLE_ID;
     if (!topic) {
-        console.error('Missing APNS_BUNDLE_ID environment variable for push notifications.');
+        console.error(`${logPrefix} Missing APNS_BUNDLE_ID env var. Cannot send push.`);
         return false;
     }
 
@@ -64,15 +91,19 @@ export async function sendPushNotification(
     try {
         const result = await apnProvider.send(note, deviceToken);
         if (result.sent.length > 0) {
-            console.log(`Push sent successfully to ${deviceToken}`);
+            console.log(`${logPrefix} Push sent OK to ${tokenShort} topic=${topic}`);
             return true;
         } else if (result.failed.length > 0) {
-            console.error(`Push failed to ${deviceToken}:`, result.failed[0]?.response || result.failed[0]?.error);
+            const failure = result.failed[0];
+            const reason = failure?.response?.reason || failure?.error || 'unknown';
+            const statusCode = failure?.response?.statusCode || 'N/A';
+            console.error(`${logPrefix} Push FAILED to ${tokenShort}: status=${statusCode} reason=${reason}`);
             return false;
         }
+        console.warn(`${logPrefix} Push to ${tokenShort}: no sent/failed results (unexpected)`);
         return false;
     } catch (err) {
-        console.error(`Error sending push notification to ${deviceToken}:`, err);
+        console.error(`${logPrefix} Exception sending push to ${tokenShort}:`, err);
         return false;
     }
 }

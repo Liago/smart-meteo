@@ -108,13 +108,20 @@ class AppState: ObservableObject {
     func fetchWeather(for location: CLLocation, name: String? = nil) {
         self.currentLocation = location
         self.weatherState = .loading
-        
+
         if let name = name {
             self.currentLocationName = name
         } else {
             reverseGeocode(location: location)
         }
-        
+
+        // Registra token push in attesa ora che abbiamo coordinate GPS valide
+        PushNotificationService.shared.registerPendingTokenIfNeeded(
+            lat: location.coordinate.latitude,
+            lon: location.coordinate.longitude,
+            locationName: currentLocationName
+        )
+
         Task {
             do {
                 let forecast = try await weatherService.getForecast(

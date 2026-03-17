@@ -155,38 +155,40 @@ Se `NODE_ENV` non è esattamente `"production"` su Netlify, il provider APNs usa
 
 ### Fase 1 — Fix Critici (priorità immediata)
 
-#### 1.1 Fix bug registrazione device token a (0, 0)
+#### 1.1 Fix bug registrazione device token a (0, 0) ✅ COMPLETATO
 
-**File:** `frontend-ios/.../PushNotificationService.swift`
+**File:** `frontend-ios/.../PushNotificationService.swift`, `frontend-ios/.../AppState.swift`
 
-- Non registrare il device token finché non è disponibile una posizione GPS valida
-- Spostare la chiamata `subscribeToAlerts` dentro `AppState.fetchWeather()` dopo che la posizione è confermata
-- Ri-registrare quando l'utente cambia località preferita/corrente
-- Aggiungere guard: `guard lat != 0 && lon != 0 else { return }`
+- ✅ Non registra il device token finché non è disponibile una posizione GPS valida
+- ✅ Token salvato come `pendingDeviceToken` e registrato quando la posizione è confermata
+- ✅ `AppState.fetchWeather()` chiama `registerPendingTokenIfNeeded()` dopo il fix GPS
+- ✅ Guard aggiuntivo: `abs(lat) > 0.01 || abs(lon) > 0.01` contro coordinate (0,0)
 
-#### 1.2 Cache bypass per allerte fresche
+#### 1.2 Cache bypass per allerte fresche ✅ COMPLETATO
 
 **File:** `backend/engine/smartEngine.ts`
 
-- Quando si restituisce un forecast dalla cache, eseguire comunque una chiamata leggera a WeatherKit per il solo dataset `weatherAlerts`
-- In alternativa: ridurre il TTL cache a 5 minuti per il campo allerte, mantenendo 30 minuti per il forecast
-- Mergiare allerte fresche nella risposta cached
+- ✅ Quando si restituisce un forecast dalla cache, esegue comunque una chiamata a WeatherKit per il dataset `weatherAlerts`
+- ✅ Allerte fresche mergiate nella risposta cached
+- ✅ Pipeline `processWeatherAlerts` lanciata anche su cache hit se ci sono allerte nuove
 
-#### 1.3 Logging strutturato per la pipeline allerte
+#### 1.3 Logging strutturato per la pipeline allerte ✅ COMPLETATO
 
 **File:** `backend/services/alertProcessor.ts`, `apns.ts`, `smartEngine.ts`
 
-- Aggiungere log strutturati con: alert ID, severity, area, coordinate, conteggio subscriptions trovate, risultato invio push, codice risposta APNs
-- Log se WeatherKit ha restituito 0 allerte (vs. errore)
-- Salvare eventi in una tabella `alert_events_log` o usare un logger strutturato
+- ✅ Log strutturati con prefisso `[AlertPipeline]`: alert ID, severity, area, coordinate, conteggio subscriptions, risultato push
+- ✅ Log con prefisso `[APNs]`: status code, reason, topic per ogni invio push
+- ✅ Log se WeatherKit ha restituito 0 allerte (vs. errore)
+- ✅ Summary finale con statistiche: processed, pushSent, pushFailed, skipped*, noSubscribers
 
-#### 1.4 Validazione configurazione APNs all'avvio
+#### 1.4 Validazione configurazione APNs all'avvio ✅ COMPLETATO
 
 **File:** `backend/services/apns.ts`
 
-- Health check all'avvio che verifica la presenza di `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, `APNS_BUNDLE_ID`
-- Loggare chiaramente se si usa gateway sandbox o production
-- Aggiungere variabile esplicita `APNS_PRODUCTION=true` invece di derivare da `NODE_ENV`
+- ✅ Health check all'avvio che verifica la presenza di `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, `APNS_BUNDLE_ID`
+- ✅ Log chiaro se si usa gateway sandbox o production con tutti i parametri di configurazione
+- ✅ Variabile esplicita `APNS_PRODUCTION=true` supportata con fallback a `NODE_ENV`
+- ✅ Funzione `getAPNsHealthStatus()` esportata per health check endpoint
 
 ---
 
@@ -333,10 +335,10 @@ Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscripti
 
 | ID | Fase | Effort | Impatto | Descrizione |
 |----|------|--------|---------|-------------|
-| 1.1 | Fix Critici | Basso | 🔴 Alto | Fix bug registrazione coordinate (0,0) |
-| 1.2 | Fix Critici | Medio | 🔴 Alto | Cache bypass per allerte fresche |
-| 1.3 | Fix Critici | Basso | 🔴 Alto | Logging strutturato pipeline allerte |
-| 1.4 | Fix Critici | Basso | 🟠 Medio | Validazione configurazione APNs |
+| 1.1 | Fix Critici | Basso | 🔴 Alto | ✅ Fix bug registrazione coordinate (0,0) |
+| 1.2 | Fix Critici | Medio | 🔴 Alto | ✅ Cache bypass per allerte fresche |
+| 1.3 | Fix Critici | Basso | 🔴 Alto | ✅ Logging strutturato pipeline allerte |
+| 1.4 | Fix Critici | Basso | 🟠 Medio | ✅ Validazione configurazione APNs |
 | 2.1 | Multi-Source | Basso | 🔴 Alto | Attivare allerte WeatherAPI (flip flag) |
 | 2.2 | Multi-Source | Medio | 🟠 Medio | Aggiungere allerte OpenWeatherMap |
 | 2.3 | Multi-Source | Medio | 🔴 Alto | Deduplicazione multi-source |

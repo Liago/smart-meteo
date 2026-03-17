@@ -109,7 +109,35 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		if (cached && !error) {
 			// If full_data is available, return the complete cached result
 			if (cached.full_data) {
-				console.log('Cache HIT: returning full smart forecast from DB');
+				console.log('Cache HIT: returning full smart forecast from DB (with fresh alerts check)');
+
+				// Bypass cache per allerte: fetch allerte fresche da WeatherKit anche con cache valida
+				try {
+					const wkResult = await fetchFromWeatherKitWithAlerts(lat, lon);
+					if (wkResult && wkResult.alerts.length > 0) {
+						const freshAlerts = wkResult.alerts.filter(
+							(a: WeatherAlert) => !a.expireTime || new Date(a.expireTime) > new Date()
+						);
+						console.log(`Fresh alerts check: found ${freshAlerts.length} active alert(s) from WeatherKit`);
+
+						// Mergia allerte fresche nella risposta cached
+						cached.full_data.alerts = freshAlerts;
+
+						// Processa le nuove allerte (push notifications, ecc.)
+						if (freshAlerts.length > 0) {
+							processWeatherAlerts(freshAlerts, lat, lon).catch(err =>
+								console.error('[AlertPipeline] Error processing fresh alerts on cache hit:', err.message)
+							);
+						}
+					} else {
+						console.log('Fresh alerts check: no active alerts from WeatherKit');
+						cached.full_data.alerts = [];
+					}
+				} catch (alertErr: any) {
+					console.warn('[AlertPipeline] Failed to fetch fresh alerts on cache hit:', alertErr.message);
+					// Non blocchiamo: restituiamo la cache anche senza allerte fresche
+				}
+
 				return cached.full_data;
 			}
 			// Legacy cache without full_data — skip and re-fetch
@@ -438,10 +466,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	// 8. Process Weather Alerts (async, non-blocking)
 	if (weatherKitAlerts.length > 0) {
-		console.log(`Processing ${weatherKitAlerts.length} weather alert(s) from WeatherKit`);
+		console.log(`[AlertPipeline] Dispatching ${weatherKitAlerts.length} alert(s) from WeatherKit for ${lat},${lon}: ${weatherKitAlerts.map(a => `${a.id}(${a.severity})`).join(', ')}`);
 		processWeatherAlerts(weatherKitAlerts, lat, lon).catch(err =>
-			console.error('Error processing weather alerts:', err.message)
+			console.error(`[AlertPipeline] Unhandled error in processWeatherAlerts for ${lat},${lon}:`, err.message, err.stack)
 		);
+	} else {
+		console.log(`[AlertPipeline] WeatherKit returned 0 alerts for ${lat},${lon}`);
 	}
 
 	return result;

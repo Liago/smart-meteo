@@ -48,20 +48,29 @@ const LOCATION_RADIUS_DEG = 0.5;
  * 4. Salva nel DB per evitare duplicati
  */
 export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, lon: number): Promise<void> {
-	if (!alerts || alerts.length === 0) return;
+	const logPrefix = '[AlertPipeline]';
 
-	const now = new Date().toISOString();
+	if (!alerts || alerts.length === 0) {
+		console.log(`${logPrefix} Called with 0 alerts for ${lat},${lon} — nothing to process`);
+		return;
+	}
+
+	console.log(`${logPrefix} Processing ${alerts.length} alert(s) for area ${lat},${lon}`);
+
+	let stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0 };
 
 	for (const alert of alerts) {
 		// Salta allerte scadute
 		if (alert.expireTime && new Date(alert.expireTime) < new Date()) {
-			console.log(`Alert ${alert.id} expired, skipping`);
+			console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} expired at ${alert.expireTime}, skipping`);
+			stats.skippedExpired++;
 			continue;
 		}
 
 		// Salta allerte con certainty troppo bassa
 		if (alert.certainty === 'unlikely') {
-			console.log(`Alert ${alert.id} certainty=unlikely, skipping`);
+			console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} certainty=unlikely, skipping`);
+			stats.skippedUnlikely++;
 			continue;
 		}
 
@@ -74,7 +83,8 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				.limit(1);
 
 			if (existing && existing.length > 0) {
-				console.log(`Alert ${alert.id} already processed, skipping`);
+				console.log(`${logPrefix} Alert ${alert.id} already processed (dedup), skipping`);
+				stats.skippedDuplicate++;
 				continue;
 			}
 
@@ -89,12 +99,13 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				.lte('location_lon', lon + LOCATION_RADIUS_DEG);
 
 			if (subError) {
-				console.error('Error fetching subscriptions for alert:', subError.message);
+				console.error(`${logPrefix} DB error fetching subscriptions for alert ${alert.id}: ${subError.message}`);
 				continue;
 			}
 
 			if (!subscriptions || subscriptions.length === 0) {
-				console.log(`No subscriptions found near ${lat},${lon} for alert ${alert.id}`);
+				console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — 0 subscriptions in radius ±${LOCATION_RADIUS_DEG}° of ${lat},${lon}`);
+				stats.noSubscribers++;
 				// Salva comunque l'allerta per deduplicazione (senza subscription_id)
 				await supabase.from('weather_alerts').insert({
 					external_alert_id: alert.id,
@@ -109,7 +120,8 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				continue;
 			}
 
-			console.log(`Processing alert ${alert.id} (${alert.severity}) for ${subscriptions.length} subscriber(s)`);
+			console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — ${subscriptions.length} subscriber(s) found`);
+			stats.processed++;
 
 			const title = alertTitle(alert.severity);
 			// Tronca la descrizione per la push notification
@@ -147,13 +159,17 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				});
 
 				if (sent) {
-					console.log(`Alert ${alert.id} sent to device ${sub.device_token.slice(0, 8)}...`);
+					stats.pushSent++;
+					console.log(`${logPrefix} Push OK: alert=${alert.id} device=${sub.device_token.slice(0, 8)}... sub_lat=${sub.location_lat} sub_lon=${sub.location_lon}`);
 				} else {
-					console.warn(`Failed to send alert ${alert.id} to device ${sub.device_token.slice(0, 8)}...`);
+					stats.pushFailed++;
+					console.warn(`${logPrefix} Push FAILED: alert=${alert.id} device=${sub.device_token.slice(0, 8)}... sub_lat=${sub.location_lat} sub_lon=${sub.location_lon}`);
 				}
 			}
 		} catch (err: any) {
-			console.error(`Error processing alert ${alert.id}:`, err.message);
+			console.error(`${logPrefix} Exception processing alert ${alert.id} severity=${alert.severity}: ${err.message}`);
 		}
 	}
+
+	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate}`);
 }
