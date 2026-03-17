@@ -78,6 +78,12 @@ export interface WeatherAlert {
 	source?: string;
 	urgency?: 'immediate' | 'expected' | 'future' | string;
 	detailsUrl?: string;
+	/** Fonte provider dell'allerta (es. 'weatherkit', 'weatherapi', 'openweathermap') */
+	providerSource?: string;
+	/** Tipo di evento meteorologico (es. "Wind", "Thunderstorm", "Flood") */
+	event?: string;
+	/** Titolo breve dell'allerta */
+	headline?: string;
 }
 
 export interface WeatherConditionWeights {

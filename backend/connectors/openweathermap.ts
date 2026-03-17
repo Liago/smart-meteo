@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { UnifiedForecast } from '../utils/formatter';
 import { normalizeCondition } from '../utils/formatter';
-import { DailyForecast, HourlyForecast, AstronomyData } from '../types';
+import { DailyForecast, HourlyForecast, AstronomyData, WeatherAlert } from '../types';
 
 const OWM_CURRENT_URL = 'https://api.openweathermap.org/data/2.5/weather';
 const OWM_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
+const OWM_ONECALL_URL = 'https://api.openweathermap.org/data/3.0/onecall';
 
 export async function fetchFromOpenWeather(lat: number, lon: number): Promise<UnifiedForecast | null> {
 	const apiKey = process.env.OPENWEATHER_API_KEY;
@@ -113,4 +114,63 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 		console.error('Error fetching OpenWeatherMap:', error.message);
 		return null;
 	}
+}
+
+/**
+ * Fetch allerte meteo da OpenWeatherMap One Call API 3.0.
+ * Richiede che l'API key abbia accesso a One Call API.
+ * Restituisce un array vuoto se l'endpoint non è disponibile.
+ */
+export async function fetchOWMAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
+	const apiKey = process.env.OPENWEATHER_API_KEY;
+	if (!apiKey) return [];
+
+	try {
+		const response = await axios.get(OWM_ONECALL_URL, {
+			params: {
+				lat,
+				lon,
+				appid: apiKey,
+				exclude: 'minutely,hourly,daily,current',
+			},
+			timeout: 5000,
+		});
+
+		const alertsData = response.data?.alerts;
+		if (!alertsData || !Array.isArray(alertsData) || alertsData.length === 0) {
+			return [];
+		}
+
+		console.log(`[OWM] Found ${alertsData.length} alert(s) for ${lat},${lon}`);
+
+		return alertsData.map((a: any) => ({
+			id: `owm:${a.event || 'unknown'}_${a.start || Date.now()}`,
+			description: a.description || a.event || 'Weather alert',
+			headline: a.event || undefined,
+			event: a.event || undefined,
+			severity: mapOWMSeverityFromTags(a.tags),
+			certainty: 'possible',
+			effectiveTime: a.start ? new Date(a.start * 1000).toISOString() : new Date().toISOString(),
+			expireTime: a.end ? new Date(a.end * 1000).toISOString() : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+			source: a.sender_name || 'OpenWeatherMap',
+			providerSource: 'openweathermap',
+		}));
+	} catch (error: any) {
+		// One Call API potrebbe non essere disponibile per tutte le API key
+		if (error.response?.status === 401 || error.response?.status === 403) {
+			console.log('[OWM] One Call API not available for this API key, skipping alerts');
+		} else {
+			console.warn(`[OWM] Error fetching alerts: ${error.message}`);
+		}
+		return [];
+	}
+}
+
+function mapOWMSeverityFromTags(tags: string[] | undefined): string {
+	if (!tags || !Array.isArray(tags)) return 'moderate';
+	const tagStr = tags.join(' ').toLowerCase();
+	if (tagStr.includes('extreme')) return 'extreme';
+	if (tagStr.includes('severe') || tagStr.includes('warning')) return 'severe';
+	if (tagStr.includes('watch') || tagStr.includes('moderate')) return 'moderate';
+	return 'minor';
 }

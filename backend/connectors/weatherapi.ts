@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { UnifiedForecast, normalizeCondition } from '../utils/formatter';
-import { DailyForecast, HourlyForecast, AstronomyData } from '../types';
+import { DailyForecast, HourlyForecast, AstronomyData, WeatherAlert } from '../types';
 
 const WEATHERAPI_URL = 'http://api.weatherapi.com/v1/forecast.json';
 
@@ -25,6 +25,47 @@ function convertTo24h(timeStr: string): string {
 	return `${String(h).padStart(2, '0')}:${m}`;
 }
 
+/**
+ * Parsa le allerte dal campo alerts della risposta WeatherAPI
+ */
+function parseWeatherAPIAlerts(alertsData: any): WeatherAlert[] {
+	if (!alertsData?.alert || !Array.isArray(alertsData.alert)) return [];
+
+	return alertsData.alert.map((a: any) => ({
+		id: `weatherapi:${a.event || 'unknown'}_${a.effective || Date.now()}`,
+		description: a.desc || a.headline || 'Weather alert',
+		headline: a.headline || undefined,
+		event: a.event || undefined,
+		severity: mapWeatherAPISeverity(a.severity),
+		certainty: a.certainty || 'possible',
+		urgency: a.urgency || undefined,
+		effectiveTime: a.effective || new Date().toISOString(),
+		expireTime: a.expires || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+		areaName: a.areas || undefined,
+		source: a.note || 'WeatherAPI',
+		providerSource: 'weatherapi',
+	}));
+}
+
+function mapWeatherAPISeverity(severity: string | undefined): string {
+	if (!severity) return 'moderate';
+	const s = severity.toLowerCase();
+	if (s.includes('extreme')) return 'extreme';
+	if (s.includes('severe')) return 'severe';
+	if (s.includes('moderate')) return 'moderate';
+	if (s.includes('minor')) return 'minor';
+	return 'moderate';
+}
+
+export async function fetchFromWeatherAPIWithAlerts(lat: number, lon: number): Promise<{ forecast: UnifiedForecast; alerts: WeatherAlert[] } | null> {
+	const result = await fetchFromWeatherAPI(lat, lon);
+	if (!result) return null;
+	// Le allerte vengono parsate dentro fetchFromWeatherAPI e salvate in _lastAlerts
+	return { forecast: result, alerts: _lastAlerts };
+}
+
+let _lastAlerts: WeatherAlert[] = [];
+
 export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<UnifiedForecast | null> {
 	const apiKey = process.env.WEATHERAPI_KEY;
 	if (!apiKey) {
@@ -40,7 +81,7 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 				q: `${lat},${lon}`,
 				days: 7,
 				aqi: 'yes',
-				alerts: 'no'
+				alerts: 'yes'
 			}
 		});
 
@@ -133,10 +174,17 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			forecastPayload.astronomy = astronomy;
 		}
 
+		// Parsa allerte dalla risposta
+		_lastAlerts = parseWeatherAPIAlerts(data.alerts);
+		if (_lastAlerts.length > 0) {
+			console.log(`[WeatherAPI] Found ${_lastAlerts.length} alert(s) for ${lat},${lon}`);
+		}
+
 		return new UnifiedForecast(forecastPayload);
 
 	} catch (error: any) {
 		console.error('Error fetching WeatherAPI:', error.message);
+		_lastAlerts = [];
 		return null;
 	}
 }

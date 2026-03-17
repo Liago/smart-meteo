@@ -194,39 +194,41 @@ Se `NODE_ENV` non è esattamente `"production"` su Netlify, il provider APNs usa
 
 ### Fase 2 — Allerte Multi-Source (ridondanza)
 
-#### 2.1 Attivare allerte da WeatherAPI
+#### 2.1 Attivare allerte da WeatherAPI ✅ COMPLETATO
 
 **File:** `backend/connectors/weatherapi.ts`
 
-Attualmente alla riga 43: `alerts: 'no'`. Cambiare in `alerts: 'yes'` e parsare l'array `alerts` dalla risposta. WeatherAPI fornisce allerte da servizi meteo nazionali con buona copertura europea.
+- ✅ Cambiato `alerts: 'no'` → `alerts: 'yes'`
+- ✅ Funzione `parseWeatherAPIAlerts()` per parsing array `alerts` dalla risposta
+- ✅ Funzione `fetchFromWeatherAPIWithAlerts()` che restituisce forecast + allerte
+- ✅ Mapping severity e campi: headline, event, areas, effective, expires
 
-Campi disponibili da WeatherAPI: `headline`, `severity`, `urgency`, `areas`, `event`, `effective`, `expires`, `desc`.
-
-**Effort:** Basso — cambiare un parametro e aggiungere il parsing.
-
-#### 2.2 Aggiungere allerte da OpenWeatherMap
+#### 2.2 Aggiungere allerte da OpenWeatherMap ✅ COMPLETATO
 
 **File:** `backend/connectors/openweathermap.ts`
 
-OpenWeatherMap One Call API 3.0 include un array `alerts` con: `sender_name`, `event`, `start`, `end`, `description`.
+- ✅ Funzione `fetchOWMAlerts()` che usa One Call API 3.0 (`/data/3.0/onecall`)
+- ✅ Esclude dati non necessari (`exclude: minutely,hourly,daily,current`)
+- ✅ Gestione graceful se API key non ha accesso a One Call (401/403)
+- ✅ ID formato `owm:{event}_{timestamp}` per deduplicazione
 
-**Effort:** Medio — richiede endpoint diverso (One Call API).
-
-#### 2.3 Aggregazione e deduplicazione multi-source
+#### 2.3 Aggregazione e deduplicazione multi-source ✅ COMPLETATO
 
 **File:** `backend/engine/smartEngine.ts`
 
-- Raccogliere allerte da tutte le fonti (WeatherKit, WeatherAPI, OpenWeatherMap)
-- Deduplicare per: area geografica simile, finestra temporale simile (±2 ore), tipo evento simile
-- Mantenere la versione con severity più alta in caso di duplicati
-- Formato `external_alert_id`: `{source}:{original_id}` per distinguere la provenienza
+- ✅ Allerte raccolte da WeatherKit, WeatherAPI, OpenWeatherMap durante il fetch
+- ✅ Funzione `deduplicateAlerts()` che deduplicazione per evento simile + finestra temporale ±2h
+- ✅ Mantiene la versione con severity più alta in caso di duplicati
+- ✅ ID formato `{source}:{original_id}` per distinguere la provenienza
+- ✅ Cache bypass aggiornato per fetch multi-source parallelo
 
-#### 2.4 Aggiornare interfaccia WeatherAlert
+#### 2.4 Aggiornare interfaccia WeatherAlert ✅ COMPLETATO
 
 **File:** `backend/types.ts`
 
-- Aggiungere campo `providerSource` per distinguere la fonte dell'allerta
-- Aggiungere campi opzionali `event` (tipo evento: "Wind", "Thunderstorm") e `headline`
+- ✅ Aggiunto campo `providerSource` per distinguere la fonte dell'allerta
+- ✅ Aggiunto campo `event` (tipo evento: "Wind", "Thunderstorm")
+- ✅ Aggiunto campo `headline` (titolo breve dell'allerta)
 
 ---
 
@@ -339,10 +341,10 @@ Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscripti
 | 1.2 | Fix Critici | Medio | 🔴 Alto | ✅ Cache bypass per allerte fresche |
 | 1.3 | Fix Critici | Basso | 🔴 Alto | ✅ Logging strutturato pipeline allerte |
 | 1.4 | Fix Critici | Basso | 🟠 Medio | ✅ Validazione configurazione APNs |
-| 2.1 | Multi-Source | Basso | 🔴 Alto | Attivare allerte WeatherAPI (flip flag) |
-| 2.2 | Multi-Source | Medio | 🟠 Medio | Aggiungere allerte OpenWeatherMap |
-| 2.3 | Multi-Source | Medio | 🔴 Alto | Deduplicazione multi-source |
-| 2.4 | Multi-Source | Basso | 🟡 Basso | Aggiornare interfaccia WeatherAlert |
+| 2.1 | Multi-Source | Basso | 🔴 Alto | ✅ Attivare allerte WeatherAPI (flip flag) |
+| 2.2 | Multi-Source | Medio | 🟠 Medio | ✅ Aggiungere allerte OpenWeatherMap |
+| 2.3 | Multi-Source | Medio | 🔴 Alto | ✅ Deduplicazione multi-source |
+| 2.4 | Multi-Source | Basso | 🟡 Basso | ✅ Aggiornare interfaccia WeatherAlert |
 | 3.1 | Polling | Alto | 🔴 Critico | Job periodico controllo allerte |
 | 3.2 | Polling | Medio | 🔴 Critico | Endpoint /api/alerts/poll |
 | 3.3 | Polling | Medio | 🔴 Critico | Netlify Scheduled Function |

@@ -7,6 +7,8 @@ import { fetchFromWWO } from '../connectors/worldweatheronline';
 import { fetchFromWeatherstack } from '../connectors/weatherstack';
 import { fetchFromMeteostat } from '../connectors/meteostat';
 import { fetchFromWeatherKit, fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
+import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
+import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
@@ -75,6 +77,51 @@ function degreesToCompass(deg: number): string {
 	return directions[index] ?? 'N';
 }
 
+/**
+ * Deduplicazione allerte multi-source.
+ * Allerte simili (stesso evento, finestra temporale ±2h) vengono unificate
+ * mantenendo la versione con severity più alta.
+ */
+function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
+	if (alerts.length <= 1) return alerts;
+
+	const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+	const deduplicated: WeatherAlert[] = [];
+	const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
+
+	for (const alert of alerts) {
+		const existingIdx = deduplicated.findIndex(existing => {
+			// Check evento simile (normalizzato)
+			const eventA = (existing.event || existing.description || '').toLowerCase();
+			const eventB = (alert.event || alert.description || '').toLowerCase();
+			const eventSimilar = eventA.includes(eventB.slice(0, 10)) || eventB.includes(eventA.slice(0, 10))
+				|| (existing.headline || '').toLowerCase().includes((alert.event || '').toLowerCase())
+				|| (alert.headline || '').toLowerCase().includes((existing.event || '').toLowerCase());
+
+			// Check finestra temporale simile (±2 ore)
+			const timeA = new Date(existing.effectiveTime).getTime();
+			const timeB = new Date(alert.effectiveTime).getTime();
+			const timeSimilar = Math.abs(timeA - timeB) < TWO_HOURS_MS;
+
+			return eventSimilar && timeSimilar;
+		});
+
+		if (existingIdx >= 0) {
+			// Mantieni la versione con severity più alta
+			const existing = deduplicated[existingIdx]!;
+			const existingSev = severityRank[existing.severity] || 2;
+			const newSev = severityRank[alert.severity] || 2;
+			if (newSev > existingSev) {
+				deduplicated[existingIdx] = alert;
+			}
+		} else {
+			deduplicated.push(alert);
+		}
+	}
+
+	return deduplicated;
+}
+
 async function upsertLocation(lat: number, lon: number): Promise<string | null> {
 	const { data, error } = await supabase.rpc('upsert_location', {
 		p_name: null,
@@ -111,31 +158,33 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			if (cached.full_data) {
 				console.log('Cache HIT: returning full smart forecast from DB (with fresh alerts check)');
 
-				// Bypass cache per allerte: fetch allerte fresche da WeatherKit anche con cache valida
+				// Bypass cache per allerte: fetch allerte fresche da tutte le fonti
 				try {
-					const wkResult = await fetchFromWeatherKitWithAlerts(lat, lon);
-					if (wkResult && wkResult.alerts.length > 0) {
-						const freshAlerts = wkResult.alerts.filter(
-							(a: WeatherAlert) => !a.expireTime || new Date(a.expireTime) > new Date()
+					const freshAlertSources = await Promise.allSettled([
+						fetchFromWeatherKitWithAlerts(lat, lon).then(r => r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' })) || []),
+						fetchFromWeatherAPIWithAlerts(lat, lon).then(r => r?.alerts || []),
+						fetchOWMAlerts(lat, lon),
+					]);
+
+					const freshAlertsRaw: WeatherAlert[] = [];
+					for (const result of freshAlertSources) {
+						if (result.status === 'fulfilled') freshAlertsRaw.push(...result.value);
+					}
+
+					const freshAlerts = deduplicateAlerts(freshAlertsRaw).filter(
+						(a: WeatherAlert) => !a.expireTime || new Date(a.expireTime) > new Date()
+					);
+					console.log(`[AlertPipeline] Cache bypass alerts check: raw=${freshAlertsRaw.length} deduplicated=${freshAlerts.length} from ${[...new Set(freshAlertsRaw.map(a => a.providerSource))].join(',') || 'none'}`);
+
+					cached.full_data.alerts = freshAlerts;
+
+					if (freshAlerts.length > 0) {
+						processWeatherAlerts(freshAlerts, lat, lon).catch(err =>
+							console.error('[AlertPipeline] Error processing fresh alerts on cache hit:', err.message)
 						);
-						console.log(`Fresh alerts check: found ${freshAlerts.length} active alert(s) from WeatherKit`);
-
-						// Mergia allerte fresche nella risposta cached
-						cached.full_data.alerts = freshAlerts;
-
-						// Processa le nuove allerte (push notifications, ecc.)
-						if (freshAlerts.length > 0) {
-							processWeatherAlerts(freshAlerts, lat, lon).catch(err =>
-								console.error('[AlertPipeline] Error processing fresh alerts on cache hit:', err.message)
-							);
-						}
-					} else {
-						console.log('Fresh alerts check: no active alerts from WeatherKit');
-						cached.full_data.alerts = [];
 					}
 				} catch (alertErr: any) {
 					console.warn('[AlertPipeline] Failed to fetch fresh alerts on cache hit:', alertErr.message);
-					// Non blocchiamo: restituiamo la cache anche senza allerte fresche
 				}
 
 				return cached.full_data;
@@ -149,8 +198,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const activeSources = sources.filter(s => s.active);
 	const accuracyMapPromise = getAccuracyMap();
 
-	// Raccoglie le allerte WeatherKit durante il fetch
-	let weatherKitAlerts: WeatherAlert[] = [];
+	// Raccoglie le allerte da tutte le fonti durante il fetch
+	let allAlerts: WeatherAlert[] = [];
 
 	const fetchPromises = activeSources.map(async s => {
 		const start = Date.now();
@@ -162,7 +211,19 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				const wkResult = await fetchFromWeatherKitWithAlerts(lat, lon);
 				if (wkResult) {
 					result = wkResult.forecast;
-					weatherKitAlerts = wkResult.alerts;
+					if (wkResult.alerts.length > 0) {
+						const tagged = wkResult.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' }));
+						allAlerts.push(...tagged);
+					}
+				}
+			} else if (s.id === 'weatherapi') {
+				// WeatherAPI: usa la variante con allerte
+				const waResult = await fetchFromWeatherAPIWithAlerts(lat, lon);
+				if (waResult) {
+					result = waResult.forecast;
+					if (waResult.alerts.length > 0) {
+						allAlerts.push(...waResult.alerts);
+					}
 				}
 			} else {
 				const fetcher = SOURCE_FETCHERS[s.id];
@@ -436,8 +497,24 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,
-		alerts: weatherKitAlerts.filter(a => !a.expireTime || new Date(a.expireTime) > new Date())
+		alerts: [] as WeatherAlert[], // verrà popolato dopo la deduplicazione
 	};
+
+	// 5c. Fetch allerte OWM in parallelo (non blocca il forecast)
+	try {
+		const owmAlerts = await fetchOWMAlerts(lat, lon);
+		if (owmAlerts.length > 0) {
+			allAlerts.push(...owmAlerts);
+		}
+	} catch (err: any) {
+		console.warn(`[AlertPipeline] OWM alerts fetch failed: ${err.message}`);
+	}
+
+	// 5d. Deduplicazione allerte multi-source
+	const deduplicatedAlerts = deduplicateAlerts(allAlerts);
+	result.alerts = deduplicatedAlerts.filter(a => !a.expireTime || new Date(a.expireTime) > new Date());
+
+	console.log(`[AlertPipeline] Multi-source alerts: total=${allAlerts.length} deduplicated=${deduplicatedAlerts.length} active=${result.alerts.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',')}`);
 
 	// 6. Save Aggregated Result to DB
 	if (locationId) {
@@ -464,14 +541,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// 7. Log Deviations for AI Accuracy
 	logAccuracyDeviations(result, validForecasts);
 
-	// 8. Process Weather Alerts (async, non-blocking)
-	if (weatherKitAlerts.length > 0) {
-		console.log(`[AlertPipeline] Dispatching ${weatherKitAlerts.length} alert(s) from WeatherKit for ${lat},${lon}: ${weatherKitAlerts.map(a => `${a.id}(${a.severity})`).join(', ')}`);
-		processWeatherAlerts(weatherKitAlerts, lat, lon).catch(err =>
+	// 8. Process Weather Alerts (async, non-blocking) — usa allerte deduplicate
+	if (result.alerts.length > 0) {
+		console.log(`[AlertPipeline] Dispatching ${result.alerts.length} deduplicated alert(s) for ${lat},${lon}: ${result.alerts.map(a => `${a.id}(${a.severity})`).join(', ')}`);
+		processWeatherAlerts(result.alerts, lat, lon).catch(err =>
 			console.error(`[AlertPipeline] Unhandled error in processWeatherAlerts for ${lat},${lon}:`, err.message, err.stack)
 		);
 	} else {
-		console.log(`[AlertPipeline] WeatherKit returned 0 alerts for ${lat},${lon}`);
+		console.log(`[AlertPipeline] No active alerts from any source for ${lat},${lon}`);
 	}
 
 	return result;

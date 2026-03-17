@@ -96,7 +96,7 @@ export async function sendPushNotification(
         } else if (result.failed.length > 0) {
             const failure = result.failed[0];
             const reason = failure?.response?.reason || failure?.error || 'unknown';
-            const statusCode = failure?.response?.statusCode || 'N/A';
+            const statusCode = (failure?.response as any)?.statusCode || 'N/A';
             console.error(`${logPrefix} Push FAILED to ${tokenShort}: status=${statusCode} reason=${reason}`);
             return false;
         }
