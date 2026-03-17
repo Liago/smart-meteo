@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabase } from '../services/supabase';
-import { sendPushNotification } from '../services/apns';
+import { sendPushNotification, getAPNsHealthStatus } from '../services/apns';
+import { pollAlerts } from '../services/alertPoller';
 
 export const alertsRouter = express.Router();
 
@@ -121,10 +122,73 @@ alertsRouter.post('/test-push', async (req, res) => {
     };
 
     const sent = await sendPushNotification(deviceToken, title, body, payload);
-    
+
     if (sent) {
         return res.json({ success: true, message: 'Push notification inviata correttamente ad APNs' });
     } else {
         return res.status(500).json({ error: 'Impossibile inviare notifica push, controllare i log del backend' });
+    }
+});
+
+/**
+ * Endpoint di polling allerte — chiamato dalla Netlify Scheduled Function.
+ * Protetto da header X-Cron-Secret.
+ * Interroga tutte le location sottoscritte, cerca allerte, le processa.
+ */
+alertsRouter.post('/poll', async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const requestSecret = req.headers['x-cron-secret'] as string;
+
+    if (cronSecret && requestSecret !== cronSecret) {
+        return res.status(403).json({ error: 'Unauthorized: invalid cron secret' });
+    }
+
+    try {
+        const result = await pollAlerts();
+        return res.json({
+            success: true,
+            ...result,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err: any) {
+        console.error('[AlertPoller] Poll endpoint error:', err.message);
+        return res.status(500).json({ error: 'Errore durante il polling allerte', details: err.message });
+    }
+});
+
+/**
+ * Health check per il sistema allerte.
+ * Restituisce stato APNs, conteggio sottoscrizioni, statistiche delivery.
+ */
+alertsRouter.get('/health', async (_req, res) => {
+    try {
+        const apnsStatus = getAPNsHealthStatus();
+
+        // Conteggio sottoscrizioni attive
+        const { count: subsCount } = await supabase
+            .from('alert_subscriptions')
+            .select('*', { count: 'exact', head: true })
+            .eq('enabled', true);
+
+        // Statistiche delivery ultime 24h
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentAlerts } = await supabase
+            .from('weather_alerts')
+            .select('id, severity')
+            .gt('sent_at', since24h);
+
+        return res.json({
+            apns: apnsStatus,
+            subscriptions: {
+                active: subsCount || 0,
+            },
+            alerts_24h: {
+                total: recentAlerts?.length || 0,
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err: any) {
+        console.error('Error in /alerts/health:', err.message);
+        return res.status(500).json({ error: 'Errore health check allerte', details: err.message });
     }
 });

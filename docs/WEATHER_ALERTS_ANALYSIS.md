@@ -234,28 +234,30 @@ Se `NODE_ENV` non è esattamente `"production"` su Netlify, il provider APNs usa
 
 ### Fase 3 — Background Polling (colmare la lacuna critica)
 
-#### 3.1 Job periodico per controllo allerte
+#### 3.1 Job periodico per controllo allerte ✅ COMPLETATO
 
-**Nuovo file:** `backend/services/alertPoller.ts`
+**File:** `backend/services/alertPoller.ts`
 
-1. Interrogare tutte le location distinte da `alert_subscriptions` (raggruppate per area approssimativa)
-2. Per ogni cluster di location, chiamare le API di allerte (WeatherKit + WeatherAPI + OWM)
-3. Processare le nuove allerte tramite la pipeline `processWeatherAlerts` esistente
+- ✅ Funzione `getSubscriptionClusters()` che raggruppa le subscription per griglia ~0.5°
+- ✅ Funzione `pollAlerts()` che per ogni cluster fetcha allerte da WeatherKit + WeatherAPI + OWM in parallelo
+- ✅ Deduplicazione multi-source integrata
+- ✅ Processa le allerte tramite la pipeline `processWeatherAlerts` esistente
 
-#### 3.2 Endpoint `/api/alerts/poll`
+#### 3.2 Endpoint `/api/alerts/poll` ✅ COMPLETATO
 
 **File:** `backend/routes/alerts.ts`
 
-- Endpoint protetto da secret header (`X-Cron-Secret`)
-- Interroga location sottoscritte, cerca allerte, le processa
-- Restituisce riepilogo: allerte trovate, notifiche inviate
+- ✅ `POST /api/alerts/poll` protetto da header `X-Cron-Secret`
+- ✅ Restituisce riepilogo: clusters, alertsFound, alertsProcessed
+- ✅ `GET /api/alerts/health` — health check con stato APNs, conteggio sottoscrizioni, statistiche 24h
 
-#### 3.3 Netlify Scheduled Function
+#### 3.3 Netlify Scheduled Function ✅ COMPLETATO
 
-**Nuovo file:** `netlify/functions/alert-poll.ts`
+**File:** `netlify/functions/alert-poll.ts`
 
-- Funzione schedulata ogni 15-30 minuti
-- Chiama l'endpoint `/api/alerts/poll` con il secret appropriato
+- ✅ Funzione schedulata ogni 15 minuti (`*/15 * * * *`)
+- ✅ Inizializza APNs e chiama `pollAlerts()` direttamente
+- ✅ Logging strutturato con timestamp
 
 ---
 
@@ -345,9 +347,9 @@ Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscripti
 | 2.2 | Multi-Source | Medio | 🟠 Medio | ✅ Aggiungere allerte OpenWeatherMap |
 | 2.3 | Multi-Source | Medio | 🔴 Alto | ✅ Deduplicazione multi-source |
 | 2.4 | Multi-Source | Basso | 🟡 Basso | ✅ Aggiornare interfaccia WeatherAlert |
-| 3.1 | Polling | Alto | 🔴 Critico | Job periodico controllo allerte |
-| 3.2 | Polling | Medio | 🔴 Critico | Endpoint /api/alerts/poll |
-| 3.3 | Polling | Medio | 🔴 Critico | Netlify Scheduled Function |
+| 3.1 | Polling | Alto | 🔴 Critico | ✅ Job periodico controllo allerte |
+| 3.2 | Polling | Medio | 🔴 Critico | ✅ Endpoint /api/alerts/poll + health |
+| 3.3 | Polling | Medio | 🔴 Critico | ✅ Netlify Scheduled Function (15min) |
 | 4.1 | Web Frontend | Basso | 🟠 Medio | Tipi e API client |
 | 4.2 | Web Frontend | Medio | 🟠 Medio | Componenti allerta |
 | 4.3 | Web Frontend | Basso | 🟠 Medio | Hook SWR useAlerts |
