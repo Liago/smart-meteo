@@ -1,4 +1,4 @@
-import type { ForecastResponse, SourcesResponse, WeatherSource } from './types';
+import type { ForecastResponse, SourcesResponse, WeatherSource, WeatherAlert } from './types';
 import { createClient } from './supabase/client';
 
 // In produzione: NEXT_PUBLIC_API_URL = URL del backend Netlify (es: https://smart-meteo-api.netlify.app)
@@ -49,6 +49,12 @@ export async function toggleSource(id: string, active: boolean): Promise<{ sourc
 
 export async function getHealth(): Promise<{ status: string; timestamp: string }> {
 	return fetchJSON(`${API_BASE}/api/health`);
+}
+
+export async function getActiveAlerts(lat: number, lon: number): Promise<{ alerts: WeatherAlert[] }> {
+	return fetchJSON<{ alerts: WeatherAlert[] }>(
+		`${API_BASE}/api/alerts/active?lat=${lat}&lon=${lon}`
+	);
 }
 
 // SWR fetcher helpers

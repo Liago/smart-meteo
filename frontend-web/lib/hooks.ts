@@ -1,6 +1,6 @@
 import useSWR from 'swr';
-import { getForecast, getSources } from './api';
-import type { ForecastResponse, SourcesResponse } from './types';
+import { getForecast, getSources, getActiveAlerts } from './api';
+import type { ForecastResponse, SourcesResponse, WeatherAlert } from './types';
 
 export function useForecast(lat: number | null, lon: number | null) {
   return useSWR<ForecastResponse>(
@@ -20,6 +20,18 @@ export function useSources() {
     () => getSources(),
     {
       revalidateOnFocus: false,
+    }
+  );
+}
+
+export function useAlerts(lat: number | null, lon: number | null) {
+  return useSWR<{ alerts: WeatherAlert[] }>(
+    lat !== null && lon !== null ? ['alerts', lat, lon] : null,
+    ([, lat, lon]: [string, number, number]) => getActiveAlerts(lat, lon),
+    {
+      refreshInterval: 180_000, // 3 min
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
     }
   );
 }

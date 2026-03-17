@@ -11,7 +11,9 @@ import SourcesIndicator from '@/components/SourcesIndicator';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
 import AuthButton from '@/components/AuthButton';
-import { useForecast } from '@/lib/hooks';
+import WeatherAlerts, { AlertBadge } from '@/components/WeatherAlerts';
+import { useForecast, useAlerts } from '@/lib/hooks';
+import type { WeatherAlert } from '@/lib/types';
 import { useLocations } from '@/lib/useLocations';
 import { getConditionLabel, isDaytime } from '@/lib/weather-utils';
 
@@ -68,6 +70,32 @@ export default function Home() {
 		}
 	};
 
+	// Fetch allerte dal database (indipendente dal forecast)
+	const { data: alertsData } = useAlerts(coords?.lat ?? null, coords?.lon ?? null);
+
+	// Merge allerte dal forecast + dal database, deduplicando per id
+	const allAlerts: WeatherAlert[] = (() => {
+		const merged = new Map<string, WeatherAlert>();
+		for (const a of (data?.alerts || [])) merged.set(a.id, a);
+		for (const a of (alertsData?.alerts || [])) {
+			// Le allerte dal DB hanno un formato diverso, mappiamo
+			const dbAlert = a as WeatherAlert & Record<string, unknown>;
+			const key = (dbAlert.external_alert_id as string) || dbAlert.id;
+			if (!merged.has(key)) {
+				merged.set(key, {
+					...dbAlert,
+					id: key,
+					description: (dbAlert.message as string) || dbAlert.description || '',
+					effectiveTime: (dbAlert.effective_time as string) || dbAlert.effectiveTime || '',
+					expireTime: (dbAlert.expire_time as string) || dbAlert.expireTime || '',
+				});
+			}
+		}
+		return Array.from(merged.values()).filter(
+			a => !a.expireTime || new Date(a.expireTime) > new Date()
+		);
+	})();
+
 	const condition = data?.current?.condition || 'unknown';
 	const isDay = data?.astronomy
 		? isDaytime(data.astronomy.sunrise, data.astronomy.sunset)
@@ -85,6 +113,9 @@ export default function Home() {
 						<p className="text-white/50 text-xs">Previsioni aggregate intelligenti</p>
 					</div>
 					<div className="flex items-center gap-2">
+						{allAlerts.length > 0 && (
+							<AlertBadge count={allAlerts.length} />
+						)}
 						<Link
 							href="/sources"
 							className="p-2 rounded-lg glass hover:bg-white/20 transition-colors text-white/60 hover:text-white"
@@ -161,6 +192,9 @@ export default function Home() {
 
 				{data && !isLoading && (
 					<>
+						{allAlerts.length > 0 && (
+							<WeatherAlerts alerts={allAlerts} />
+						)}
 						<CurrentWeather
 							data={data.current}
 							locationName={locationName}

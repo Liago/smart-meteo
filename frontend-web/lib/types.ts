@@ -52,6 +52,26 @@ export interface AstronomyData {
 	moon_phase: string;
 }
 
+export interface WeatherAlert {
+	id: string;
+	areaId?: string;
+	areaName?: string;
+	certainty: string;
+	countryCode?: string;
+	description: string;
+	effectiveTime: string;
+	expireTime: string;
+	issuedTime?: string;
+	eventSource?: string;
+	severity: 'minor' | 'moderate' | 'severe' | 'extreme' | string;
+	source?: string;
+	urgency?: string;
+	detailsUrl?: string;
+	providerSource?: string;
+	event?: string;
+	headline?: string;
+}
+
 export interface ForecastResponse {
 	location: {
 		lat: number;
@@ -63,6 +83,7 @@ export interface ForecastResponse {
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
+	alerts?: WeatherAlert[];
 }
 
 export interface WeatherSource {

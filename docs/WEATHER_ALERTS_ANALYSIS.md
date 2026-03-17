@@ -263,36 +263,38 @@ Se `NODE_ENV` non è esattamente `"production"` su Netlify, il provider APNs usa
 
 ### Fase 4 — Frontend Web (completare la lacuna)
 
-#### 4.1 Tipi e API client
+#### 4.1 Tipi e API client ✅ COMPLETATO
 
 **File:** `frontend-web/lib/types.ts`, `frontend-web/lib/api.ts`
 
-- Aggiungere interfaccia `WeatherAlert` nel frontend web
-- Aggiungere campo `alerts` a `ForecastResponse` (il backend lo restituisce già!)
-- Aggiungere funzione `getActiveAlerts(lat, lon)` nell'API client
+- ✅ Interfaccia `WeatherAlert` aggiunta con tutti i campi (inclusi providerSource, event, headline)
+- ✅ Campo `alerts` aggiunto a `ForecastResponse`
+- ✅ Funzione `getActiveAlerts(lat, lon)` nell'API client
 
-#### 4.2 Componenti
+#### 4.2 Componenti ✅ COMPLETATO
 
-**Nuovi file:**
-- `frontend-web/components/WeatherAlerts.tsx` — Banner/card allerte con severità colorata
-- `frontend-web/components/AlertBadge.tsx` — Badge indicatore nell'header
+**File:** `frontend-web/components/WeatherAlerts.tsx`
 
-Stile: glassmorphism coerente con il design esistente. Banner dismissibile in cima alla dashboard con dettagli espandibili.
+- ✅ Componente `WeatherAlerts` — Banner/card con severità colorata, espandibile, dismissibile
+- ✅ Componente `AlertBadge` — Badge compatto per l'header con conteggio
+- ✅ Stile glassmorphism coerente (backdrop-blur, bordi colorati per severity)
+- ✅ Animazioni Framer Motion per ingresso/uscita
 
-#### 4.3 Hook SWR
+#### 4.3 Hook SWR ✅ COMPLETATO
 
 **File:** `frontend-web/lib/hooks.ts`
 
-- Aggiungere hook `useAlerts` che fetcha da `/api/alerts/active` con refresh ogni 2-3 minuti
-- Indipendente dal refresh del forecast (5 minuti)
+- ✅ Hook `useAlerts` con refresh ogni 3 minuti (indipendente dal forecast a 5 min)
+- ✅ Deduplicazione SWR a 60 secondi
 
-#### 4.4 Integrazione Dashboard
+#### 4.4 Integrazione Dashboard ✅ COMPLETATO
 
 **File:** `frontend-web/app/page.tsx`
 
-- Mostrare allerte sopra `CurrentWeather`
-- Estrarre allerte dalla risposta forecast + dall'hook `useAlerts`
-- Badge con conteggio allerte attive
+- ✅ Allerte mostrate sopra `CurrentWeather`
+- ✅ Merge allerte dal forecast + dal database con deduplicazione per id
+- ✅ `AlertBadge` con conteggio nell'header
+- ✅ Mappatura campi DB → interfaccia frontend (snake_case → camelCase)
 
 ---
 
@@ -350,10 +352,10 @@ Quando APNs restituisce `BadDeviceToken` o `Unregistered`, marcare la subscripti
 | 3.1 | Polling | Alto | 🔴 Critico | ✅ Job periodico controllo allerte |
 | 3.2 | Polling | Medio | 🔴 Critico | ✅ Endpoint /api/alerts/poll + health |
 | 3.3 | Polling | Medio | 🔴 Critico | ✅ Netlify Scheduled Function (15min) |
-| 4.1 | Web Frontend | Basso | 🟠 Medio | Tipi e API client |
-| 4.2 | Web Frontend | Medio | 🟠 Medio | Componenti allerta |
-| 4.3 | Web Frontend | Basso | 🟠 Medio | Hook SWR useAlerts |
-| 4.4 | Web Frontend | Medio | 🟠 Medio | Integrazione dashboard |
+| 4.1 | Web Frontend | Basso | 🟠 Medio | ✅ Tipi e API client |
+| 4.2 | Web Frontend | Medio | 🟠 Medio | ✅ Componenti allerta |
+| 4.3 | Web Frontend | Basso | 🟠 Medio | ✅ Hook SWR useAlerts |
+| 4.4 | Web Frontend | Medio | 🟠 Medio | ✅ Integrazione dashboard |
 | 5.1 | Monitoraggio | Medio | 🔴 Alto | Tabella log delivery |
 | 5.2 | Monitoraggio | Basso | 🟠 Medio | Health check endpoint |
 | 5.3 | Monitoraggio | Basso | 🟠 Medio | Pulizia token scaduti |
