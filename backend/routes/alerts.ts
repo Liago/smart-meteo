@@ -53,29 +53,67 @@ function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
 /**
  * Fetcha allerte live da tutte le fonti (WeatherKit, WeatherAPI, OWM) con cache.
  */
-async function fetchLiveAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
+interface FetchLiveAlertsResult {
+    alerts: WeatherAlert[];
+    debug?: {
+        weatherkit: { status: string; count: number; error?: string; raw?: any };
+        weatherapi: { status: string; count: number; error?: string };
+        owm: { status: string; count: number; error?: string };
+        rawTotal: number;
+        deduplicatedTotal: number;
+    };
+}
+
+async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): Promise<FetchLiveAlertsResult> {
     const cacheKey = getLiveCacheKey(lat, lon);
     const cached = liveAlertsCache.get(cacheKey);
-    if (cached && (Date.now() - cached.fetchedAt) < LIVE_CACHE_TTL_MS) {
-        return cached.alerts;
+    if (!includeDebug && cached && (Date.now() - cached.fetchedAt) < LIVE_CACHE_TTL_MS) {
+        return { alerts: cached.alerts };
     }
 
     const results = await Promise.allSettled([
         fetchFromWeatherKitWithAlerts(lat, lon)
-            .then(r => r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' })) || []),
+            .then(r => {
+                if (includeDebug) {
+                    console.log(`[AlertsRoute DEBUG] WeatherKit raw result: alerts=${r?.alerts?.length ?? 'null'}, forecast=${r?.forecast ? 'yes' : 'no'}, rawWeatherAlerts=${JSON.stringify(r?.forecast?.raw_data?.weatherAlerts ?? 'N/A').slice(0, 500)}`);
+                }
+                return {
+                    alerts: r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' as string })) || [],
+                    raw: r ? { hasAlerts: !!r.alerts, alertCount: r.alerts?.length, hasWeatherAlertsKey: !!r.forecast?.raw_data?.weatherAlerts, weatherAlertsRaw: r.forecast?.raw_data?.weatherAlerts } : null
+                };
+            }),
         fetchFromWeatherAPIWithAlerts(lat, lon)
-            .then(r => r?.alerts || []),
-        fetchOWMAlerts(lat, lon),
+            .then(r => ({ alerts: r?.alerts || [], raw: null })),
+        fetchOWMAlerts(lat, lon)
+            .then(alerts => ({ alerts, raw: null })),
     ]);
 
     const allAlerts: WeatherAlert[] = [];
-    for (const result of results) {
-        if (result.status === 'fulfilled') allAlerts.push(...result.value);
+    const debugInfo: any = {
+        weatherkit: { status: 'unknown', count: 0 },
+        weatherapi: { status: 'unknown', count: 0 },
+        owm: { status: 'unknown', count: 0 },
+    };
+    const sourceNames = ['weatherkit', 'weatherapi', 'owm'] as const;
+
+    for (let i = 0; i < results.length; i++) {
+        const result = results[i]!;
+        const name = sourceNames[i]!;
+        if (result.status === 'fulfilled') {
+            const value = result.value as { alerts: WeatherAlert[]; raw?: any };
+            allAlerts.push(...value.alerts);
+            debugInfo[name] = { status: 'ok', count: value.alerts.length, raw: includeDebug ? value.raw : undefined };
+        } else {
+            debugInfo[name] = { status: 'error', count: 0, error: result.reason?.message || String(result.reason) };
+        }
     }
 
     const deduplicated = deduplicateAlerts(allAlerts).filter(
         a => !a.expireTime || new Date(a.expireTime) > new Date()
     );
+
+    debugInfo.rawTotal = allAlerts.length;
+    debugInfo.deduplicatedTotal = deduplicated.length;
 
     console.log(`[AlertsRoute] Live fetch for ${lat},${lon}: raw=${allAlerts.length} deduplicated=${deduplicated.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',') || 'none'}`);
 
@@ -89,7 +127,7 @@ async function fetchLiveAlerts(lat: number, lon: number): Promise<WeatherAlert[]
         }
     }
 
-    return deduplicated;
+    return { alerts: deduplicated, debug: includeDebug ? debugInfo : undefined };
 }
 
 export const alertsRouter = express.Router();
@@ -162,6 +200,7 @@ alertsRouter.get('/active', async (req, res) => {
     const lat = parseFloat(req.query.lat as string);
     const lon = parseFloat(req.query.lon as string);
     const radius = parseFloat(req.query.radius as string) || 0.5;
+    const includeDebug = req.query.debug === 'true';
 
     if (isNaN(lat) || isNaN(lon)) {
         return res.status(400).json({ error: 'Parametri lat/lon mancanti o non validi' });
@@ -169,7 +208,7 @@ alertsRouter.get('/active', async (req, res) => {
 
     try {
         // 1. Fetch allerte live dalle fonti (con cache 5 min)
-        const liveAlerts = await fetchLiveAlerts(lat, lon);
+        const { alerts: liveAlerts, debug: debugInfo } = await fetchLiveAlerts(lat, lon, includeDebug);
 
         // 2. Fetch allerte dal DB (con filtro geografico)
         const now = new Date().toISOString();
@@ -223,7 +262,11 @@ alertsRouter.get('/active', async (req, res) => {
 
         console.log(`[AlertsRoute] /active response for ${lat},${lon}: live=${liveAlerts.length} db=${dbAlerts?.length || 0} merged=${alerts.length}`);
 
-        return res.json({ alerts });
+        const response: any = { alerts };
+        if (includeDebug && debugInfo) {
+            response.debug = debugInfo;
+        }
+        return res.json(response);
     } catch (err: any) {
         console.error('Error in /alerts/active:', err.message);
         return res.status(500).json({ error: 'Impossibile recuperare le allerte attive', details: err.message });

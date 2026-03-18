@@ -264,6 +264,19 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
 
         const data = await response.json();
 
+        // Log dettagliato della struttura weatherAlerts per debug
+        const topLevelKeys = Object.keys(data || {});
+        console.log(`[WeatherKit] Response keys for ${lat},${lon}: ${topLevelKeys.join(', ')}`);
+        if (data?.weatherAlerts) {
+            const alertKeys = Object.keys(data.weatherAlerts);
+            console.log(`[WeatherKit] weatherAlerts keys: ${alertKeys.join(', ')}, alerts type: ${typeof data.weatherAlerts.alerts}, isArray: ${Array.isArray(data.weatherAlerts.alerts)}, length: ${data.weatherAlerts?.alerts?.length ?? 'N/A'}`);
+            if (data.weatherAlerts.alerts?.[0]) {
+                console.log(`[WeatherKit] First alert sample: ${JSON.stringify(data.weatherAlerts.alerts[0]).slice(0, 300)}`);
+            }
+        } else {
+            console.log(`[WeatherKit] NO weatherAlerts key in response! URL: ${url}`);
+        }
+
         // Estrai allerte
         const alerts = parseWeatherAlerts(data);
         console.log(`[WeatherKit] Alerts for ${lat},${lon} (cc=${countryCode}): found=${alerts.length} rawAlerts=${data?.weatherAlerts?.alerts?.length ?? 0} hasWeatherAlertsKey=${!!data?.weatherAlerts}`);
