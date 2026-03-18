@@ -5,7 +5,7 @@ import { pollAlerts } from '../services/alertPoller';
 import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
-import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
+import { fetchMeteoAlarmAlerts, debugMeteoAlarmFeed } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
 
 /**
@@ -369,4 +369,18 @@ alertsRouter.get('/health', async (_req, res) => {
         console.error('Error in /alerts/health:', err.message);
         return res.status(500).json({ error: 'Errore health check allerte', details: err.message });
     }
+});
+
+/**
+ * Debug: mostra la struttura parsata del feed MeteoAlarm.
+ * GET /api/alerts/debug-feed?lat=44.0611&lon=12.5665
+ */
+alertsRouter.get('/debug-feed', async (req, res) => {
+    const lat = parseFloat(req.query.lat as string);
+    const lon = parseFloat(req.query.lon as string);
+    if (isNaN(lat) || isNaN(lon)) {
+        return res.status(400).json({ error: 'lat/lon required' });
+    }
+    const result = await debugMeteoAlarmFeed(lat, lon);
+    return res.json(result);
 });

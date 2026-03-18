@@ -245,3 +245,45 @@ function buildDescription(entry: any, event: string): string {
 
 	return event || 'Allerta meteo';
 }
+
+/**
+ * Debug: fetcha il feed e ritorna la struttura parsata del primo entry.
+ * Usato solo per diagnostica.
+ */
+export async function debugMeteoAlarmFeed(lat: number, lon: number): Promise<any> {
+	const countryCode = getCountryCode(lat, lon);
+	const countryName = COUNTRY_FEED_NAMES[countryCode];
+	if (!countryName) return { error: 'No feed for country', countryCode };
+
+	const feedUrl = `${FEED_BASE_URL}-${countryName}`;
+
+	try {
+		const response = await fetch(feedUrl, {
+			headers: { 'Accept': 'application/atom+xml, application/xml, text/xml' },
+			signal: AbortSignal.timeout(8000),
+		});
+
+		if (!response.ok) {
+			return { error: `Feed error: ${response.status}`, feedUrl };
+		}
+
+		const xml = await response.text();
+		const parsed = xmlParser.parse(xml);
+
+		const entries = parsed?.feed?.entry;
+		const entryCount = Array.isArray(entries) ? entries.length : (entries ? 1 : 0);
+		const firstEntry = Array.isArray(entries) ? entries[0] : entries;
+
+		return {
+			feedUrl,
+			countryCode,
+			entryCount,
+			feedTopLevelKeys: Object.keys(parsed?.feed || {}),
+			firstEntryKeys: firstEntry ? Object.keys(firstEntry) : [],
+			firstEntryRaw: firstEntry ? JSON.parse(JSON.stringify(firstEntry)) : null,
+			xmlSnippet: xml.slice(0, 500),
+		};
+	} catch (error: any) {
+		return { error: error.message, feedUrl };
+	}
+}
