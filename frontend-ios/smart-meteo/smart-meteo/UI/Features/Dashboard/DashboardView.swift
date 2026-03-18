@@ -156,6 +156,15 @@ struct DashboardView: View {
                             .padding(.top, 120)
                                 
                         case .success(let forecast):
+                            // Banner allerte prominente (sopra al meteo)
+                            if !appState.activeAlerts.isEmpty {
+                                AlertBannerView(
+                                    alerts: appState.activeAlerts,
+                                    onTap: { isAlertsPresented = true }
+                                )
+                                .padding(.horizontal)
+                            }
+
                             // Current Weather
                             CurrentWeatherView(current: forecast.current, today: forecast.daily?.first, astronomy: forecast.astronomy)
                             
