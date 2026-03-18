@@ -3,6 +3,7 @@ import { processWeatherAlerts } from './alertProcessor';
 import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
+import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
 
 /**
@@ -107,6 +108,7 @@ export async function pollAlerts(): Promise<{ clusters: number; alertsFound: num
 				fetchFromWeatherAPIWithAlerts(cluster.lat, cluster.lon)
 					.then(r => r?.alerts || []),
 				fetchOWMAlerts(cluster.lat, cluster.lon),
+				fetchMeteoAlarmAlerts(cluster.lat, cluster.lon),
 			]);
 
 			const allAlerts: WeatherAlert[] = [];

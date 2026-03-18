@@ -5,6 +5,7 @@ import { pollAlerts } from '../services/alertPoller';
 import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
+import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
 
 /**
@@ -59,6 +60,7 @@ interface FetchLiveAlertsResult {
         weatherkit: { status: string; count: number; error?: string; raw?: any };
         weatherapi: { status: string; count: number; error?: string };
         owm: { status: string; count: number; error?: string };
+        meteoalarm: { status: string; count: number; error?: string };
         rawTotal: number;
         deduplicatedTotal: number;
     };
@@ -74,22 +76,21 @@ async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): 
     const results = await Promise.allSettled([
         fetchFromWeatherKitWithAlerts(lat, lon)
             .then(r => {
-                if (includeDebug) {
-                    console.log(`[AlertsRoute DEBUG] WeatherKit raw result: alerts=${r?.alerts?.length ?? 'null'}, forecast=${r?.forecast ? 'yes' : 'no'}, rawWeatherAlerts=${JSON.stringify(r?.forecast?.raw_data?.weatherAlerts ?? 'N/A').slice(0, 500)}`);
-                }
                 return {
                     alerts: r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' as string })) || [],
-                    raw: r ? {
+                    raw: includeDebug ? (r ? {
                         hasAlerts: !!r.alerts,
                         alertCount: r.alerts?.length,
                         responseKeys: r._debugResponseKeys,
                         weatherAlertsRaw: r._debugWeatherAlertsRaw,
-                    } : 'fetchFromWeatherKitWithAlerts returned null (JWT generation likely failed)'
+                    } : 'fetchFromWeatherKitWithAlerts returned null (JWT generation likely failed)') : undefined
                 };
             }),
         fetchFromWeatherAPIWithAlerts(lat, lon)
             .then(r => ({ alerts: r?.alerts || [], raw: null })),
         fetchOWMAlerts(lat, lon)
+            .then(alerts => ({ alerts, raw: null })),
+        fetchMeteoAlarmAlerts(lat, lon)
             .then(alerts => ({ alerts, raw: null })),
     ]);
 
@@ -98,8 +99,9 @@ async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): 
         weatherkit: { status: 'unknown', count: 0 },
         weatherapi: { status: 'unknown', count: 0 },
         owm: { status: 'unknown', count: 0 },
+        meteoalarm: { status: 'unknown', count: 0 },
     };
-    const sourceNames = ['weatherkit', 'weatherapi', 'owm'] as const;
+    const sourceNames = ['weatherkit', 'weatherapi', 'owm', 'meteoalarm'] as const;
 
     for (let i = 0; i < results.length; i++) {
         const result = results[i]!;
