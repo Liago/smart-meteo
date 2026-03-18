@@ -142,6 +142,8 @@ function parseWeatherAlerts(data: any): WeatherAlert[] {
 export interface WeatherKitResult {
     forecast: UnifiedForecast;
     alerts: WeatherAlert[];
+    _debugResponseKeys?: string[];
+    _debugWeatherAlertsRaw?: any;
 }
 
 /**
@@ -333,7 +335,9 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
 
         return {
             forecast: new UnifiedForecast(forecastPayload),
-            alerts
+            alerts,
+            _debugResponseKeys: Object.keys(data),
+            _debugWeatherAlertsRaw: data?.weatherAlerts ?? null
         };
     } catch (err: any) {
         console.error('Apple WeatherKit Fetch Error (with alerts):', err.message);

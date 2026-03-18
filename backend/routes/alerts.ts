@@ -79,7 +79,12 @@ async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): 
                 }
                 return {
                     alerts: r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' as string })) || [],
-                    raw: r ? { hasAlerts: !!r.alerts, alertCount: r.alerts?.length, hasWeatherAlertsKey: !!r.forecast?.raw_data?.weatherAlerts, weatherAlertsRaw: r.forecast?.raw_data?.weatherAlerts } : null
+                    raw: r ? {
+                        hasAlerts: !!r.alerts,
+                        alertCount: r.alerts?.length,
+                        responseKeys: r._debugResponseKeys,
+                        weatherAlertsRaw: r._debugWeatherAlertsRaw,
+                    } : 'fetchFromWeatherKitWithAlerts returned null (JWT generation likely failed)'
                 };
             }),
         fetchFromWeatherAPIWithAlerts(lat, lon)
