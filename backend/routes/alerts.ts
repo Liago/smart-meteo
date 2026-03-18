@@ -5,7 +5,7 @@ import { pollAlerts } from '../services/alertPoller';
 import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
-import { fetchMeteoAlarmAlerts, debugMeteoAlarmFeed } from '../connectors/meteoalarm';
+import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
 
 /**
@@ -75,17 +75,10 @@ async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): 
 
     const results = await Promise.allSettled([
         fetchFromWeatherKitWithAlerts(lat, lon)
-            .then(r => {
-                return {
-                    alerts: r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' as string })) || [],
-                    raw: includeDebug ? (r ? {
-                        hasAlerts: !!r.alerts,
-                        alertCount: r.alerts?.length,
-                        responseKeys: r._debugResponseKeys,
-                        weatherAlertsRaw: r._debugWeatherAlertsRaw,
-                    } : 'fetchFromWeatherKitWithAlerts returned null (JWT generation likely failed)') : undefined
-                };
-            }),
+            .then(r => ({
+                alerts: r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' as string })) || [],
+                raw: null
+            })),
         fetchFromWeatherAPIWithAlerts(lat, lon)
             .then(r => ({ alerts: r?.alerts || [], raw: null })),
         fetchOWMAlerts(lat, lon)
@@ -371,16 +364,3 @@ alertsRouter.get('/health', async (_req, res) => {
     }
 });
 
-/**
- * Debug: mostra la struttura parsata del feed MeteoAlarm.
- * GET /api/alerts/debug-feed?lat=44.0611&lon=12.5665
- */
-alertsRouter.get('/debug-feed', async (req, res) => {
-    const lat = parseFloat(req.query.lat as string);
-    const lon = parseFloat(req.query.lon as string);
-    if (isNaN(lat) || isNaN(lon)) {
-        return res.status(400).json({ error: 'lat/lon required' });
-    }
-    const result = await debugMeteoAlarmFeed(lat, lon);
-    return res.json(result);
-});
