@@ -97,7 +97,10 @@ export async function fetchMeteoAlarmAlerts(lat: number, lon: number): Promise<W
 
 	try {
 		const response = await fetch(feedUrl, {
-			headers: { 'Accept': 'application/atom+xml, application/xml, text/xml' },
+			headers: {
+				'Accept': '*/*',
+				'User-Agent': 'SmartMeteo/1.0',
+			},
 			signal: AbortSignal.timeout(8000),
 		});
 
@@ -259,7 +262,10 @@ export async function debugMeteoAlarmFeed(lat: number, lon: number): Promise<any
 
 	try {
 		const response = await fetch(feedUrl, {
-			headers: { 'Accept': 'application/atom+xml, application/xml, text/xml' },
+			headers: {
+				'Accept': '*/*',
+				'User-Agent': 'SmartMeteo/1.0',
+			},
 			signal: AbortSignal.timeout(8000),
 		});
 
