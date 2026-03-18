@@ -2,6 +2,95 @@ import express from 'express';
 import { supabase } from '../services/supabase';
 import { sendPushNotification, getAPNsHealthStatus } from '../services/apns';
 import { pollAlerts } from '../services/alertPoller';
+import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
+import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
+import { fetchOWMAlerts } from '../connectors/openweathermap';
+import { WeatherAlert } from '../types';
+
+/**
+ * Cache in-memory per le allerte live, evita di chiamare le API ad ogni richiesta.
+ * TTL: 5 minuti per cluster geografico (arrotondato a 0.1°).
+ */
+const liveAlertsCache = new Map<string, { alerts: WeatherAlert[]; fetchedAt: number }>();
+const LIVE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minuti
+
+function getLiveCacheKey(lat: number, lon: number): string {
+    return `${Math.round(lat * 10) / 10}_${Math.round(lon * 10) / 10}`;
+}
+
+/**
+ * Deduplicazione allerte multi-source (stessa logica di smartEngine).
+ */
+function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
+    if (alerts.length <= 1) return alerts;
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const deduplicated: WeatherAlert[] = [];
+    const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
+
+    for (const alert of alerts) {
+        const existingIdx = deduplicated.findIndex(existing => {
+            const eventA = (existing.event || existing.description || '').toLowerCase();
+            const eventB = (alert.event || alert.description || '').toLowerCase();
+            const eventSimilar = eventA.includes(eventB.slice(0, 10)) || eventB.includes(eventA.slice(0, 10));
+            const timeA = new Date(existing.effectiveTime).getTime();
+            const timeB = new Date(alert.effectiveTime).getTime();
+            const timeSimilar = Math.abs(timeA - timeB) < TWO_HOURS_MS;
+            return eventSimilar && timeSimilar;
+        });
+
+        if (existingIdx >= 0) {
+            const existing = deduplicated[existingIdx]!;
+            if ((severityRank[alert.severity] || 2) > (severityRank[existing.severity] || 2)) {
+                deduplicated[existingIdx] = alert;
+            }
+        } else {
+            deduplicated.push(alert);
+        }
+    }
+    return deduplicated;
+}
+
+/**
+ * Fetcha allerte live da tutte le fonti (WeatherKit, WeatherAPI, OWM) con cache.
+ */
+async function fetchLiveAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
+    const cacheKey = getLiveCacheKey(lat, lon);
+    const cached = liveAlertsCache.get(cacheKey);
+    if (cached && (Date.now() - cached.fetchedAt) < LIVE_CACHE_TTL_MS) {
+        return cached.alerts;
+    }
+
+    const results = await Promise.allSettled([
+        fetchFromWeatherKitWithAlerts(lat, lon)
+            .then(r => r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' })) || []),
+        fetchFromWeatherAPIWithAlerts(lat, lon)
+            .then(r => r?.alerts || []),
+        fetchOWMAlerts(lat, lon),
+    ]);
+
+    const allAlerts: WeatherAlert[] = [];
+    for (const result of results) {
+        if (result.status === 'fulfilled') allAlerts.push(...result.value);
+    }
+
+    const deduplicated = deduplicateAlerts(allAlerts).filter(
+        a => !a.expireTime || new Date(a.expireTime) > new Date()
+    );
+
+    console.log(`[AlertsRoute] Live fetch for ${lat},${lon}: raw=${allAlerts.length} deduplicated=${deduplicated.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',') || 'none'}`);
+
+    liveAlertsCache.set(cacheKey, { alerts: deduplicated, fetchedAt: Date.now() });
+
+    // Pulizia cache entries vecchie (max 100 entries)
+    if (liveAlertsCache.size > 100) {
+        const oldest = [...liveAlertsCache.entries()].sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
+        for (let i = 0; i < oldest.length - 50; i++) {
+            liveAlertsCache.delete(oldest[i]![0]);
+        }
+    }
+
+    return deduplicated;
+}
 
 export const alertsRouter = express.Router();
 
@@ -65,6 +154,8 @@ alertsRouter.post('/unsubscribe', async (req, res) => {
 
 /**
  * Restituisce le allerte meteo attive (non scadute) per una data area geografica.
+ * Fetcha allerte LIVE dalle fonti (WeatherKit, WeatherAPI, OWM) con cache 5min,
+ * e le merge con eventuali allerte già salvate nel DB.
  * Query params: lat, lon, radius (opzionale, default 0.5 gradi ~50km)
  */
 alertsRouter.get('/active', async (req, res) => {
@@ -77,25 +168,62 @@ alertsRouter.get('/active', async (req, res) => {
     }
 
     try {
+        // 1. Fetch allerte live dalle fonti (con cache 5 min)
+        const liveAlerts = await fetchLiveAlerts(lat, lon);
+
+        // 2. Fetch allerte dal DB (con filtro geografico)
         const now = new Date().toISOString();
-        const { data, error } = await supabase
+        const { data: dbAlerts, error } = await supabase
             .from('weather_alerts')
             .select('*')
             .gt('expire_time', now)
             .not('external_alert_id', 'is', null)
+            .gte('effective_time', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()) // ultimi 2 giorni
             .order('sent_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.warn('[AlertsRoute] DB query error (continuing with live only):', error.message);
+        }
 
-        // Deduplica per external_alert_id (una riga per allerta, non per sottoscrizione)
-        const seen = new Set<string>();
-        const unique = (data || []).filter(alert => {
-            if (!alert.external_alert_id || seen.has(alert.external_alert_id)) return false;
-            seen.add(alert.external_alert_id);
-            return true;
-        });
+        // 3. Merge: live alerts hanno priorità, DB alerts come fallback
+        const merged = new Map<string, WeatherAlert>();
 
-        return res.json({ alerts: unique });
+        // Prima le live alerts (fonte primaria)
+        for (const a of liveAlerts) {
+            merged.set(a.id, a);
+        }
+
+        // Poi le DB alerts (solo quelle non già presenti)
+        if (dbAlerts) {
+            const seen = new Set<string>();
+            for (const dbAlert of dbAlerts) {
+                const key = dbAlert.external_alert_id;
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                if (!merged.has(key)) {
+                    // Mappa formato DB → formato WeatherAlert
+                    merged.set(key, {
+                        id: key,
+                        description: dbAlert.message || '',
+                        severity: dbAlert.severity === 'critical' ? 'extreme' : dbAlert.severity === 'warning' ? 'moderate' : 'minor',
+                        effectiveTime: dbAlert.effective_time || '',
+                        expireTime: dbAlert.expire_time || '',
+                        areaName: dbAlert.area_name,
+                        eventSource: dbAlert.event_source,
+                        certainty: 'possible',
+                        providerSource: dbAlert.event_source,
+                    });
+                }
+            }
+        }
+
+        const alerts = Array.from(merged.values()).filter(
+            a => !a.expireTime || new Date(a.expireTime) > new Date()
+        );
+
+        console.log(`[AlertsRoute] /active response for ${lat},${lon}: live=${liveAlerts.length} db=${dbAlerts?.length || 0} merged=${alerts.length}`);
+
+        return res.json({ alerts });
     } catch (err: any) {
         console.error('Error in /alerts/active:', err.message);
         return res.status(500).json({ error: 'Impossibile recuperare le allerte attive', details: err.message });
