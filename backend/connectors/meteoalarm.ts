@@ -118,10 +118,26 @@ export async function fetchMeteoAlarmAlerts(lat: number, lon: number): Promise<W
 		const now = new Date();
 		const alerts: WeatherAlert[] = [];
 
+		// Debug: log structure of first entry to understand parsing
+		if (entries.length > 0) {
+			const first = entries[0];
+			console.log(`[MeteoAlarm] First entry keys: ${Object.keys(first).join(', ')}`);
+			const geocode = first['cap:geocode'] || first['geocode'];
+			console.log(`[MeteoAlarm] First geocode structure: ${JSON.stringify(geocode)}`);
+			console.log(`[MeteoAlarm] First areaDesc: ${JSON.stringify(first['cap:areaDesc'])}`);
+			console.log(`[MeteoAlarm] First event: ${JSON.stringify(first['cap:event'])}`);
+		}
+
 		for (const entry of entries) {
 			const geocode = entry['cap:geocode'] || entry['geocode'];
-			const areaId = geocode?.['cap:value'] || geocode?.['value'] || '';
-			const areaDesc = entry['cap:areaDesc'] || entry['areaDesc'] || '';
+			// fast-xml-parser parses <cap:geocode><value>IT008</value></cap:geocode>
+			// The child 'value' tag may be parsed as 'value' or 'cap:value' depending on config
+			const areaId = geocode?.['value'] || geocode?.['cap:value'] ||
+						   (typeof geocode === 'string' ? geocode : '') || '';
+			// areaDesc: try cap:areaDesc, then link title
+			const links = Array.isArray(entry['link']) ? entry['link'] : (entry['link'] ? [entry['link']] : []);
+			const linkTitle = links.find((l: any) => l['@_title'])?.['@_title'] || '';
+			const areaDesc = entry['cap:areaDesc'] || entry['areaDesc'] || linkTitle;
 
 			// Filtra per regione: verifica se l'area corrisponde alla posizione
 			const regionMatch = matchRegion(areaId, areaDesc, lat, lon, countryCode);
@@ -158,7 +174,7 @@ export async function fetchMeteoAlarmAlerts(lat: number, lon: number): Promise<W
 				severity: mapSeverity(severity),
 				source: 'MeteoAlarm',
 				urgency: (entry['cap:urgency'] || 'future').toLowerCase(),
-				detailsUrl: entry['link']?.['@_href'] || `https://meteoalarm.org`,
+				detailsUrl: links[0]?.['@_href'] || `https://meteoalarm.org`,
 				providerSource: 'meteoalarm',
 			});
 		}
@@ -182,22 +198,28 @@ function matchRegion(
 	countryCode: string
 ): { name: string } | null {
 	if (countryCode === 'IT') {
-		// Match per EMMA_ID (es. "IT008" → Emilia-Romagna)
+		// 1. Match diretto per EMMA_ID (es. "IT008") — verifica che la posizione sia nel bbox
 		const region = ITALY_REGIONS[areaId];
 		if (region && isInBbox(lat, lon, region.bbox)) {
 			return { name: region.name };
 		}
 
-		// Fallback: controlla tutte le regioni per bounding box
-		for (const [, reg] of Object.entries(ITALY_REGIONS)) {
-			if (isInBbox(lat, lon, reg.bbox) && areaDesc.toLowerCase().includes(reg.name.toLowerCase().slice(0, 6))) {
-				return { name: reg.name };
+		// 2. Fallback: cerca la regione che contiene la posizione tra tutte
+		//    e verifica se l'areaId o areaDesc corrisponde
+		for (const [id, reg] of Object.entries(ITALY_REGIONS)) {
+			if (isInBbox(lat, lon, reg.bbox)) {
+				// Match se areaId corrisponde O se il nome regione appare nell'areaDesc
+				if (areaId === id ||
+					areaDesc.toLowerCase().includes(reg.name.toLowerCase().slice(0, 5)) ||
+					reg.name.toLowerCase().includes(areaDesc.toLowerCase().slice(0, 5))) {
+					return { name: reg.name };
+				}
 			}
 		}
 	}
 
 	// Fallback generico: accetta se l'area è nazionale o se contiene "all"
-	const descLower = areaDesc.toLowerCase();
+	const descLower = (areaDesc || '').toLowerCase();
 	if (descLower.includes('national') || descLower.includes('tutto') || descLower === '') {
 		return { name: areaDesc || countryCode };
 	}
