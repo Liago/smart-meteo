@@ -3,7 +3,7 @@
 # Questo deploy gestisce solo le Netlify Functions (API backend).
 
 [build]
-  command = "cd backend && npm install"
+  command = "npm install && cd backend && npm install"
   publish = "backend/public"
   functions = "netlify/functions"
 
