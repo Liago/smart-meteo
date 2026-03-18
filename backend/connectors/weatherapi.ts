@@ -58,34 +58,30 @@ function mapWeatherAPISeverity(severity: string | undefined): string {
 }
 
 export async function fetchFromWeatherAPIWithAlerts(lat: number, lon: number): Promise<{ forecast: UnifiedForecast; alerts: WeatherAlert[] } | null> {
-	const result = await fetchFromWeatherAPI(lat, lon);
-	if (!result) return null;
-	// Le allerte vengono parsate dentro fetchFromWeatherAPI e salvate in _lastAlerts
-	return { forecast: result, alerts: _lastAlerts };
-}
-
-let _lastAlerts: WeatherAlert[] = [];
-
-export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<UnifiedForecast | null> {
 	const apiKey = process.env.WEATHERAPI_KEY;
-	if (!apiKey) {
-		console.error('Missing WEATHERAPI_KEY');
-		return null;
-	}
+	if (!apiKey) return null;
 
 	try {
-		// Use forecast.json instead of current.json — includes current + forecast + astronomy
 		const response = await axios.get(WEATHERAPI_URL, {
-			params: {
-				key: apiKey,
-				q: `${lat},${lon}`,
-				days: 7,
-				aqi: 'yes',
-				alerts: 'yes'
-			}
+			params: { key: apiKey, q: `${lat},${lon}`, days: 7, aqi: 'yes', alerts: 'yes' }
 		});
 
-		const data = response.data;
+		const alerts = parseWeatherAPIAlerts(response.data.alerts);
+		const forecast = buildForecastFromData(response.data, lat, lon);
+		if (!forecast) return null;
+
+		return { forecast, alerts };
+	} catch (error: any) {
+		console.error('Error in fetchFromWeatherAPIWithAlerts:', error.message);
+		return null;
+	}
+}
+
+/**
+ * Costruisce un UnifiedForecast dai dati raw della risposta WeatherAPI.
+ */
+function buildForecastFromData(data: any, lat: number, lon: number): UnifiedForecast | null {
+	try {
 		const current = data.current;
 
 		const aqiData = current.air_quality;
@@ -174,17 +170,35 @@ export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<Uni
 			forecastPayload.astronomy = astronomy;
 		}
 
-		// Parsa allerte dalla risposta
-		_lastAlerts = parseWeatherAPIAlerts(data.alerts);
-		if (_lastAlerts.length > 0) {
-			console.log(`[WeatherAPI] Found ${_lastAlerts.length} alert(s) for ${lat},${lon}`);
-		}
-
 		return new UnifiedForecast(forecastPayload);
+	} catch (error: any) {
+		console.error('Error building WeatherAPI forecast:', error.message);
+		return null;
+	}
+}
+
+export async function fetchFromWeatherAPI(lat: number, lon: number): Promise<UnifiedForecast | null> {
+	const apiKey = process.env.WEATHERAPI_KEY;
+	if (!apiKey) {
+		console.error('Missing WEATHERAPI_KEY');
+		return null;
+	}
+
+	try {
+		const response = await axios.get(WEATHERAPI_URL, {
+			params: {
+				key: apiKey,
+				q: `${lat},${lon}`,
+				days: 7,
+				aqi: 'yes',
+				alerts: 'yes'
+			}
+		});
+
+		return buildForecastFromData(response.data, lat, lon);
 
 	} catch (error: any) {
 		console.error('Error fetching WeatherAPI:', error.message);
-		_lastAlerts = [];
 		return null;
 	}
 }
