@@ -37,7 +37,18 @@ app.use(cors({
 }));
 
 app.use(express.json());
-// Fallback: capture body as text when express.json() fails (serverless compatibility)
+// Fallback: in ambienti serverless (Netlify Functions) il body può arrivare come stringa
+// anche dopo express.json(). Questo middleware lo ri-parsa se necessario.
+app.use((req: Request, _res: Response, next: NextFunction) => {
+	if (typeof req.body === 'string' && req.body.length > 0) {
+		try {
+			req.body = JSON.parse(req.body);
+		} catch {
+			// Non è JSON valido, lascia il body com'è
+		}
+	}
+	next();
+});
 app.use(express.text({ type: 'application/json' }));
 
 app.get('/', (req: Request, res: Response) => {
