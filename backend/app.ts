@@ -49,7 +49,6 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 	}
 	next();
 });
-app.use(express.text({ type: 'application/json' }));
 
 app.get('/', (req: Request, res: Response) => {
 	res.json({
