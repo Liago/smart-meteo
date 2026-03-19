@@ -37,14 +37,21 @@ app.use(cors({
 }));
 
 app.use(express.json());
-// Fallback: in ambienti serverless (Netlify Functions) il body può arrivare come stringa
-// anche dopo express.json(). Questo middleware lo ri-parsa se necessario.
+// Fallback: in Netlify Functions il body può arrivare come Buffer o stringa
+// invece di essere parsato da express.json(). Questo middleware lo gestisce.
 app.use((req: Request, _res: Response, next: NextFunction) => {
-	if (typeof req.body === 'string' && req.body.length > 0) {
+	if (req.body && typeof req.body === 'object' && req.body.type === 'Buffer' && Array.isArray(req.body.data)) {
+		try {
+			const str = Buffer.from(req.body.data).toString('utf-8');
+			req.body = JSON.parse(str);
+		} catch {
+			// Non è JSON valido, lascia il body com'è
+		}
+	} else if (typeof req.body === 'string' && req.body.length > 0) {
 		try {
 			req.body = JSON.parse(req.body);
 		} catch {
-			// Non è JSON valido, lascia il body com'è
+			// Non è JSON valido
 		}
 	}
 	next();
