@@ -40,10 +40,9 @@ app.use(express.json());
 // Fallback: in Netlify Functions il body può arrivare come Buffer o stringa
 // invece di essere parsato da express.json(). Questo middleware lo gestisce.
 app.use((req: Request, _res: Response, next: NextFunction) => {
-	if (req.body && typeof req.body === 'object' && req.body.type === 'Buffer' && Array.isArray(req.body.data)) {
+	if (Buffer.isBuffer(req.body)) {
 		try {
-			const str = Buffer.from(req.body.data).toString('utf-8');
-			req.body = JSON.parse(str);
+			req.body = JSON.parse(req.body.toString('utf-8'));
 		} catch {
 			// Non è JSON valido, lascia il body com'è
 		}
