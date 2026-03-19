@@ -56,18 +56,6 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 	next();
 });
 
-// DEBUG temporaneo: ispeziona come arriva il body nelle Netlify Functions
-app.post('/api/debug-body', (req: Request, res: Response) => {
-	res.json({
-		bodyType: typeof req.body,
-		bodyValue: req.body,
-		bodyIsNull: req.body === null,
-		bodyIsUndefined: req.body === undefined,
-		contentType: req.headers['content-type'],
-		bodyKeys: typeof req.body === 'object' && req.body !== null ? Object.keys(req.body) : [],
-	});
-});
-
 app.get('/', (req: Request, res: Response) => {
 	res.json({
 		service: 'Smart Meteo API',
