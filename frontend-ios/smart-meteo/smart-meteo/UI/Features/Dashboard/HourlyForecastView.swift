@@ -14,6 +14,7 @@ struct HourlyForecastView: View {
     let hourly: [HourlyForecast]
     let astronomy: AstronomyData?
     let current: ForecastCurrent?
+    let daily: [DailyForecast]?
     
     // MARK: - Processed Data
     struct DayPeriod: Identifiable {
@@ -63,7 +64,9 @@ struct HourlyForecastView: View {
                 .padding(.horizontal, 8)
             
             // Generate dynamic description
-            let dynamicDesc = generateDailyDescription()
+            let dynamicDesc = WeatherDescriptionEngine.generateEnhancedDescription(
+                current: current, hourly: hourly, daily: daily, astronomy: astronomy
+            )
             
             Text(dynamicDesc)
                 .font(.subheadline)
@@ -151,29 +154,7 @@ struct HourlyForecastView: View {
     }
 
     private func extractTime(from isoDateStr: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var d = formatter.date(from: isoDateStr)
-        if d == nil {
-            formatter.formatOptions = [.withInternetDateTime]
-            d = formatter.date(from: isoDateStr)
-        }
-        
-        guard let date = d else {
-            // Fallback: try to just extract HH:mm if it's already a time string or simple date
-            if isoDateStr.contains("T") {
-                let parts = isoDateStr.split(separator: "T")
-                if parts.count > 1 {
-                    let timeStr = String(parts[1])
-                    return String(timeStr.prefix(5)) // take HH:mm
-                }
-            }
-            return isoDateStr.count >= 5 ? String(isoDateStr.prefix(5)) : isoDateStr
-        }
-        
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm" // 24h format
-        return f.string(from: date)
+        WeatherDescriptionEngine.extractTime(from: isoDateStr)
     }
     
     private func processData() {
@@ -356,132 +337,6 @@ struct HourlyForecastView: View {
         self.chartData = ChartData(items: items, minTemp: minTemp, maxTemp: maxTemp, width: width, height: height, periods: periods)
     }
     
-    private func generateDailyDescription() -> String {
-        let calendar = Calendar.current
-        
-        let formatters: [ISO8601DateFormatter] = [
-            {
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                return f
-            }(),
-            {
-                let f = ISO8601DateFormatter()
-                f.formatOptions = [.withInternetDateTime]
-                return f
-            }()
-        ]
-        
-        let simpleFormatter = DateFormatter()
-        simpleFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        
-        func parseDate(_ str: String) -> Date? {
-            for f in formatters {
-                if let d = f.date(from: str) { return d }
-            }
-            return simpleFormatter.date(from: str)
-        }
-        
-        var morningCodes: [Int: Int] = [:]
-        var afternoonCodes: [Int: Int] = [:]
-        var eveningCodes: [Int: Int] = [:]
-        var maxTemp: Double = -100
-        var minTemp: Double = 100
-        var hasTodayData = false
-        
-        for h in hourly {
-            guard let date = parseDate(h.time), calendar.isDateInToday(date) else { continue }
-            hasTodayData = true
-            let hour = calendar.component(.hour, from: date)
-            let code = Int(h.conditionCode) ?? normalizedToWMO(h.conditionCode)
-            
-            if hour >= 6 && hour < 12 {
-                morningCodes[code, default: 0] += 1
-            } else if hour >= 12 && hour < 18 {
-                afternoonCodes[code, default: 0] += 1
-            } else if hour >= 18 && hour < 24 {
-                eveningCodes[code, default: 0] += 1
-            }
-            
-            if h.temp > maxTemp { maxTemp = h.temp }
-            if h.temp < minTemp { minTemp = h.temp }
-        }
-        
-        if !hasTodayData {
-            return "Previsioni dettagliate per la giornata odierna in fase di aggiornamento."
-        }
-        
-        func topCondition(_ codes: [Int: Int]) -> Int? {
-            return codes.max(by: { $0.value < $1.value })?.key
-        }
-        
-        let topMorning = topCondition(morningCodes)
-        let topAfternoon = topCondition(afternoonCodes)
-        let topEvening = topCondition(eveningCodes)
-        
-        let firstCode = topAfternoon ?? topMorning ?? topEvening ?? 0
-        let secondCode = topEvening ?? topAfternoon ?? 0
-        
-        let timePeriod1 = topAfternoon != nil ? "questo pomeriggio" : (topMorning != nil ? "questa mattina" : "questa sera")
-        let timePeriod2 = (topEvening != nil && topAfternoon != nil) ? "in serata" : "più tardi"
-        
-        var desc = "Cieli \(conditionAdjectivePlural(for: firstCode)) \(timePeriod1)"
-        if firstCode != secondCode && topEvening != nil {
-            desc += ", \(conditionAdjectiveSingular(for: secondCode)) \(timePeriod2)."
-        } else {
-            desc += " e \(timePeriod2)."
-        }
-        
-        if maxTemp > -100 {
-            desc += " Temperature previste tra \(Int(round(minTemp)))° e \(Int(round(maxTemp)))°."
-        }
-        
-        let sunsetStr = astronomy?.sunset ?? "17:10"
-        let sunsetTime = extractTime(from: sunsetStr)
-        desc += " Tramonto alle \(sunsetTime)."
-        
-        return desc
-    }
-    
-    private func normalizedToWMO(_ code: String) -> Int {
-        switch code.lowercased() {
-        case "clear": return 0
-        case "cloudy": return 3
-        case "rain": return 61
-        case "snow": return 71
-        case "storm": return 95
-        case "fog": return 45
-        default: return 0
-        }
-    }
-
-    private func conditionAdjectivePlural(for code: Int) -> String {
-        switch code {
-        case 0: return "sereni"
-        case 1, 2: return "poco nuvolosi"
-        case 3: return "coperti"
-        case 45, 48: return "nebbiosi"
-        case 51...57: return "con pioviggine"
-        case 61...67, 80...81: return "con pioggia"
-        case 71...77, 85...86: return "con neve"
-        case 82, 95...99: return "temporaleschi"
-        default: return "variabili"
-        }
-    }
-    
-    private func conditionAdjectiveSingular(for code: Int) -> String {
-        switch code {
-        case 0: return "sereno"
-        case 1, 2: return "poco nuvoloso"
-        case 3: return "coperto"
-        case 45, 48: return "nebbioso"
-        case 51...57: return "con pioviggine"
-        case 61...67, 80...81: return "piovoso"
-        case 71...77, 85...86: return "nevoso"
-        case 82, 95...99: return "temporalesco"
-        default: return "variabile"
-        }
-    }
 }
 
 // MARK: - Subviews

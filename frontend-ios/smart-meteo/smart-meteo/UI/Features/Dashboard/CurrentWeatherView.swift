@@ -654,6 +654,14 @@ struct AirQualityBalloon: View {
                 Text("Qualità dell'aria")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
+
+                Text(WeatherDescriptionEngine.aqiCategoryLabel(airQuality.aqiUsEpa))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(WeatherDescriptionEngine.aqiCategoryColor(airQuality.aqiUsEpa)))
+
                 Spacer()
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
@@ -661,6 +669,11 @@ struct AirQualityBalloon: View {
                         .foregroundColor(.gray.opacity(0.5))
                 }
             }
+
+            Text(WeatherDescriptionEngine.generateAirQualityDescription(airQuality: airQuality))
+                .font(.system(size: 13))
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.3))
+                .lineSpacing(2)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 AQIDetailItem(label: "PM2.5", value: airQuality.pm25, unit: "µg/m³")
@@ -672,7 +685,7 @@ struct AirQualityBalloon: View {
             }
         }
         .padding(14)
-        .frame(width: 280)
+        .frame(width: 300)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.white)
