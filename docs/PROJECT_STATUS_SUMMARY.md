@@ -1,7 +1,7 @@
 # Riepilogo Stato Progetto — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-03-11
+> **Ultimo aggiornamento:** 2026-04-01
 > **Scopo:** Riepilogo dello stato di implementazione, gap identificati e migliorie future
 
 ---
@@ -10,9 +10,9 @@
 
 | Fase | Descrizione | Completamento | Note |
 |------|-------------|:------------:|------|
-| **Fase 1** | Backend Core (connettori, Smart Engine, API, DB) | **100%** | 9 connettori attivi (incl. Apple WeatherKit), engine con media pesata + voting |
+| **Fase 1** | Backend Core (connettori, Smart Engine, API, DB) | **100%** | 8 connettori attivi (Weatherstack disabilitato: HTTP non sicuro), engine con media pesata + voting |
 | **Fase 2** | Frontend Web MVP (Next.js, Glassmorphism, SWR) | **~95%** | Mancano: test E2E Playwright, audit Lighthouse |
-| **Fase 3** | iOS App (SwiftUI, MVVM, Supabase) | **~98%** | Manca: Widget iOS |
+| **Fase 3** | iOS App (SwiftUI, MVVM, Supabase) | **100%** | Widget iOS implementati (WidgetKit) |
 | **API Improvements** | Bug fix + espansione fonti + nuovi campi | **~98%** | Backend 100%, Web 100%, iOS ~95% |
 | **Fase 5A** | Estrazione campi mancanti backend | **100%** | visibility, uvIndex, cloudCover, dewPoint, moonrise/moonset, hourly AccuWeather |
 | **Fase 5B** | iOS: nuovi campi API + card UV/AQI | **100%** | Modello aggiornato, 6 card flippabili, dettaglio AQI |
@@ -24,8 +24,10 @@
 ## 2. Cosa e stato fatto
 
 ### Fase 1 — Backend Core
-- 9 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack, Meteostat, WWO, Apple WeatherKit
-- Smart Engine V1 con aggregazione pesata (pesi da 0.8 a 1.2)
+- 9 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack (disabilitato: HTTP), Meteostat, WWO, Apple WeatherKit
+- Smart Engine V1 con aggregazione pesata (pesi da 0.8 a 1.2) — Weatherstack escluso (peso 0, HTTP non sicuro)
+- Sistema allerte meteo completo: 4 fonti (WeatherKit, WeatherAPI, OWM, MeteoAlarm), push APNs, polling 15min, deduplicazione multi-source, cooldown 6h anti-spam
+- Migrazioni DB fino a 019 (push notifications, alert enhancement, delivery log)
 - API Express: `/api/forecast`, `/api/sources`, `/api/health`
 - Database Supabase con 12 migration, RLS, trigger, funzioni utility
 - Deploy su Netlify Functions (serverless)
@@ -152,9 +154,19 @@
 
 ### 3.4 Database ✅ VERIFICATO
 
-- Migration 013 (`full_data JSONB`) presente nel file system — **da verificare esecuzione su Supabase Dashboard**
+- Migrazioni 001-019 presenti nel file system (incluse 017-019 per push notifications e allerte)
+- Migration 013 (`full_data JSONB`), 014-016 (sync sources, accuracy, WeatherKit), 017-019 (alert system) tutte applicate
 - Migration 010 (5 fonti) + 012 (3 fonti aggiuntive con `ON CONFLICT`) coprono tutte 8 fonti del backend
-- **Azione richiesta:** verificare esecuzione migration su Supabase Dashboard o via `supabase db push`
+
+### 3.5 Sistema Allerte Meteo ✅ COMPLETATO
+
+- 4 fonti allerte: WeatherKit, WeatherAPI, OpenWeatherMap, MeteoAlarm (EUMETNET)
+- Push notification via APNs con deduplicazione multi-source
+- Polling automatico ogni 15 minuti (Netlify Scheduled Function)
+- Cooldown 6h per subscription per prevenire spam notifiche
+- ID allerta deterministici per deduplicazione stabile nel DB
+- Delivery log per audit e monitoraggio
+- Fix critico (2026-04-01): risolto bug ID non-deterministici che causavano decine di notifiche duplicate
 
 ---
 
@@ -186,7 +198,7 @@
 
 | # | Miglioramento | Stato | Documento |
 |---|---------------|:-----:|-----------|
-| 13 | Weatherstack: migrazione a HTTPS | ⏳ | `VALUTAZIONI_TECNICHE.md` §1 |
+| 13 | Weatherstack: migrazione a HTTPS | ✅ | Disabilitato (peso 0) — `VALUTAZIONI_TECNICHE.md` §1 |
 | 14 | SpriteKit particle effects iOS | ✅ | Fase 5D.3 |
 | 15 | Cloud cover per accuratezza `condition_code` | ✅ | Fase 5D.4 |
 | 16 | Moonrise/moonset da WWO | ✅ | Fase 5A.5 |

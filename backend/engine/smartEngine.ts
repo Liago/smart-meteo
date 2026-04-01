@@ -23,7 +23,7 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'weatherapi': 1.0,
 	'accuweather': 1.1,
 	'worldweatheronline': 1.0,
-	'weatherstack': 0.9,
+	'weatherstack': 0, // Disabilitato: il piano free usa HTTP non cifrato (no HTTPS)
 	'meteostat': 0.8,
 	'apple_weatherkit': 1.2
 };
@@ -195,7 +195,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	}
 
 	// 3. Fetch from External & Load Accuracies
-	const activeSources = sources.filter(s => s.active);
+	const activeSources = sources.filter(s => s.active && (SOURCE_WEIGHTS[s.id] ?? 1) > 0);
 	const accuracyMapPromise = getAccuracyMap();
 
 	// Raccoglie le allerte da tutte le fonti durante il fetch
@@ -368,12 +368,13 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		if (f.daily && Array.isArray(f.daily)) {
 			f.daily.forEach(d => {
 				if (!dailyMap.has(d.date)) {
-					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [] });
+					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [] });
 				}
 				const entry = dailyMap.get(d.date)!;
 				if (d.temp_max !== null) entry.temp_max.push(d.temp_max);
 				if (d.temp_min !== null) entry.temp_min.push(d.temp_min);
 				if (d.precipitation_prob !== null) entry.precip_prob.push(d.precipitation_prob);
+				if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
 				entry.codes.push(d.condition_code);
 			});
 		}
@@ -390,13 +391,15 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
 		const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
 
+		const uvMax = data.uv_index_max.length > 0 ? Math.max(...data.uv_index_max) : undefined;
 		return {
 			date,
 			temp_max: avgSimple(data.temp_max),
 			temp_min: avgSimple(data.temp_min),
 			precipitation_prob: avgSimple(data.precip_prob) || 0,
 			condition_code: bestCode,
-			condition_text: bestCode.toUpperCase()
+			condition_text: bestCode.toUpperCase(),
+			...(uvMax !== undefined && { uv_index_max: uvMax }),
 		};
 	});
 

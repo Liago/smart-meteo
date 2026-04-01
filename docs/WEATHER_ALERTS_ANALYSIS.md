@@ -1,7 +1,9 @@
 # Analisi Sistema Allerte Meteo — Smart Meteo
 
 **Data:** 2026-03-17
-**Problema:** Il 16 marzo 2026 era attiva un'allerta meteo per vento, ma l'app non ha segnalato nulla.
+**Ultimo aggiornamento:** 2026-04-01
+**Problema originale:** Il 16 marzo 2026 era attiva un'allerta meteo per vento, ma l'app non ha segnalato nulla.
+**Problema successivo (risolto 2026-04-01):** ID allerta non-deterministici (Date.now/Math.random) nei connettori WeatherKit, WeatherAPI e OWM causavano bypass della deduplicazione, generando 57 notifiche duplicate in un giorno. Fix: ID deterministici basati su area/severity/effectiveTime + cooldown 6h per subscription.
 
 ---
 

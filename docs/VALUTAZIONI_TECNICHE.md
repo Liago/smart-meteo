@@ -1,7 +1,8 @@
 # Valutazioni Tecniche — Decisioni Pendenti
 
 > **Data:** 2026-03-10
-> **Stato:** In valutazione
+> **Ultimo aggiornamento:** 2026-04-01
+> **Stato:** Parzialmente risolto
 > **Scopo:** Analisi e raccomandazioni per decisioni che richiedono valutazione prima dell'implementazione
 
 ---
@@ -15,9 +16,10 @@
 
 ---
 
-## 1. Weatherstack — Migrazione HTTPS
+## 1. Weatherstack — Migrazione HTTPS ✅ RISOLTO
 
-> Punto 13 del PROJECT_STATUS_SUMMARY (Bassa Priorità)
+> Punto 13 del PROJECT_STATUS_SUMMARY — **Risolto 2026-04-01**
+> **Decisione:** Opzione D — Disabilitato il connector (peso impostato a 0, escluso dal fetch)
 
 ### Contesto
 
