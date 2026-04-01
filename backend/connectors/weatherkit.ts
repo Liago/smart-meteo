@@ -122,7 +122,7 @@ function parseWeatherAlerts(data: any): WeatherAlert[] {
     if (!Array.isArray(alertsData) || alertsData.length === 0) return [];
 
     return alertsData.map((a: any) => ({
-        id: a.id || `wk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: a.id || `wk:${(a.areaId || 'unknown')}_${(a.severity || 'mod')}_${a.effectiveTime || a.issuedTime || 'notime'}`,
         areaId: a.areaId,
         areaName: a.areaName,
         certainty: a.certainty || 'possible',

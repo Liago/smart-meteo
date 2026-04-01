@@ -144,7 +144,7 @@ export async function fetchOWMAlerts(lat: number, lon: number): Promise<WeatherA
 		console.log(`[OWM] Found ${alertsData.length} alert(s) for ${lat},${lon}`);
 
 		return alertsData.map((a: any) => ({
-			id: `owm:${a.event || 'unknown'}_${a.start || Date.now()}`,
+			id: `owm:${a.event || 'unknown'}_${a.start || 'notime'}`,
 			description: a.description || a.event || 'Weather alert',
 			headline: a.event || undefined,
 			event: a.event || undefined,

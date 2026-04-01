@@ -32,7 +32,7 @@ function parseWeatherAPIAlerts(alertsData: any): WeatherAlert[] {
 	if (!alertsData?.alert || !Array.isArray(alertsData.alert)) return [];
 
 	return alertsData.alert.map((a: any) => ({
-		id: `weatherapi:${a.event || 'unknown'}_${a.effective || Date.now()}`,
+		id: `weatherapi:${a.event || 'unknown'}_${a.effective || 'notime'}`,
 		description: a.desc || a.headline || 'Weather alert',
 		headline: a.headline || undefined,
 		event: a.event || undefined,

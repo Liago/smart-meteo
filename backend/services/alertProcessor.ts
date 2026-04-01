@@ -42,6 +42,12 @@ function alertTitle(severity: string): string {
 const LOCATION_RADIUS_DEG = 0.5;
 
 /**
+ * Cooldown in ore: non inviare la stessa tipologia di allerta allo stesso dispositivo
+ * entro questo intervallo, anche se l'external_alert_id cambia (protezione anti-spam).
+ */
+const COOLDOWN_HOURS = 6;
+
+/**
  * Processa le allerte meteo ricevute da WeatherKit.
  * 1. Filtra allerte scadute o già inviate
  * 2. Trova sottoscrizioni nella zona interessata
@@ -58,7 +64,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 	console.log(`${logPrefix} Processing ${alerts.length} alert(s) for area ${lat},${lon}`);
 
-	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
+	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, skippedCooldown: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
 
 	for (const alert of alerts) {
 		// Salta allerte scadute
@@ -131,6 +137,22 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				: alert.description;
 
 			for (const sub of subscriptions) {
+				// Cooldown: controlla se questa subscription ha già ricevuto un'allerta simile di recente
+				const cooldownSince = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
+				const { data: recentAlerts } = await supabase
+					.from('weather_alerts')
+					.select('id')
+					.eq('subscription_id', sub.id)
+					.eq('alert_type', alert.severity)
+					.gte('sent_at', cooldownSince)
+					.limit(1);
+
+				if (recentAlerts && recentAlerts.length > 0) {
+					console.log(`${logPrefix} Cooldown active: sub=${sub.id} already received ${alert.severity} alert in last ${COOLDOWN_HOURS}h, skipping`);
+					stats.skippedCooldown++;
+					continue;
+				}
+
 				const payload = {
 					categoryId: 'WEATHER_ALERT',
 					customData: {
@@ -196,5 +218,5 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 		}
 	}
 
-	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate}`);
+	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate} skippedCooldown=${stats.skippedCooldown}`);
 }
