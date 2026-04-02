@@ -52,11 +52,11 @@
 | `temperature` | ✅ | ✅ | |
 | `precipitationChance` | ✅ | ✅ | |
 | `conditionCode` | ✅ | ✅ | |
-| `humidity` | ❌ | — | Disponibile ma non estratto |
+| `humidity` | ✅ | ✅ | Convertito da 0-1 a 0-100, aggregato hourly |
 | `pressure` | ❌ | — | Disponibile ma non estratto |
 | `visibility` | ❌ | — | Disponibile ma non estratto |
-| `uvIndex` | ❌ | — | Disponibile ma non estratto |
-| `windSpeed` | ❌ | — | Disponibile ma non estratto |
+| `uvIndex` | ✅ | ✅ | Aggregato hourly |
+| `windSpeed` | ✅ | ✅ | Convertito da km/h a m/s, aggregato hourly |
 | `windDirection` | ❌ | — | Disponibile ma non estratto |
 | `cloudCover` | ❌ | — | Disponibile ma non estratto |
 | `snowfallIntensity` | ❌ | — | Disponibile ma non estratto |
@@ -130,63 +130,40 @@ Forecast request → Smart Engine → WeatherKit API (con weatherAlerts)
 
 ---
 
-### 2.2 — `forecastNextHour`
+### 2.2 — `forecastNextHour` ✅ IMPLEMENTATO
 
 **Cosa fornisce:** Previsione precipitazioni minuto-per-minuto per la prossima ora (disponibile solo in alcuni paesi, inclusa l'Italia).
 
 **Caso d'uso:** Notifiche tipo "Pioggia prevista tra 15 minuti nella tua zona".
 
-**Struttura:**
-```json
-{
-  "forecastNextHour": {
-    "summary": [
-      {
-        "condition": "rain",
-        "startTime": "2026-03-11T14:15:00Z",
-        "endTime": "2026-03-11T14:45:00Z",
-        "precipitationChance": 0.85,
-        "precipitationIntensity": 2.3
-      }
-    ],
-    "minutes": [
-      { "startTime": "...", "precipitationChance": 0.0, "precipitationIntensity": 0.0 },
-      ...
-    ]
-  }
-}
-```
+**Implementazione completata (2026-04-02):**
 
-**Priorità:** Media — utile per UX avanzata ma richiede un sistema di polling/cron per essere efficace nelle notifiche.
+1. ✅ **Tipi** aggiunti in `backend/types.ts`: `MinutelyPrecipitation` e `ForecastNextHour`
+2. ✅ **Dataset** `forecastNextHour` aggiunto alla richiesta WeatherKit (entrambe le funzioni: `fetchFromWeatherKit` e `fetchFromWeatherKitWithAlerts`)
+3. ✅ **Parser** `parseForecastNextHour()` in `backend/connectors/weatherkit.ts` — estrae summary + minutes, normalizza precipitationChance da 0-1 a 0-100
+4. ✅ **`UnifiedForecast`** esteso con campo `forecastNextHour` in `backend/utils/formatter.ts`
+5. ✅ **Smart Engine** propaga `forecastNextHour` dalla fonte WeatherKit al risultato finale (non aggregabile, singola fonte)
 
 ---
 
 ## 3. Gap nell'Aggregazione Smart Engine
 
-### 3.1 — `uv_index_max` nel Daily
+### 3.1 — `uv_index_max` nel Daily ✅ COMPLETATO
 
-Il campo `uv_index_max` viene estratto dal connettore WeatherKit (e anche da Tomorrow.io) nel daily forecast, ma **l'aggregazione daily nello Smart Engine non lo include nell'output**.
+**Stato:** ✅ Implementato nel commit `1e84908` — `uv_index_max` aggiunto all'aggregazione daily nello Smart Engine.
 
-**File:** `backend/engine/smartEngine.ts` righe 246-277
-**Problema:** Il `dailyMap` aggrega solo `temp_max`, `temp_min`, `precip_prob` e `codes`. Non raccoglie `uv_index_max`.
+### 3.2 — Hourly Data Arricchiti ✅ COMPLETATO
 
-**Fix suggerito:** Aggiungere `uv_index_max` alla daily aggregation:
-```typescript
-// Nel dailyMap
-dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [] });
+**Stato:** ✅ Implementato — `humidity`, `wind_speed`, `uv_index` aggiunti a `HourlyForecast` in `types.ts`, estratti da tutti e 7 i connettori attivi (Open-Meteo, Tomorrow.io, OWM, AccuWeather, WeatherAPI, WeatherKit, WWO) e aggregati con media semplice nello Smart Engine.
 
-// Nell'iterazione
-if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
-
-// Nell'output
-uv_index_max: avgSimple(data.uv_index_max)
-```
-
-### 3.2 — Hourly Data Arricchiti
-
-Attualmente l'aggregazione hourly usa solo `temp`, `precipitation_prob` e `condition_code`. Aggiungere `humidity`, `windSpeed`, `uvIndex` per ora renderebbe il drill-down orario più informativo nel frontend.
-
-**Effort:** Medio — richiede estendere `HourlyForecast` in `types.ts`, aggiornare i connettori che forniscono dati hourly arricchiti (WeatherKit, Open-Meteo, WeatherAPI), e modificare l'aggregazione hourly nel Smart Engine.
+**Connettori aggiornati:**
+- Open-Meteo: `relative_humidity_2m`, `wind_speed_10m`, `uv_index` aggiunti ai params hourly
+- Tomorrow.io: `humidity`, `windSpeed`, `uvIndex` estratti dal forecast hourly
+- OpenWeatherMap: `humidity`, `wind.speed` estratti dai slot 3h
+- AccuWeather: `RelativeHumidity`, `Wind.Speed.Value` (km/h→m/s), `UVIndex` dal 12h hourly
+- WeatherAPI: `humidity`, `wind_kph` (km/h→m/s), `uv` dall'hourly
+- WeatherKit: `humidity` (0-1→%), `windSpeed` (km/h→m/s), `uvIndex` dall'hourly
+- WWO: `humidity`, `windspeedKmph` (km/h→m/s), `uvIndex` dall'hourly
 
 ---
 
@@ -195,11 +172,11 @@ Attualmente l'aggregazione hourly usa solo `temp`, `precipitation_prob` e `condi
 | # | Miglioramento | Impatto | Effort | Stato |
 |---|---------------|---------|--------|-------|
 | 1 | **`weatherAlerts`** → Push notifications automatiche | Alto | Medio | ✅ Completato |
-| 2 | **`uv_index_max`** nell'aggregazione daily | Basso | Basso | Da fare |
-| 3 | **`forecastNextHour`** → Notifiche precipitazioni imminenti | Medio | Medio | Da fare |
-| 4 | **Hourly arricchiti** (humidity, wind, UV per ora) | Medio | Medio | Da fare |
+| 2 | **`uv_index_max`** nell'aggregazione daily | Basso | Basso | ✅ Completato (commit `1e84908`) |
+| 3 | **`forecastNextHour`** → Previsione precipitazione minuto-per-minuto | Medio | Medio | ✅ Completato |
+| 4 | **Hourly arricchiti** (humidity, wind, UV per ora) | Medio | Medio | ✅ Completato |
 | 5 | **Daily arricchiti** (precipitationAmount, snowfall, windMax) | Basso | Basso | Da fare |
 
 ---
 
-> **Prossimo passo:** Implementare il punto 2 (`uv_index_max`) — effort basso, richiede solo modifiche all'aggregazione daily nello Smart Engine.
+> **Prossimo passo:** Punto 5 (daily arricchiti) rimane l'unico gap aperto — bassa priorità.

@@ -1,7 +1,7 @@
 # Riepilogo Stato Progetto — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-04-01
+> **Ultimo aggiornamento:** 2026-04-02
 > **Scopo:** Riepilogo dello stato di implementazione, gap identificati e migliorie future
 
 ---
@@ -114,6 +114,10 @@
 - 5D.5: Apple WeatherKit — 9ª fonte meteo, connettore JWT, peso 1.2, verificato LIVE su Netlify
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
+
+### Fase 5E — Hourly Arricchiti e ForecastNextHour
+- `HourlyForecast` esteso con `humidity`, `wind_speed`, `uv_index` — estratti da 7 connettori e aggregati nello Smart Engine
+- `ForecastNextHour` (previsione precipitazione minuto-per-minuto da WeatherKit) — nuovi tipi, parser, propagazione nel risultato finale
 
 ---
 
