@@ -70,6 +70,8 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 				precipitation_prob: (slot.pop ?? 0) * 100,
 				condition_code: normalizeCondition(slot.weather[0].main),
 				condition_text: slot.weather[0].description,
+				humidity: slot.main.humidity ?? null,
+				wind_speed: slot.wind?.speed ?? null, // already m/s
 			}));
 		} else {
 			console.warn('OWM forecast failed, using current only:', (forecastRes as PromiseRejectedResult).reason?.message);

@@ -404,7 +404,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	});
 
 	// 5b. Hourly Aggregation (merge from all sources by time slot)
-	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[] }>();
+	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[] }>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
 			f.hourly.forEach(h => {
@@ -413,11 +413,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				const normalizedTime = h.time.replace(' ', 'T');
 				const timeKey = normalizedTime.slice(0, 13) + ':00';
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [] });
+					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push(h.temp);
 				if (h.precipitation_prob != null) entry.probs.push(h.precipitation_prob);
+				if (h.humidity != null) entry.humidities.push(h.humidity);
+				if (h.wind_speed != null) entry.wind_speeds.push(h.wind_speed);
+				if (h.uv_index != null) entry.uv_indices.push(h.uv_index);
 				entry.codes.push(h.condition_code);
 			});
 		}
@@ -439,7 +442,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				temp: avgSimple(data.temps) ?? 0,
 				precipitation_prob: avgSimple(data.probs) ?? 0,
 				condition_code: bestCode,
-				condition_text: bestCode.toUpperCase()
+				condition_text: bestCode.toUpperCase(),
+				...(data.humidities.length > 0 && { humidity: avgSimple(data.humidities) }),
+				...(data.wind_speeds.length > 0 && { wind_speed: avgSimple(data.wind_speeds) }),
+				...(data.uv_indices.length > 0 && { uv_index: avgSimple(data.uv_indices) }),
 			};
 		});
 
@@ -500,6 +506,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,
+		// forecastNextHour: disponibile solo da WeatherKit (non aggregabile)
+		...(validForecasts.find(f => f.forecastNextHour)?.forecastNextHour && {
+			forecastNextHour: validForecasts.find(f => f.forecastNextHour)!.forecastNextHour,
+		}),
 		alerts: [] as WeatherAlert[], // verrà popolato dopo la deduplicazione
 	};
 
@@ -546,7 +556,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	// 8. Process Weather Alerts (async, non-blocking) — usa allerte deduplicate
 	if (result.alerts.length > 0) {
-		console.log(`[AlertPipeline] Dispatching ${result.alerts.length} deduplicated alert(s) for ${lat},${lon}: ${result.alerts.map(a => `${a.id}(${a.severity})`).join(', ')}`);
+		console.log(`[AlertPipeline] Dispatching ${result.alerts.length} deduplicated alert(s) for ${lat},${lon}: ${result.alerts.map((a: WeatherAlert) => `${a.id}(${a.severity})`).join(', ')}`);
 		processWeatherAlerts(result.alerts, lat, lon).catch(err =>
 			console.error(`[AlertPipeline] Unhandled error in processWeatherAlerts for ${lat},${lon}:`, err.message, err.stack)
 		);

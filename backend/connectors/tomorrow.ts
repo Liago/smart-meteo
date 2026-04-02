@@ -120,6 +120,9 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 					precipitation_prob: h.values.precipitationProbability ?? null,
 					condition_code: tomorrowCodeToText(h.values.weatherCode),
 					condition_text: tomorrowCodeToText(h.values.weatherCode),
+					humidity: h.values.humidity ?? null,
+					wind_speed: h.values.windSpeed ?? null, // m/s
+					uv_index: h.values.uvIndex ?? null,
 				}));
 			}
 		} else {

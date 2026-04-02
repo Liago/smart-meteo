@@ -14,6 +14,24 @@ export interface HourlyForecast {
 	precipitation_prob: number | null;
 	condition_code: string;
 	condition_text: string | null;
+	humidity?: number | null;
+	wind_speed?: number | null;      // m/s
+	uv_index?: number | null;
+}
+
+/**
+ * Previsione precipitazione minuto per minuto (prossima ora).
+ * Fonte: Apple WeatherKit forecastNextHour dataset.
+ */
+export interface MinutelyPrecipitation {
+	startTime: string;              // ISO8601
+	precipitationChance: number;    // 0-100
+	precipitationIntensity: number; // mm/h
+}
+
+export interface ForecastNextHour {
+	summary: { condition: string; startTime: string; endTime: string }[];
+	minutes: MinutelyPrecipitation[];
 }
 
 export interface AstronomyData {
@@ -61,6 +79,7 @@ export interface UnifiedForecastData {
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
+	forecastNextHour?: ForecastNextHour;
 }
 
 export interface WeatherAlert {

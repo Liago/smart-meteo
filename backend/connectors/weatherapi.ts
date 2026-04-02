@@ -108,6 +108,9 @@ function buildForecastFromData(data: any, lat: number, lon: number): UnifiedFore
 						precipitation_prob: h.chance_of_rain,
 						condition_code: normalizeCondition(h.condition.text),
 						condition_text: h.condition.text,
+						humidity: h.humidity ?? null,
+						wind_speed: h.wind_kph != null ? Number((h.wind_kph / 3.6).toFixed(2)) : null,
+						uv_index: h.uv ?? null,
 					}));
 					hourly.push(...dayHourly);
 				}

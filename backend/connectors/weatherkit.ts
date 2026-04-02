@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { UnifiedForecast, normalizeCondition } from '../utils/formatter';
-import { WeatherAlert } from '../types';
+import { WeatherAlert, ForecastNextHour } from '../types';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -139,6 +139,35 @@ function parseWeatherAlerts(data: any): WeatherAlert[] {
     }));
 }
 
+/**
+ * Estrae e normalizza il dataset forecastNextHour dalla risposta WeatherKit.
+ * Fornisce previsione precipitazioni minuto-per-minuto per la prossima ora.
+ */
+function parseForecastNextHour(data: any): ForecastNextHour | undefined {
+    const nextHour = data?.forecastNextHour;
+    if (!nextHour) return undefined;
+
+    const summary = Array.isArray(nextHour.summary)
+        ? nextHour.summary.map((s: any) => ({
+            condition: s.condition || 'clear',
+            startTime: s.startTime,
+            endTime: s.endTime,
+        }))
+        : [];
+
+    const minutes = Array.isArray(nextHour.minutes)
+        ? nextHour.minutes.map((m: any) => ({
+            startTime: m.startTime,
+            precipitationChance: m.precipitationChance != null ? m.precipitationChance * 100 : 0,
+            precipitationIntensity: m.precipitationIntensity ?? 0,
+        }))
+        : [];
+
+    if (summary.length === 0 && minutes.length === 0) return undefined;
+
+    return { summary, minutes };
+}
+
 export interface WeatherKitResult {
     forecast: UnifiedForecast;
     alerts: WeatherAlert[];
@@ -153,7 +182,7 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
     if (!token) return null;
 
     const countryCode = getCountryCodeFromCoords(lat, lon);
-    const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,weatherAlerts&countryCode=${countryCode}`;
+    const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts&countryCode=${countryCode}`;
 
     try {
         const response = await fetch(url, {
@@ -167,8 +196,8 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
         }
 
         const data = await response.json();
-        
-        // Estrazione current 
+
+        // Estrazione current
         const current = data.currentWeather || {};
         
         // Estrazione daily
@@ -190,7 +219,10 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             temp: h.temperature,
             precipitation_prob: h.precipitationChance != null ? h.precipitationChance * 100 : 0,
             condition_code: mapConditionCode(h.conditionCode),
-            condition_text: h.conditionCode
+            condition_text: h.conditionCode,
+            humidity: h.humidity != null ? h.humidity * 100 : null,
+            wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
+            uv_index: h.uvIndex ?? null,
         }));
 
         // WeatherKit non restituisce aqi, ma dà uvIndex, visibility e pressure
@@ -235,6 +267,11 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             forecastPayload.wind_speed = current.windSpeed / 3.6;
         }
 
+        const nextHour = parseForecastNextHour(data);
+        if (nextHour) {
+            (forecastPayload as any).forecastNextHour = nextHour;
+        }
+
         return new UnifiedForecast(forecastPayload);
     } catch (err: any) {
         console.error('Apple WeatherKit Fetch Error:', err.message);
@@ -251,7 +288,7 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
     if (!token) return null;
 
     const countryCode = getCountryCodeFromCoords(lat, lon);
-    const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,weatherAlerts&countryCode=${countryCode}`;
+    const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts&countryCode=${countryCode}`;
 
     try {
         const response = await fetch(url, {
@@ -285,7 +322,10 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
             temp: h.temperature,
             precipitation_prob: h.precipitationChance != null ? h.precipitationChance * 100 : 0,
             condition_code: mapConditionCode(h.conditionCode),
-            condition_text: h.conditionCode
+            condition_text: h.conditionCode,
+            humidity: h.humidity != null ? h.humidity * 100 : null,
+            wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
+            uv_index: h.uvIndex ?? null,
         }));
 
         const forecastPayload: any = {
@@ -316,6 +356,11 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
             } as any : undefined,
             raw_data: data
         };
+
+        const nextHour = parseForecastNextHour(data);
+        if (nextHour) {
+            forecastPayload.forecastNextHour = nextHour;
+        }
 
         return {
             forecast: new UnifiedForecast(forecastPayload),

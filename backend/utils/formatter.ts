@@ -1,4 +1,4 @@
-import { UnifiedForecastData, DailyForecast, HourlyForecast, AstronomyData, AirQualityDetail } from '../types';
+import { UnifiedForecastData, DailyForecast, HourlyForecast, AstronomyData, AirQualityDetail, ForecastNextHour } from '../types';
 
 /**
  * Standardizes the weather condition codes across different providers.
@@ -69,6 +69,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
+	forecastNextHour?: ForecastNextHour;
 
 	constructor(data: Partial<UnifiedForecastData> & { source: string; lat: number; lon: number; time: string }) {
 		this.source = data.source;
@@ -105,6 +106,9 @@ export class UnifiedForecast implements UnifiedForecastData {
 		}
 		if (data.astronomy) {
 			this.astronomy = data.astronomy;
+		}
+		if (data.forecastNextHour) {
+			this.forecastNextHour = data.forecastNextHour;
 		}
 	}
 }

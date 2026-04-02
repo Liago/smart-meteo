@@ -108,6 +108,9 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 					precipitation_prob: h.PrecipitationProbability ?? 0,
 					condition_code: normalizeCondition(h.IconPhrase),
 					condition_text: h.IconPhrase ?? null,
+					humidity: h.RelativeHumidity ?? null,
+					wind_speed: h.Wind?.Speed?.Value != null ? Number((h.Wind.Speed.Value / 3.6).toFixed(2)) : null, // km/h → m/s
+					uv_index: h.UVIndex ?? null,
 				}));
 			}
 		} else {
