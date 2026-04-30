@@ -144,22 +144,32 @@ alertsRouter.post('/subscribe', async (req, res) => {
     }
 
     try {
-        // Usa upsert su un indice univoco se è stato definito, altrimenti inserimento manuale gestendo i conflitti
+        // Un device = una sola subscription attiva.
+        // Rimuovi tutte le subscription precedenti per questo device prima di inserire la nuova.
+        const { error: deleteError } = await supabase
+            .from('alert_subscriptions')
+            .delete()
+            .eq('device_token', deviceToken);
+
+        if (deleteError) {
+            console.warn('[AlertSubscribe] Failed to clean old subscriptions:', deleteError.message);
+        }
+
         const { data, error } = await supabase
             .from('alert_subscriptions')
-            .upsert({
+            .insert({
                 device_token: deviceToken,
                 location_lat: lat,
                 location_lon: lon,
                 location_name: locationName,
                 platform
-            }, { onConflict: 'device_token, location_lat, location_lon' })
+            })
             .select()
             .single();
 
         if (error) throw error;
-        
-        return res.json({ success: true, message: 'Iscritto alle allerte', data });
+
+        return res.json({ success: true, message: 'Iscritto alle allerte (posizione aggiornata)', data });
     } catch (err: any) {
         console.error('Error in /alerts/subscribe:', err.message);
         return res.status(500).json({ error: 'Impossibile iscriversi alle allerte', details: err.message });

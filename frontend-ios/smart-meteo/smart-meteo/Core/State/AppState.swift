@@ -64,6 +64,12 @@ class AppState: ObservableObject {
             .first() // Auto-fetch on first location update
             .sink { [weak self] location in
                 self?.fetchWeather(for: location)
+                // Registra push SOLO per la posizione GPS reale del device
+                PushNotificationService.shared.registerPendingTokenIfNeeded(
+                    lat: location.coordinate.latitude,
+                    lon: location.coordinate.longitude,
+                    locationName: self?.currentLocationName ?? ""
+                )
             }
             .store(in: &cancellables)
         
@@ -114,13 +120,6 @@ class AppState: ObservableObject {
         } else {
             reverseGeocode(location: location)
         }
-
-        // Registra token push in attesa ora che abbiamo coordinate GPS valide
-        PushNotificationService.shared.registerPendingTokenIfNeeded(
-            lat: location.coordinate.latitude,
-            lon: location.coordinate.longitude,
-            locationName: currentLocationName
-        )
 
         Task {
             do {
