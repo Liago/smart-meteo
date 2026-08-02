@@ -110,8 +110,11 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 					precipitation_prob: h.PrecipitationProbability ?? 0,
 					condition_code: normalizeCondition(h.IconPhrase),
 					condition_text: h.IconPhrase ?? null,
+					feels_like: h.RealFeelTemperature?.Value ?? null,
 					humidity: h.RelativeHumidity ?? null,
 					wind_speed: h.Wind?.Speed?.Value != null ? Number((h.Wind.Speed.Value / 3.6).toFixed(2)) : null, // km/h → m/s
+					wind_direction: h.Wind?.Direction?.Degrees ?? null,
+					wind_gust: h.WindGust?.Speed?.Value != null ? Number((h.WindGust.Speed.Value / 3.6).toFixed(2)) : null, // km/h → m/s
 					uv_index: h.UVIndex ?? null,
 					precipitation_mm: h.TotalLiquid?.Value ?? null,
 				}));

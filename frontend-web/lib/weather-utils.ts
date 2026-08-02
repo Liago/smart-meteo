@@ -213,3 +213,63 @@ export function formatHourRange(iso: string): string {
 	return `${pad(hour)}:00 - ${pad(hour + 1)}:00`;
 }
 
+// --- Scale delle altre metriche orarie ---
+//
+// Tutte restituiscono colori hex/rgba, non classi Tailwind: servono come `fill`
+// negli SVG dei grafici. `getUvColor` qui sopra resta com'è per i consumer che
+// la usano come classe di testo.
+
+/**
+ * Soglie di intensità del vento in km/h, semplificazione della scala Beaufort:
+ * fino a 20 km/h è brezza (Beaufort ≤ 3), fino a 40 km/h vento teso (4-5),
+ * oltre è vento forte (6+, rami che si muovono, ombrelli inutilizzabili).
+ */
+export const WIND_THRESHOLDS = {
+	moderate: 20,
+	strong: 40,
+} as const;
+
+export function getWindScale(kmh: number | null | undefined): { label: string; color: string } {
+	if (kmh == null || isNaN(kmh)) return { label: '—', color: 'rgba(255,255,255,0.25)' };
+	if (kmh >= WIND_THRESHOLDS.strong) return { label: 'Forte', color: '#EC685A' };
+	if (kmh >= WIND_THRESHOLDS.moderate) return { label: 'Teso', color: '#3B82F6' };
+	return { label: 'Debole', color: '#7FB3E8' };
+}
+
+/** Soglie OMS dell'indice UV: le stesse su cui è tarata `getUvLabel`. */
+export const UV_THRESHOLDS = {
+	moderate: 3,
+	high: 6,
+	veryHigh: 8,
+	extreme: 11,
+} as const;
+
+export function getUvScale(uv: number | null | undefined): { label: string; color: string } {
+	if (uv == null || isNaN(uv)) return { label: '—', color: 'rgba(255,255,255,0.25)' };
+	if (uv >= UV_THRESHOLDS.extreme) return { label: 'Estremo', color: '#A855F7' };
+	if (uv >= UV_THRESHOLDS.veryHigh) return { label: 'Molto alto', color: '#EF4444' };
+	if (uv >= UV_THRESHOLDS.high) return { label: 'Alto', color: '#F97316' };
+	if (uv >= UV_THRESHOLDS.moderate) return { label: 'Moderato', color: '#EAB308' };
+	return { label: 'Basso', color: '#4ADE80' };
+}
+
+/** Colore per l'umidità relativa: dal secco ambrato all'afoso blu pieno. */
+export function getHumidityColor(pct: number | null | undefined): string {
+	if (pct == null || isNaN(pct)) return 'rgba(255,255,255,0.25)';
+	if (pct >= 80) return '#3B82F6';
+	if (pct >= 60) return '#60A5FA';
+	if (pct >= 30) return '#7FB3E8';
+	return '#FBBF24';
+}
+
+/** Colore per una temperatura in °C, dal freddo viola al caldo rosso. */
+export function getTempColor(celsius: number | null | undefined): string {
+	if (celsius == null || isNaN(celsius)) return 'rgba(255,255,255,0.25)';
+	if (celsius >= 35) return '#DC2626';
+	if (celsius >= 28) return '#F97316';
+	if (celsius >= 20) return '#FBBF24';
+	if (celsius >= 10) return '#4ADE80';
+	if (celsius >= 0) return '#60A5FA';
+	return '#A78BFA';
+}
+

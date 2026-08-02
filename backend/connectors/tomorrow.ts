@@ -121,8 +121,11 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 					precipitation_prob: h.values.precipitationProbability ?? null,
 					condition_code: tomorrowCodeToText(h.values.weatherCode),
 					condition_text: tomorrowCodeToText(h.values.weatherCode),
+					feels_like: h.values.temperatureApparent ?? null,
 					humidity: h.values.humidity ?? null,
 					wind_speed: h.values.windSpeed ?? null, // m/s
+					wind_direction: h.values.windDirection ?? null,
+					wind_gust: h.values.windGust ?? null,   // m/s, come windSpeed con units:metric
 					uv_index: h.values.uvIndex ?? null,
 					// Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
 					precipitation_mm: h.values.rainAccumulation ?? h.values.rainIntensity ?? null,

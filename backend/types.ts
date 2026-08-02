@@ -15,8 +15,11 @@ export interface HourlyForecast {
 	precipitation_prob: number | null;
 	condition_code: string;
 	condition_text: string | null;
+	feels_like?: number | null;      // °C percepiti
 	humidity?: number | null;
 	wind_speed?: number | null;      // m/s
+	wind_direction?: number | null;  // gradi, 0 = da nord
+	wind_gust?: number | null;       // m/s
 	uv_index?: number | null;
 	precipitation_mm?: number | null; // mm accumulati nell'ora
 }

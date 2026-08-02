@@ -204,8 +204,11 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             precipitation_prob: h.precipitationChance != null ? h.precipitationChance * 100 : 0,
             condition_code: mapConditionCode(h.conditionCode),
             condition_text: h.conditionCode,
+            feels_like: h.temperatureApparent ?? null,
             humidity: h.humidity != null ? h.humidity * 100 : null,
             wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
+            wind_direction: h.windDirection ?? null,
+            wind_gust: h.windGust != null ? Number((h.windGust / 3.6).toFixed(2)) : null, // km/h → m/s
             uv_index: h.uvIndex ?? null,
             // Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
             precipitation_mm: h.precipitationAmount ?? h.precipitationIntensity ?? null,
@@ -310,8 +313,11 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
             precipitation_prob: h.precipitationChance != null ? h.precipitationChance * 100 : 0,
             condition_code: mapConditionCode(h.conditionCode),
             condition_text: h.conditionCode,
+            feels_like: h.temperatureApparent ?? null,
             humidity: h.humidity != null ? h.humidity * 100 : null,
             wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
+            wind_direction: h.windDirection ?? null,
+            wind_gust: h.windGust != null ? Number((h.windGust / 3.6).toFixed(2)) : null, // km/h → m/s
             uv_index: h.uvIndex ?? null,
             // Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
             precipitation_mm: h.precipitationAmount ?? h.precipitationIntensity ?? null,

@@ -56,8 +56,11 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 							precipitation_prob: Number(h.chanceofrain),
 							condition_code: h.weatherCode,
 							condition_text: h.weatherDesc && h.weatherDesc[0] ? h.weatherDesc[0].value : '',
+							feels_like: h.FeelsLikeC != null ? Number(h.FeelsLikeC) : null,
 							humidity: h.humidity != null ? Number(h.humidity) : null,
 							wind_speed: h.windspeedKmph != null ? Number((Number(h.windspeedKmph) / 3.6).toFixed(2)) : null,
+							wind_direction: h.winddirDegree != null ? Number(h.winddirDegree) : null,
+							wind_gust: h.WindGustKmph != null ? Number((Number(h.WindGustKmph) / 3.6).toFixed(2)) : null,
 							uv_index: h.uvIndex != null ? Number(h.uvIndex) : null,
 							precipitation_mm: h.precipMM != null ? Number(h.precipMM) : null,
 						};

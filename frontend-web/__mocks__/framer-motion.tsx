@@ -40,15 +40,28 @@ const stripAnimationProps = (props: Record<string, any>) => {
 	return clean;
 };
 
+/**
+ * I componenti vanno memoizzati per tag: creandoli a ogni accesso, `motion.div`
+ * restituirebbe un'identità nuova a ogni render e React smonterebbe e
+ * rimonterebbe l'intero sottoalbero. Il vero framer-motion espone componenti
+ * stabili, e un test che clicca un elemento appena ri-renderizzato lo troverebbe
+ * altrimenti già staccato dal DOM.
+ */
+const componentCache = new Map<string, React.ComponentType<any>>();
+
 export const motion: any = new Proxy(
 	{},
 	{
 		get: (_target, tag: string) => {
+			const cached = componentCache.get(tag);
+			if (cached) return cached;
+
 			const Component = React.forwardRef<unknown, Record<string, any>>(
 				({ children, ...props }, ref) =>
 					React.createElement(tag, { ...stripAnimationProps(props), ref }, children)
 			);
 			Component.displayName = `motion.${tag}`;
+			componentCache.set(tag, Component);
 			return Component;
 		},
 	}

@@ -3,32 +3,28 @@
 import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { HourlyForecast, DailyForecast } from '@/lib/types';
-import {
-	getPrecipIntensity,
-	formatPrecipMm,
-	formatHourRange,
-	getWMOWeatherInfo,
-	PRECIP_THRESHOLDS,
-} from '@/lib/weather-utils';
+import { METRICS, MetricId, MetricSection } from '@/lib/metrics';
+import { formatHourRange } from '@/lib/weather-utils';
 
-interface PrecipitationDetailProps {
+interface HourlyDetailProps {
 	hourly: HourlyForecast[];
 	daily?: DailyForecast[];
 	initialDate?: string;
+	/** Metrica da visualizzare; la scelta vive nel chiamante insieme alla dropdown. */
+	metric: MetricId;
 }
 
 const HOURS_IN_DAY = 24;
 
-/** Slot orario del giorno selezionato. `undefined` = ora non coperta da nessuna fonte. */
+/** Slot orario del giorno selezionato. `h` assente = ora non coperta da nessuna fonte. */
 interface HourSlot {
 	hour: number;
-	mm?: number | null;
-	prob?: number | null;
-	condition_code?: string;
-	time?: string;
+	h?: HourlyForecast;
 }
 
-export default function PrecipitationDetail({ hourly, daily, initialDate }: PrecipitationDetailProps) {
+export default function HourlyDetail({ hourly, daily, initialDate, metric }: HourlyDetailProps) {
+	const spec = METRICS[metric];
+
 	// Giorni disponibili: dal daily se c'è, altrimenti dedotti dagli orari.
 	const days = useMemo(() => {
 		const fromDaily = daily?.map((d) => d.date.slice(0, 10)) ?? [];
@@ -56,40 +52,38 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 			.forEach((h) => {
 				const hour = Number(h.time.slice(11, 13));
 				if (isNaN(hour) || hour < 0 || hour >= HOURS_IN_DAY) return;
-				base[hour] = {
-					hour,
-					mm: h.precipitation_mm,
-					prob: h.precipitation_prob,
-					condition_code: h.condition_code,
-					time: h.time,
-				};
+				base[hour] = { hour, h };
 			});
 		return base;
 	}, [hourly, selectedDate]);
 
-	const hasAnyHour = slots.some((s) => s.time !== undefined);
-	const mmValues = slots.map((s) => s.mm).filter((v): v is number => v != null);
-	// Il backend omette la chiave quando nessuna fonte l'ha fornita (cache vecchia,
-	// fonti senza mm): in quel caso il grafico dei mm non va proprio disegnato.
-	const hasMmData = mmValues.length > 0;
-	const isAllDry = hasMmData && mmValues.every((v) => v === 0);
+	const hasAnyHour = slots.some((s) => s.h !== undefined);
 
-	// Ora attiva: quella corrente se il giorno è oggi, altrimenti la più piovosa.
+	// Ora attiva: quella corrente se il giorno è oggi, altrimenti quella col
+	// valore massimo della metrica principale (l'ora più piovosa, la più ventosa…).
 	const defaultIndex = useMemo(() => {
 		const today = new Date();
 		const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 		if (selectedDate === todayKey) return today.getHours();
-		if (hasMmData && !isAllDry) {
+
+		const primary = spec.sections[0];
+		const values = slots.map((s) => (s.h ? primary.valueOf(s.h) : null));
+		const present = values.filter((v): v is number => v != null);
+		// Un giorno piatto (tutto asciutto, tutto uguale) non ha un'ora "notevole":
+		// meglio la prima coperta che una scelta arbitraria fra valori identici.
+		const isFlat = present.length === 0 || present.every((v) => v === present[0]);
+		if (!isFlat) {
 			let best = 0;
-			let bestVal = -1;
-			slots.forEach((s, i) => {
-				if ((s.mm ?? -1) > bestVal) { bestVal = s.mm ?? -1; best = i; }
+			let bestVal = -Infinity;
+			values.forEach((v, i) => {
+				if (v != null && v > bestVal) { bestVal = v; best = i; }
 			});
 			return best;
 		}
-		const firstCovered = slots.findIndex((s) => s.time !== undefined);
+
+		const firstCovered = slots.findIndex((s) => s.h !== undefined);
 		return firstCovered === -1 ? 12 : firstCovered;
-	}, [selectedDate, slots, hasMmData, isAllDry]);
+	}, [selectedDate, slots, spec]);
 
 	// Cambiando giorno l'ora selezionata torna al default: è un aggiustamento di
 	// stato in fase di render, non un effect (evita il render extra).
@@ -101,7 +95,6 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 	}
 
 	const active = slots[activeIndex];
-	const activeIntensity = getPrecipIntensity(active?.mm);
 
 	const dateLabel = useMemo(() => {
 		if (!selectedDate) return '';
@@ -153,93 +146,85 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 					Dati orari non disponibili per questa data
 				</p>
 			) : (
-				<>
-					{/* Grafico quantità in mm */}
-					{hasMmData ? (
-						<section className="mb-4 rounded-lg bg-white/5 p-3">
-							<header className="text-center mb-1">
-								<p className="text-xs text-white/40">{active?.time ? formatHourRange(active.time) : '—'}</p>
-								<p className="text-3xl font-light text-white/90 leading-tight">
-									{active?.time === undefined
-										? 'Dato non disponibile'
-										: activeIntensity.level === 'none'
-											? formatPrecipMm(active?.mm)
-											: activeIntensity.label}
-								</p>
-								<p className="text-xs text-blue-200/80">
-									{active?.condition_code
-										? getWMOWeatherInfo(active.condition_code).label
-										: ''}
-									{activeIntensity.level !== 'none' && active?.mm != null
-										? ` · ${formatPrecipMm(active.mm)}`
-										: ''}
-								</p>
-							</header>
-							<div className="relative">
-								<BarChart
-									slots={slots}
-									activeIndex={activeIndex}
-									onActiveIndexChange={setActiveIndex}
-									height={150}
-									yMax={Math.max(PRECIP_THRESHOLDS.heavy * 1.25, ...mmValues.map((v) => v * 1.15))}
-									// Le linee marcano i confini fra le fasce; le etichette
-									// stanno dentro alla fascia che nominano, come nel
-									// riferimento. Una linea a 0,1 mm sarebbe appiccicata
-									// alla base e illeggibile.
-									gridLines={[
-										{ value: PRECIP_THRESHOLDS.moderate },
-										{ value: PRECIP_THRESHOLDS.heavy },
-									]}
-									bands={[
-										{ from: 0, to: PRECIP_THRESHOLDS.moderate, label: 'Debole' },
-										{ from: PRECIP_THRESHOLDS.moderate, to: PRECIP_THRESHOLDS.heavy, label: 'Moderata' },
-										{ from: PRECIP_THRESHOLDS.heavy, to: Infinity, label: 'Forte' },
-									]}
-									valueOf={(s) => s.mm}
-									colorOf={(v) => getPrecipIntensity(v).color}
-									ariaLabel="Precipitazione oraria prevista in millimetri"
-								/>
-								{isAllDry && (
-									<p className="absolute inset-0 flex items-center justify-center text-sm text-white/40 pointer-events-none">
-										Nessuna precipitazione prevista
-									</p>
-								)}
-							</div>
-						</section>
-					) : (
-						<p className="text-center text-xs text-white/40 mb-4">
-							Quantità in mm non disponibile per questa località
-						</p>
-					)}
-
-					{/* Grafico probabilità */}
-					<section className="rounded-lg bg-white/5 p-3">
-						<header className="text-center mb-1">
-							<p className="text-xs text-white/40">{active?.time ? formatHourRange(active.time) : '—'}</p>
-							<p className="text-3xl font-light text-blue-300 leading-tight">
-								{active?.prob != null ? `${Math.round(active.prob)}%` : '—%'}
-							</p>
-							<p className="text-xs text-white/50">Probabilità</p>
-						</header>
-						<BarChart
-							slots={slots}
-							activeIndex={activeIndex}
-							onActiveIndexChange={setActiveIndex}
-							height={100}
-							yMax={100}
-							gridLines={[
-								{ value: 80, label: '80%' },
-								{ value: 100, label: '100%' },
-							]}
-							bands={[]}
-							valueOf={(s) => s.prob}
-							colorOf={() => 'rgba(147,197,253,0.85)'}
-							ariaLabel="Probabilità oraria di precipitazione"
-						/>
-					</section>
-				</>
+				spec.sections.map((section, i) => (
+					<Section
+						key={section.id}
+						section={section}
+						slots={slots}
+						active={active}
+						activeIndex={activeIndex}
+						onActiveIndexChange={setActiveIndex}
+						isLast={i === spec.sections.length - 1}
+					/>
+				))
 			)}
 		</div>
+	);
+}
+
+// --- Sezione: intestazione + grafico di una singola serie ---
+
+interface SectionProps {
+	section: MetricSection;
+	slots: HourSlot[];
+	active: HourSlot | undefined;
+	activeIndex: number;
+	onActiveIndexChange: (i: number) => void;
+	isLast: boolean;
+}
+
+function Section({ section, slots, active, activeIndex, onActiveIndexChange, isLast }: SectionProps) {
+	const values = slots
+		.map((s) => (s.h ? section.valueOf(s.h) : null))
+		.filter((v): v is number => v != null);
+	const secondaries = section.secondaryOf
+		? slots
+			.map((s) => (s.h ? section.secondaryOf!(s.h) : null))
+			.filter((v): v is number => v != null)
+		: [];
+
+	// Il backend omette la chiave quando nessuna fonte l'ha fornita (cache vecchia,
+	// fonti senza il dato): in quel caso il grafico non va proprio disegnato.
+	if (values.length === 0) {
+		return <p className="text-center text-xs text-white/40 mb-4">{section.emptyMessage}</p>;
+	}
+
+	const isFlatZero = values.every((v) => v === 0);
+	const domain = section.domain([...values, ...secondaries]);
+
+	return (
+		<section className={`rounded-lg bg-white/5 p-3 ${isLast ? '' : 'mb-4'}`}>
+			<header className="text-center mb-1">
+				<p className="text-xs text-white/40">{active?.h ? formatHourRange(active.h.time) : '—'}</p>
+				<p className={`text-3xl font-light leading-tight ${section.headlineClassName}`}>
+					{section.headline(active?.h)}
+				</p>
+				<p className={`text-xs ${section.captionClassName}`}>{section.caption(active?.h)}</p>
+			</header>
+			<div className="relative">
+				<BarChart
+					slots={slots}
+					activeIndex={activeIndex}
+					onActiveIndexChange={onActiveIndexChange}
+					height={section.height}
+					yMin={domain.min}
+					yMax={domain.max}
+					gridLines={section.gridLines(domain)}
+					bands={section.bands(domain)}
+					valueOf={(s) => (s.h ? section.valueOf(s.h) : null)}
+					secondaryValueOf={
+						section.secondaryOf ? (s) => (s.h ? section.secondaryOf!(s.h) : null) : undefined
+					}
+					colorOf={section.colorOf}
+					ariaLabel={section.ariaLabel}
+				/>
+				{isFlatZero && section.flatMessage && (
+					<p className="absolute inset-0 flex items-center justify-center text-sm text-white/40 pointer-events-none">
+						{section.flatMessage}
+					</p>
+				)}
+			</div>
+		</section>
 	);
 }
 
@@ -256,12 +241,16 @@ interface BarChartProps {
 	activeIndex: number;
 	onActiveIndexChange: (i: number) => void;
 	height: number;
+	/** Base dell'asse Y. Diverso da 0 per le metriche senza uno zero significativo. */
+	yMin: number;
 	yMax: number;
 	/** Linee orizzontali di riferimento; `label` opzionale, scritto sulla linea. */
 	gridLines: { value: number; label?: string }[];
 	/** Etichette di fascia, centrate verticalmente nella regione che nominano. */
 	bands: { from: number; to: number; label: string }[];
 	valueOf: (s: HourSlot) => number | null | undefined;
+	/** Serie secondaria (raffiche): una tacca sopra la barra, non una seconda barra. */
+	secondaryValueOf?: (s: HourSlot) => number | null | undefined;
 	colorOf: (v: number) => string;
 	ariaLabel: string;
 }
@@ -279,10 +268,12 @@ function BarChart({
 	activeIndex,
 	onActiveIndexChange,
 	height,
+	yMin,
 	yMax,
 	gridLines,
 	bands,
 	valueOf,
+	secondaryValueOf,
 	colorOf,
 	ariaLabel,
 }: BarChartProps) {
@@ -295,7 +286,10 @@ function BarChart({
 	const barW = Math.max(2, slotW * 0.62);
 	const baselineY = PAD_T + plotH;
 
-	const y = (v: number) => PAD_T + plotH * (1 - Math.min(v, yMax) / yMax);
+	// Un dominio degenere (tutti i valori identici) azzererebbe lo span: si
+	// forza un minimo perché le barre restino disegnabili.
+	const span = Math.max(yMax - yMin, 1e-6);
+	const y = (v: number) => PAD_T + plotH * (1 - (Math.min(Math.max(v, yMin), yMax) - yMin) / span);
 	const x = (i: number) => PAD_L + i * slotW + (slotW - barW) / 2;
 
 	const indexFromClientX = (clientX: number) => {
@@ -320,40 +314,44 @@ function BarChart({
 			aria-label={ariaLabel}
 		>
 			{/* Linee di riferimento */}
-			{gridLines.map((g) => (
-				<g key={`grid-${g.value}`}>
-					<line
-						x1={PAD_L}
-						x2={W - PAD_R}
-						y1={y(g.value)}
-						y2={y(g.value)}
-						stroke="rgba(255,255,255,0.12)"
-						strokeDasharray="2 3"
-					/>
-					{g.label && (
-						<text x={4} y={y(g.value) + 3} className="fill-white/40" fontSize={9}>
-							{g.label}
-						</text>
-					)}
-				</g>
-			))}
+			{gridLines
+				.filter((g) => g.value > yMin && g.value <= yMax)
+				.map((g) => (
+					<g key={`grid-${g.value}`}>
+						<line
+							x1={PAD_L}
+							x2={W - PAD_R}
+							y1={y(g.value)}
+							y2={y(g.value)}
+							stroke="rgba(255,255,255,0.12)"
+							strokeDasharray="2 3"
+						/>
+						{g.label && (
+							<text x={4} y={y(g.value) + 3} className="fill-white/40" fontSize={9}>
+								{g.label}
+							</text>
+						)}
+					</g>
+				))}
 
 			{/* Etichette di fascia, centrate nella regione che nominano */}
-			{bands.map((b) => {
-				const top = y(Math.min(b.to, yMax));
-				const bottom = y(b.from);
-				return (
-					<text
-						key={b.label}
-						x={4}
-						y={(top + bottom) / 2 + 3}
-						className="fill-white/40"
-						fontSize={9}
-					>
-						{b.label}
-					</text>
-				);
-			})}
+			{bands
+				.filter((b) => b.from < yMax && Math.min(b.to, yMax) > yMin)
+				.map((b) => {
+					const top = y(Math.min(b.to, yMax));
+					const bottom = y(Math.max(b.from, yMin));
+					return (
+						<text
+							key={b.label}
+							x={4}
+							y={(top + bottom) / 2 + 3}
+							className="fill-white/40"
+							fontSize={9}
+						>
+							{b.label}
+						</text>
+					);
+				})}
 
 			{/* Linea di base */}
 			<line x1={PAD_L} x2={W - PAD_R} y1={baselineY} y2={baselineY} stroke="rgba(255,255,255,0.2)" />
@@ -377,7 +375,7 @@ function BarChart({
 					);
 				}
 				const barH = baselineY - y(v);
-				// Valore nullo: tacca piena, visivamente distinta dal dato mancante.
+				// Valore al minimo dell'asse: tacca piena, visivamente distinta dal dato mancante.
 				if (barH < 1) {
 					return (
 						<rect
@@ -403,6 +401,28 @@ function BarChart({
 					/>
 				);
 			})}
+
+			{/* Serie secondaria: tacca al livello della raffica, sopra la barra */}
+			{secondaryValueOf &&
+				slots.map((s, i) => {
+					const sec = secondaryValueOf(s);
+					const primary = valueOf(s);
+					// Una raffica pari o inferiore al vento medio non aggiunge informazione
+					// e disegnerebbe la tacca dentro la barra.
+					if (sec == null || primary == null || sec <= primary) return null;
+					return (
+						<line
+							key={`sec-${i}`}
+							x1={x(i)}
+							x2={x(i) + barW}
+							y1={y(sec)}
+							y2={y(sec)}
+							stroke="rgba(255,255,255,0.55)"
+							strokeWidth={1.5}
+							strokeLinecap="round"
+						/>
+					);
+				})}
 
 			{/* Indicatore dell'ora selezionata */}
 			<line

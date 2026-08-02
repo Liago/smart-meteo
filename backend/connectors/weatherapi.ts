@@ -109,8 +109,11 @@ function buildForecastFromData(data: any, lat: number, lon: number): UnifiedFore
 						precipitation_prob: h.chance_of_rain,
 						condition_code: normalizeCondition(h.condition.text),
 						condition_text: h.condition.text,
+						feels_like: h.feelslike_c ?? null,
 						humidity: h.humidity ?? null,
 						wind_speed: h.wind_kph != null ? Number((h.wind_kph / 3.6).toFixed(2)) : null,
+						wind_direction: h.wind_degree ?? null,
+						wind_gust: h.gust_kph != null ? Number((h.gust_kph / 3.6).toFixed(2)) : null,
 						uv_index: h.uv ?? null,
 						precipitation_mm: h.precip_mm ?? null,
 					}));
