@@ -49,6 +49,29 @@ const LOCATION_RADIUS_DEG = 0.5;
 const COOLDOWN_HOURS = 6;
 
 /**
+ * Un device può avere più righe in `alert_subscriptions` (registrazioni residue,
+ * `/subscribe` che non è riuscito a ripulire le precedenti). Dedup e cooldown
+ * sono per `subscription_id`, quindi righe multiple significano notifiche
+ * multiple sullo stesso telefono: si tiene solo la più recente per device.
+ */
+function oneSubscriptionPerDevice(subscriptions: any[]): any[] {
+	const byToken = new Map<string, any>();
+
+	for (const sub of subscriptions) {
+		const existing = byToken.get(sub.device_token);
+		if (!existing) {
+			byToken.set(sub.device_token, sub);
+			continue;
+		}
+		const existingTime = existing.updated_at || existing.created_at || '';
+		const candidateTime = sub.updated_at || sub.created_at || '';
+		if (candidateTime > existingTime) byToken.set(sub.device_token, sub);
+	}
+
+	return Array.from(byToken.values());
+}
+
+/**
  * Processa le allerte meteo ricevute da WeatherKit.
  * 1. Filtra allerte scadute o già inviate
  * 2. Trova sottoscrizioni nella zona interessata
@@ -65,7 +88,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 	console.log(`${logPrefix} Processing ${alerts.length} alert(s) for area ${lat},${lon}`);
 
-	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, skippedCooldown: 0, skippedOutOfArea: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
+	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, skippedCooldown: 0, skippedOutOfArea: 0, skippedSameDevice: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, dedupWriteFailed: 0, expiredTokens: 0 };
 
 	for (const alert of alerts) {
 		// Salta allerte scadute
@@ -100,12 +123,18 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 			// Il raggio di ricerca (±0.5°) è più ampio dell'area dell'allerta:
 			// verifica ogni dispositivo sulle SUE coordinate prima di notificarlo.
-			const recipients = (subscriptions || []).filter(sub => {
+			const inArea = (subscriptions || []).filter(sub => {
 				if (isAlertRelevantForPoint(alert, sub.location_lat, sub.location_lon)) return true;
 				console.log(`${logPrefix} Alert ${alert.id} area=${alert.areaName || alert.areaId || 'unknown'} non pertinente per sub=${sub.id} (${sub.location_lat},${sub.location_lon}), skipping`);
 				stats.skippedOutOfArea++;
 				return false;
 			});
+
+			const recipients = oneSubscriptionPerDevice(inArea);
+			if (recipients.length < inArea.length) {
+				stats.skippedSameDevice += inArea.length - recipients.length;
+				console.warn(`${logPrefix} Alert ${alert.id}: ${inArea.length - recipients.length} subscription duplicate per device ignorate`);
+			}
 
 			if (recipients.length === 0) {
 				console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — 0 destinatari nel raggio ±${LOCATION_RADIUS_DEG}° di ${lat},${lon}`);
@@ -119,7 +148,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 					.limit(1);
 
 				if (!alreadyLogged || alreadyLogged.length === 0) {
-					await supabase.from('weather_alerts').insert({
+					const { error: historyError } = await supabase.from('weather_alerts').insert({
 						external_alert_id: alert.id,
 						alert_type: alert.severity,
 						message: alert.description,
@@ -133,6 +162,11 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 						effective_time: alert.effectiveTime,
 						expire_time: alert.expireTime
 					});
+
+					if (historyError) {
+						stats.dedupWriteFailed++;
+						console.error(`${logPrefix} DEDUP WRITE FAILED (storico) per alert ${alert.id}: ${historyError.message}`);
+					}
 				}
 				continue;
 			}
@@ -193,8 +227,10 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 				const pushResult: PushResult = await sendPushNotification(sub.device_token, title, body, payload);
 
-				// Salva il record dell'allerta inviata
-				await supabase.from('weather_alerts').insert({
+				// Salva il record dell'allerta inviata: è ciò su cui si basano dedup e
+				// cooldown, quindi un fallimento silenzioso qui significa rispedire la
+				// stessa notifica a ogni giro.
+				const { error: dedupError } = await supabase.from('weather_alerts').insert({
 					subscription_id: sub.id,
 					external_alert_id: alert.id,
 					alert_type: alert.severity,
@@ -209,6 +245,11 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 					effective_time: alert.effectiveTime,
 					expire_time: alert.expireTime
 				});
+
+				if (dedupError) {
+					stats.dedupWriteFailed++;
+					console.error(`${logPrefix} DEDUP WRITE FAILED per alert ${alert.id} sub=${sub.id}: ${dedupError.message} — la notifica verrà rispedita al prossimo giro finché non si risolve (migration non applicata?)`);
+				}
 
 				// Log delivery nella tabella di audit
 				const tokenHash = crypto.createHash('sha256').update(sub.device_token).digest('hex').slice(0, 16);
@@ -247,5 +288,5 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 		}
 	}
 
-	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedOutOfArea=${stats.skippedOutOfArea} skippedDuplicate=${stats.skippedDuplicate} skippedCooldown=${stats.skippedCooldown}`);
+	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedOutOfArea=${stats.skippedOutOfArea} skippedSameDevice=${stats.skippedSameDevice} skippedDuplicate=${stats.skippedDuplicate} skippedCooldown=${stats.skippedCooldown} dedupWriteFailed=${stats.dedupWriteFailed}`);
 }

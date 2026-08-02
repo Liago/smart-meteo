@@ -258,12 +258,92 @@ export function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
 }
 
 /**
+ * Firma stabile di un'allerta, indipendente dall'id assegnato dal provider.
+ *
+ * Serve perché gli id non sono affidabili per la deduplicazione: MeteoAlarm
+ * riemette lo stesso avviso con un `<id>` diverso a ogni aggiornamento del feed,
+ * e lo stesso evento arriva da fonti diverse con id diversi. Due allerte con la
+ * stessa firma descrivono lo stesso evento e non vanno notificate due volte.
+ *
+ * Formato: `severity|evento|area|giorno`.
+ */
+export function alertSignature(alert: Partial<WeatherAlert>): string {
+	const rawEvent = alert.event || alert.headline || alert.description || '';
+	const event = rawEvent
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim()
+		.slice(0, 40);
+	const area = (alert.areaId || alert.areaName || '').toLowerCase();
+	// Il giorno di validità: un avviso rinnovato per il giorno dopo è un evento
+	// nuovo e va notificato, le entry ripetute per lo stesso giorno no.
+	const day = (alert.effectiveTime || '').slice(0, 10);
+
+	return `${alert.severity || 'moderate'}|${event}|${area}|${day}`;
+}
+
+/**
+ * Collassa le allerte che condividono la stessa firma.
+ *
+ * Il feed MeteoAlarm espone più entry per la stessa regione e lo stesso tipo di
+ * avviso (finestre orarie diverse dello stesso giorno, riemissioni): senza questo
+ * passaggio diventano notifiche distinte ma visivamente identiche.
+ * Della coppia si tiene la severity più alta e la finestra temporale più ampia.
+ */
+export function collapseBySignature(alerts: WeatherAlert[]): WeatherAlert[] {
+	if (alerts.length <= 1) return alerts;
+
+	const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
+	const bySignature = new Map<string, WeatherAlert>();
+
+	for (const alert of alerts) {
+		const signature = alertSignature(alert);
+		const existing = bySignature.get(signature);
+
+		if (!existing) {
+			bySignature.set(signature, alert);
+			continue;
+		}
+
+		const winner = (severityRank[alert.severity] || 2) > (severityRank[existing.severity] || 2)
+			? alert
+			: existing;
+		const other = winner === alert ? existing : alert;
+
+		// La finestra risultante copre entrambe le entry collassate
+		const earliest = [winner.effectiveTime, other.effectiveTime]
+			.filter(Boolean)
+			.sort()[0];
+		const latest = [winner.expireTime, other.expireTime]
+			.filter(Boolean)
+			.sort()
+			.pop();
+
+		bySignature.set(signature, {
+			...winner,
+			effectiveTime: earliest || winner.effectiveTime,
+			expireTime: latest || winner.expireTime,
+		});
+	}
+
+	const collapsed = Array.from(bySignature.values());
+	if (collapsed.length < alerts.length) {
+		console.log(`[AlertGeo] Collassate ${alerts.length - collapsed.length}/${alerts.length} allerte con firma identica`);
+	}
+
+	return collapsed;
+}
+
+/**
  * Pipeline unica di aggregazione allerte usata da smart engine, route e poller:
- * scarta le scadute → filtra per area geografica → deduplica multi-source.
+ * scarta le scadute → filtra per area geografica → deduplica multi-source →
+ * collassa le entry che descrivono lo stesso evento.
  */
 export function aggregateAlerts(alerts: WeatherAlert[], lat: number, lon: number): WeatherAlert[] {
 	const now = new Date();
 	const active = alerts.filter(a => !a.expireTime || new Date(a.expireTime) > now);
 	const relevant = filterAlertsForPoint(active, lat, lon);
-	return deduplicateAlerts(relevant);
+	return collapseBySignature(deduplicateAlerts(relevant));
 }

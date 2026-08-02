@@ -16,7 +16,6 @@ import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../type
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
 import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
-import { processWeatherAlerts } from '../services/alertProcessor';
 import { aggregateAlerts } from '../utils/alertGeo';
 
 /**
@@ -151,12 +150,6 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 					console.log(`[AlertPipeline] Cache bypass alerts check: raw=${freshAlertsRaw.length} rilevanti=${freshAlerts.length} from ${[...new Set(freshAlertsRaw.map(a => a.providerSource))].join(',') || 'none'}`);
 
 					cached.full_data.alerts = freshAlerts;
-
-					if (freshAlerts.length > 0) {
-						processWeatherAlerts(freshAlerts, lat, lon).catch(err =>
-							console.error('[AlertPipeline] Error processing fresh alerts on cache hit:', err.message)
-						);
-					}
 				} catch (alertErr: any) {
 					console.warn('[AlertPipeline] Failed to fetch fresh alerts on cache hit:', alertErr.message);
 				}
@@ -583,15 +576,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// 7. Log Deviations for AI Accuracy
 	logAccuracyDeviations(result, validForecasts);
 
-	// 8. Process Weather Alerts (async, non-blocking) — usa allerte deduplicate
-	if (result.alerts.length > 0) {
-		console.log(`[AlertPipeline] Dispatching ${result.alerts.length} deduplicated alert(s) for ${lat},${lon}: ${result.alerts.map((a: WeatherAlert) => `${a.id}(${a.severity})`).join(', ')}`);
-		processWeatherAlerts(result.alerts, lat, lon).catch(err =>
-			console.error(`[AlertPipeline] Unhandled error in processWeatherAlerts for ${lat},${lon}:`, err.message, err.stack)
-		);
-	} else {
-		console.log(`[AlertPipeline] No active alerts from any source for ${lat},${lon}`);
-	}
+	// 8. Le allerte vengono solo restituite, non notificate.
+	//    L'invio delle push è compito esclusivo del poller schedulato
+	//    (netlify/functions/alert-poll.ts): è un writer unico, mentre questo
+	//    percorso gira in parallelo su ogni richiesta di forecast e faceva
+	//    partire una notifica per ogni invocazione concorrente.
+	console.log(`[AlertPipeline] ${result.alerts.length} allerta/e rilevanti per ${lat},${lon} (solo risposta, nessuna push)`);
 
 	return result;
 }
