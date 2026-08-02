@@ -82,6 +82,8 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 					precipitation_prob: day.Day?.PrecipitationProbability ?? null,
 					condition_code: normalizeCondition(day.Day?.IconPhrase),
 					condition_text: day.Day?.IconPhrase ?? null,
+					// Disponibile grazie a details=true + metric=true sulla richiesta
+					precipitation_mm: day.Day?.TotalLiquid?.Value ?? null,
 				}));
 
 				// Extract astronomy from first day
@@ -111,6 +113,7 @@ export async function fetchFromAccuWeather(lat: number, lon: number): Promise<Un
 					humidity: h.RelativeHumidity ?? null,
 					wind_speed: h.Wind?.Speed?.Value != null ? Number((h.Wind.Speed.Value / 3.6).toFixed(2)) : null, // km/h → m/s
 					uv_index: h.UVIndex ?? null,
+					precipitation_mm: h.TotalLiquid?.Value ?? null,
 				}));
 			}
 		} else {

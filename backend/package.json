@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:alerts",
+    "test": "npm run test:alerts && npm run test:precipitation",
     "test:alerts": "ts-node scripts/verifyAlertGeo.ts",
+    "test:precipitation": "ts-node scripts/verifyPrecipitation.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

@@ -6,6 +6,7 @@ export interface DailyForecast {
 	condition_code: string;
 	condition_text: string | null;
 	uv_index_max?: number | null;
+	precipitation_mm?: number | null; // mm totali del giorno
 }
 
 export interface HourlyForecast {
@@ -17,6 +18,7 @@ export interface HourlyForecast {
 	humidity?: number | null;
 	wind_speed?: number | null;      // m/s
 	uv_index?: number | null;
+	precipitation_mm?: number | null; // mm accumulati nell'ora
 }
 
 /**
@@ -75,6 +77,13 @@ export interface UnifiedForecastData {
 	visibility?: number | null;        // km
 	cloud_cover?: number | null;       // %
 	air_quality?: AirQualityDetail;
+	/**
+	 * Offset del fuso orario locale rispetto a UTC, in secondi.
+	 * Serve allo Smart Engine per allineare gli slot orari delle fonti che
+	 * restituiscono timestamp UTC (tomorrow.io, weatherkit) con quelle che
+	 * restituiscono l'ora locale (open-meteo, weatherapi, wwo).
+	 */
+	utc_offset_seconds?: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

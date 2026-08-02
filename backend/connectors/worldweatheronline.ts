@@ -59,6 +59,7 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 							humidity: h.humidity != null ? Number(h.humidity) : null,
 							wind_speed: h.windspeedKmph != null ? Number((Number(h.windspeedKmph) / 3.6).toFixed(2)) : null,
 							uv_index: h.uvIndex != null ? Number(h.uvIndex) : null,
+							precipitation_mm: h.precipMM != null ? Number(h.precipMM) : null,
 						};
 					});
 					hourly.push(...dayHourly);

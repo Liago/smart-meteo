@@ -192,7 +192,8 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             precipitation_prob: d.precipitationChance != null ? d.precipitationChance * 100 : 0, 
             condition_code: mapConditionCode(d.conditionCode),
             condition_text: d.conditionCode,
-            uv_index_max: d.maxUvIndex
+            uv_index_max: d.maxUvIndex,
+            precipitation_mm: d.precipitationAmount ?? null,
         }));
 
         // Estrazione hourly
@@ -206,6 +207,8 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             humidity: h.humidity != null ? h.humidity * 100 : null,
             wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
             uv_index: h.uvIndex ?? null,
+            // Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
+            precipitation_mm: h.precipitationAmount ?? h.precipitationIntensity ?? null,
         }));
 
         // WeatherKit non restituisce aqi, ma dà uvIndex, visibility e pressure
@@ -297,7 +300,8 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
             precipitation_prob: d.precipitationChance != null ? d.precipitationChance * 100 : 0,
             condition_code: mapConditionCode(d.conditionCode),
             condition_text: d.conditionCode,
-            uv_index_max: d.maxUvIndex
+            uv_index_max: d.maxUvIndex,
+            precipitation_mm: d.precipitationAmount ?? null,
         }));
         const hourlyData = data.forecastHourly?.hours || [];
         const hourly = hourlyData.slice(0, 24).map((h: any) => ({
@@ -309,6 +313,8 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
             humidity: h.humidity != null ? h.humidity * 100 : null,
             wind_speed: h.windSpeed != null ? Number((h.windSpeed / 3.6).toFixed(2)) : null, // km/h → m/s
             uv_index: h.uvIndex ?? null,
+            // Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
+            precipitation_mm: h.precipitationAmount ?? h.precipitationIntensity ?? null,
         }));
 
         const forecastPayload: any = {

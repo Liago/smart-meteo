@@ -10,6 +10,7 @@ import { fetchFromWeatherKit, fetchFromWeatherKitWithAlerts } from '../connector
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
+import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
@@ -252,13 +253,17 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	const accuracyMap = await accuracyMapPromise;
 
-	validForecasts.forEach(f => {
-		const baseWeight = SOURCE_WEIGHTS[f.source] || 1.0;
-		// Use dynamic weight if accuracy data is available for this source
-		const sourceAccuracy = accuracyMap[f.source];
+	// Peso dinamico della fonte: base_weight * (1 / (1 + MAE)).
+	// Estratto qui perché serve anche alle aggregazioni daily/hourly più sotto.
+	const weightOf = (source: string) => {
+		const baseWeight = SOURCE_WEIGHTS[source] || 1.0;
+		const sourceAccuracy = accuracyMap[source];
 		const mae = sourceAccuracy ? (sourceAccuracy['temperature'] || 0) : 0;
-		// Formula: base_weight * (1 / (1 + MAE))
-		const weight = baseWeight * (1 / (1 + mae));
+		return baseWeight * (1 / (1 + mae));
+	};
+
+	validForecasts.forEach(f => {
+		const weight = weightOf(f.source);
 
 		const pushValue = (key: keyof Omit<AggregationData, 'conditions'>, val: number | null | undefined) => {
 			if (val !== null && val !== undefined) {
@@ -324,13 +329,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		if (f.daily && Array.isArray(f.daily)) {
 			f.daily.forEach(d => {
 				if (!dailyMap.has(d.date)) {
-					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [] });
+					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [] });
 				}
 				const entry = dailyMap.get(d.date)!;
 				if (d.temp_max !== null) entry.temp_max.push(d.temp_max);
 				if (d.temp_min !== null) entry.temp_min.push(d.temp_min);
 				if (d.precipitation_prob !== null) entry.precip_prob.push(d.precipitation_prob);
 				if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
+				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: weightOf(f.source) });
 				entry.codes.push(d.condition_code);
 			});
 		}
@@ -356,20 +362,47 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_code: bestCode,
 			condition_text: bestCode.toUpperCase(),
 			...(uvMax !== undefined && { uv_index_max: uvMax }),
+			...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
 		};
 	});
 
 	// 5b. Hourly Aggregation (merge from all sources by time slot)
-	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[] }>();
+
+	// Offset locale della località, preso dalla prima fonte che lo espone
+	// (open-meteo lo restituisce con timezone:'auto').
+	const tzOffsetMs = (validForecasts.find(f => f.utc_offset_seconds != null)?.utc_offset_seconds ?? 0) * 1000;
+
+	/**
+	 * Costruisce la chiave YYYY-MM-DDTHH:00 dello slot orario.
+	 *
+	 * Le fonti non sono omogenee: open-meteo, weatherapi e wwo restituiscono già
+	 * l'ora locale, mentre tomorrow.io e weatherkit restituiscono UTC. Troncare
+	 * la stringa a 13 caratteri, come si faceva prima, trattava un timestamp UTC
+	 * come se fosse locale e spostava i loro dati di un'intera fascia oraria
+	 * (−2h per l'Italia d'estate). Sulla temperatura la media lo assorbiva, sui
+	 * millimetri produceva barre in ore sbagliate.
+	 */
+	const hourKeyOf = (rawTime: string): string => {
+		const normalizedTime = rawTime.replace(' ', 'T');
+		// Timestamp con fuso esplicito (…Z oppure …+02:00): va convertito in ora locale.
+		if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(normalizedTime)) {
+			const parsed = Date.parse(normalizedTime);
+			if (!isNaN(parsed)) {
+				return new Date(parsed + tzOffsetMs).toISOString().slice(0, 13) + ':00';
+			}
+		}
+		// Timestamp già in ora locale (nessun fuso indicato): si usa così com'è.
+		return normalizedTime.slice(0, 13) + ':00';
+	};
+
+	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[]; precip_mm: { val: number; weight: number }[] }>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
+			const sourceWeight = weightOf(f.source);
 			f.hourly.forEach(h => {
-				// Normalize time key to YYYY-MM-DDTHH:00 for consistent grouping
-				// Replace space with T (WeatherAPI uses "2026-03-10 14:00" format)
-				const normalizedTime = h.time.replace(' ', 'T');
-				const timeKey = normalizedTime.slice(0, 13) + ':00';
+				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [] });
+					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push(h.temp);
@@ -377,6 +410,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				if (h.humidity != null) entry.humidities.push(h.humidity);
 				if (h.wind_speed != null) entry.wind_speeds.push(h.wind_speed);
 				if (h.uv_index != null) entry.uv_indices.push(h.uv_index);
+				// NB: openweathermap non popola precipitation_mm sull'hourly perché i suoi
+				// slot sono totali su 3 ore e non sono confrontabili con gli accumuli orari
+				// delle altre fonti. Contribuisce solo alla somma giornaliera.
+				if (h.precipitation_mm != null) entry.precip_mm.push({ val: h.precipitation_mm, weight: sourceWeight });
 				entry.codes.push(h.condition_code);
 			});
 		}
@@ -402,6 +439,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				...(data.humidities.length > 0 && { humidity: avgSimple(data.humidities) }),
 				...(data.wind_speeds.length > 0 && { wind_speed: avgSimple(data.wind_speeds) }),
 				...(data.uv_indices.length > 0 && { uv_index: avgSimple(data.uv_indices) }),
+				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
 			};
 		});
 

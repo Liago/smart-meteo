@@ -44,14 +44,16 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 			const forecastData = forecastRes.value.data;
 
 			// Aggregate 3h slots into daily forecasts
-			const dailyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[] }>();
+			const dailyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[]; precip_mm: number[] }>();
 			forecastData.list.forEach((slot: any) => {
 				const date = slot.dt_txt.slice(0, 10);
-				if (!dailyMap.has(date)) dailyMap.set(date, { temps: [], probs: [], codes: [] });
+				if (!dailyMap.has(date)) dailyMap.set(date, { temps: [], probs: [], codes: [], precip_mm: [] });
 				const entry = dailyMap.get(date)!;
 				entry.temps.push(slot.main.temp);
 				entry.probs.push((slot.pop ?? 0) * 100); // pop is 0-1
 				entry.codes.push(slot.weather[0].main);
+				// Le chiavi rain/snow sono assenti quando non piove: assenza = 0 mm
+				entry.precip_mm.push((slot.rain?.['3h'] ?? 0) + (slot.snow?.['3h'] ?? 0));
 			});
 
 			daily = Array.from(dailyMap.entries()).map(([date, d]) => ({
@@ -61,9 +63,13 @@ export async function fetchFromOpenWeather(lat: number, lon: number): Promise<Un
 				precipitation_prob: Number((d.probs.reduce((a, b) => a + b, 0) / d.probs.length).toFixed(1)),
 				condition_code: normalizeCondition(d.codes[Math.floor(d.codes.length / 2)]),
 				condition_text: d.codes[Math.floor(d.codes.length / 2)] ?? null,
+				precipitation_mm: Number(d.precip_mm.reduce((a, b) => a + b, 0).toFixed(1)),
 			}));
 
 			// Hourly from all available slots (~5 days at 3h intervals)
+			// NB: volutamente SENZA precipitation_mm — gli slot OWM sono totali su 3 ore,
+			// non accumuli orari, e non sono confrontabili con quelli delle altre fonti.
+			// Il contributo di OWM ai mm resta quindi solo nella somma giornaliera qui sopra.
 			hourly = forecastData.list.map((slot: any) => ({
 				time: new Date(slot.dt * 1000).toISOString(),
 				temp: slot.main.temp,
