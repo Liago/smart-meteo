@@ -156,3 +156,60 @@ export function getUvColor(uv: number): string {
 	return 'text-purple-300';
 }
 
+// --- Precipitazioni (quantità in mm) ---
+
+export type PrecipLevel = 'none' | 'light' | 'moderate' | 'heavy';
+
+/**
+ * Soglie di intensità in mm accumulati in un'ora, secondo lo standard NWS/AMS
+ * (debole ≤ 0.10 in/h, moderata 0.11–0.30 in/h, forte > 0.30 in/h).
+ *
+ * Preferite alle soglie WMO (2.5 / 10 / 50) perché la spaziatura WMO spingerebbe
+ * la banda "Forte" fuori dal grafico per la climatologia italiana.
+ */
+export const PRECIP_THRESHOLDS = {
+	light: 0.1,
+	moderate: 2.5,
+	heavy: 7.6,
+} as const;
+
+const precipLevels: Record<PrecipLevel, { label: string; color: string }> = {
+	none: { label: '—', color: 'rgba(255,255,255,0.25)' },
+	light: { label: 'Debole', color: '#7FB3E8' },
+	moderate: { label: 'Moderata', color: '#3B82F6' },
+	heavy: { label: 'Forte', color: '#EC685A' },
+};
+
+export function getPrecipIntensity(mm: number | null | undefined): {
+	level: PrecipLevel;
+	label: string;
+	color: string;
+} {
+	let level: PrecipLevel = 'none';
+	if (mm != null && !isNaN(mm)) {
+		if (mm >= PRECIP_THRESHOLDS.heavy) level = 'heavy';
+		else if (mm >= PRECIP_THRESHOLDS.moderate) level = 'moderate';
+		else if (mm >= PRECIP_THRESHOLDS.light) level = 'light';
+	}
+	return { level, ...precipLevels[level] };
+}
+
+/** Formatta i mm in italiano con un decimale, es. "0,5 mm". */
+export function formatPrecipMm(mm: number | null | undefined): string {
+	if (mm == null || isNaN(mm)) return '—';
+	return `${mm.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`;
+}
+
+/**
+ * Intervallo orario leggibile a partire da un timestamp, es. "17:00 - 18:00".
+ * Lavora sui caratteri della stringa ISO: i timestamp del backend sono già in
+ * ora locale della località, quindi convertirli con `Date` li sposterebbe nel
+ * fuso del browser.
+ */
+export function formatHourRange(iso: string): string {
+	const hour = Number(iso.slice(11, 13));
+	if (isNaN(hour)) return '—';
+	const pad = (h: number) => String(h % 24).padStart(2, '0');
+	return `${pad(hour)}:00 - ${pad(hour + 1)}:00`;
+}
+

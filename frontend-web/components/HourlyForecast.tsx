@@ -12,6 +12,8 @@ interface HourlyForecastProps {
 	mode?: 'next-12' | 'exact';
 	title?: string;
 	current?: ForecastCurrent;
+	/** Se passata, ogni ora diventa cliccabile e apre il dettaglio precipitazioni. */
+	onPrecipitationClick?: (isoTime: string) => void;
 }
 
 // Discriminator type for the items in our timeline
@@ -19,7 +21,7 @@ type TimelineItem =
 	| { type: 'weather'; time: number; data: HourlyForecast }
 	| { type: 'sun'; time: number; data: { label: string; icon: string } };
 
-export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore', current }: HourlyForecastProps) {
+export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore', current, onPrecipitationClick }: HourlyForecastProps) {
 	const chartData = useMemo(() => {
 		// 1. Merge and sort events
 		const events: TimelineItem[] = hourly.map(h => ({
@@ -143,7 +145,7 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		}
 
 		return { width, height, points, pathD };
-	}, [hourly, astronomy]);
+	}, [hourly, astronomy, mode]);
 
 	if (!chartData) return null;
 
@@ -222,17 +224,44 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 								</foreignObject>
 
 								{/* Time and Precip below line */}
-								<foreignObject x={p.x - 25} y={p.y + 15} width={50} height={60}>
-									<div className="flex flex-col items-center justify-start h-full pt-1">
-										<span className={`text-sm ${p.type === 'sun' ? 'text-yellow-200' : 'text-white/50'}`}>
-											{formatHour(p.time)}
-										</span>
-										{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
-											<span className="text-xs text-blue-300 font-medium mt-1">
-												{Math.round(p.data.precipitation_prob)}%
-											</span>
-										)}
-									</div>
+								<foreignObject x={p.x - 25} y={p.y + 15} width={50} height={70}>
+									{(() => {
+										const labels = (
+											<>
+												<span className={`text-sm ${p.type === 'sun' ? 'text-yellow-200' : 'text-white/50'}`}>
+													{formatHour(p.time)}
+												</span>
+												{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
+													<span className="text-xs text-blue-300 font-medium mt-1">
+														{Math.round(p.data.precipitation_prob)}%
+													</span>
+												)}
+												{p.type === 'weather' && p.data.precipitation_mm != null && p.data.precipitation_mm > 0 && (
+													<span className="text-[10px] text-blue-200/80 mt-0.5">
+														{p.data.precipitation_mm.toLocaleString('it-IT', { maximumFractionDigits: 1 })} mm
+													</span>
+												)}
+											</>
+										);
+
+										// L'istanza annidata dentro ForecastDetails non riceve la callback
+										// e resta volutamente inerte: un bottone dentro la riga-bottone
+										// del giorno sarebbe HTML non valido.
+										if (!onPrecipitationClick || p.type !== 'weather') {
+											return <div className="flex flex-col items-center justify-start h-full pt-1">{labels}</div>;
+										}
+
+										return (
+											<button
+												type="button"
+												onClick={() => onPrecipitationClick(p.data.time)}
+												aria-label={`Dettaglio precipitazioni delle ${formatHour(p.time)}`}
+												className="flex flex-col items-center justify-start h-full w-full pt-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+											>
+												{labels}
+											</button>
+										);
+									})()}
 								</foreignObject>
 							</g>
 						))}

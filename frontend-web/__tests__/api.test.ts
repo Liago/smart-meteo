@@ -24,6 +24,27 @@ describe('API Client', () => {
           condition: 'clear',
           condition_text: 'CLEAR',
         },
+        hourly: [
+          {
+            time: '2026-01-01T00:00',
+            temp: 15.2,
+            precipitation_prob: 10,
+            condition_code: '61',
+            condition_text: 'Pioggia debole',
+            precipitation_mm: 0.4,
+          },
+        ],
+        daily: [
+          {
+            date: '2026-01-01',
+            temp_max: 18,
+            temp_min: 9,
+            precipitation_prob: 10,
+            condition_code: '61',
+            condition_text: 'Pioggia debole',
+            precipitation_mm: 2.1,
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -35,7 +56,7 @@ describe('API Client', () => {
       expect(result).toEqual(mockResponse);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/forecast?lat=45.46&lon=9.19'),
-        undefined
+        expect.objectContaining({ headers: expect.any(Object) })
       );
     });
 
