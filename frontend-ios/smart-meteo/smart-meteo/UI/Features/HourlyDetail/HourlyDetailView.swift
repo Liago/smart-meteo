@@ -133,9 +133,9 @@ struct HourlyDetailView: View {
             }
         }
         .onChange(of: selectedDate) { _, _ in selectedHour = nil }
-        // Cambiando metrica l'ora torna al default della nuova serie: l'ora più
-        // piovosa non è quella più ventosa.
-        .onChange(of: metric) { _, _ in selectedHour = nil }
+        // Nessun reset al cambio metrica: se l'utente ha scelto un'ora la tiene,
+        // così può confrontare metriche diverse sullo stesso istante. Se invece
+        // non ha scelto nulla, `defaultPoint` segue già la nuova metrica.
     }
 
     private var header: some View {
