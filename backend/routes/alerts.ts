@@ -112,30 +112,68 @@ alertsRouter.post('/subscribe', async (req, res) => {
     }
 
     try {
-        // Un device = una sola subscription attiva.
-        // Rimuovi tutte le subscription precedenti per questo device prima di inserire la nuova.
-        const { error: deleteError } = await supabase
+        // Un device = una sola subscription attiva, e la riga va aggiornata in
+        // place: l'app si ri-registra a ogni spostamento significativo, e
+        // cancellare/ricreare la riga cambierebbe l'id ad ogni giro.
+        const { data: existing, error: lookupError } = await supabase
             .from('alert_subscriptions')
-            .delete()
-            .eq('device_token', deviceToken);
+            .select('id')
+            .eq('device_token', deviceToken)
+            .order('updated_at', { ascending: false });
 
-        if (deleteError) {
-            console.warn('[AlertSubscribe] Failed to clean old subscriptions:', deleteError.message);
+        if (lookupError) throw lookupError;
+
+        let data;
+
+        if (existing && existing.length > 0) {
+            const keep = existing[0]!;
+
+            // Registrazioni residue dello stesso device: ognuna riceverebbe la
+            // propria copia di ogni notifica.
+            const stale = existing.slice(1).map(s => s.id);
+            if (stale.length > 0) {
+                const { error: cleanupError } = await supabase
+                    .from('alert_subscriptions')
+                    .delete()
+                    .in('id', stale);
+                if (cleanupError) {
+                    console.warn('[AlertSubscribe] Failed to clean duplicate subscriptions:', cleanupError.message);
+                } else {
+                    console.log(`[AlertSubscribe] Rimosse ${stale.length} subscription duplicate per il device`);
+                }
+            }
+
+            const { data: updated, error: updateError } = await supabase
+                .from('alert_subscriptions')
+                .update({
+                    location_lat: lat,
+                    location_lon: lon,
+                    location_name: locationName,
+                    platform,
+                    enabled: true
+                })
+                .eq('id', keep.id)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+            data = updated;
+        } else {
+            const { data: inserted, error: insertError } = await supabase
+                .from('alert_subscriptions')
+                .insert({
+                    device_token: deviceToken,
+                    location_lat: lat,
+                    location_lon: lon,
+                    location_name: locationName,
+                    platform
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+            data = inserted;
         }
-
-        const { data, error } = await supabase
-            .from('alert_subscriptions')
-            .insert({
-                device_token: deviceToken,
-                location_lat: lat,
-                location_lon: lon,
-                location_name: locationName,
-                platform
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
 
         return res.json({ success: true, message: 'Iscritto alle allerte (posizione aggiornata)', data });
     } catch (err: any) {
@@ -326,6 +364,14 @@ alertsRouter.get('/health', async (_req, res) => {
     try {
         const apnsStatus = getAPNsHealthStatus();
 
+        // Self-check dello schema: se una migration non è stata applicata, le
+        // insert di deduplicazione falliscono e le notifiche vengono rispedite
+        // ad ogni giro. Meglio scoprirlo qui che dai log.
+        const { error: schemaError } = await supabase
+            .from('weather_alerts')
+            .select('location_lat, device_token_hash, alert_signature, delivery_status')
+            .limit(1);
+
         // Conteggio sottoscrizioni attive
         const { count: subsCount } = await supabase
             .from('alert_subscriptions')
@@ -341,6 +387,11 @@ alertsRouter.get('/health', async (_req, res) => {
 
         return res.json({
             apns: apnsStatus,
+            schema: {
+                ok: !schemaError,
+                error: schemaError?.message,
+                hint: schemaError ? 'Applicare le migration in supabase/migrations (020, 021)' : undefined,
+            },
             subscriptions: {
                 active: subsCount || 0,
             },

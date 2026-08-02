@@ -290,12 +290,15 @@ export function alertSignature(alert: Partial<WeatherAlert>): string {
  * Il feed MeteoAlarm espone più entry per la stessa regione e lo stesso tipo di
  * avviso (finestre orarie diverse dello stesso giorno, riemissioni): senza questo
  * passaggio diventano notifiche distinte ma visivamente identiche.
- * Della coppia si tiene la severity più alta e la finestra temporale più ampia.
+ *
+ * La severity fa parte della firma, quindi un aggravamento (giallo → rosso)
+ * resta un'allerta a sé: è una notizia nuova e va notificato. Il caso di due
+ * severity per lo stesso evento e la stessa ora è già gestito prima da
+ * `deduplicateAlerts`, che tiene la più grave.
  */
 export function collapseBySignature(alerts: WeatherAlert[]): WeatherAlert[] {
 	if (alerts.length <= 1) return alerts;
 
-	const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
 	const bySignature = new Map<string, WeatherAlert>();
 
 	for (const alert of alerts) {
@@ -307,24 +310,19 @@ export function collapseBySignature(alerts: WeatherAlert[]): WeatherAlert[] {
 			continue;
 		}
 
-		const winner = (severityRank[alert.severity] || 2) > (severityRank[existing.severity] || 2)
-			? alert
-			: existing;
-		const other = winner === alert ? existing : alert;
-
 		// La finestra risultante copre entrambe le entry collassate
-		const earliest = [winner.effectiveTime, other.effectiveTime]
+		const earliest = [existing.effectiveTime, alert.effectiveTime]
 			.filter(Boolean)
 			.sort()[0];
-		const latest = [winner.expireTime, other.expireTime]
+		const latest = [existing.expireTime, alert.expireTime]
 			.filter(Boolean)
 			.sort()
 			.pop();
 
 		bySignature.set(signature, {
-			...winner,
-			effectiveTime: earliest || winner.effectiveTime,
-			expireTime: latest || winner.expireTime,
+			...existing,
+			effectiveTime: earliest || existing.effectiveTime,
+			expireTime: latest || existing.expireTime,
 		});
 	}
 

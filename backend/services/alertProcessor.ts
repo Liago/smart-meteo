@@ -1,8 +1,19 @@
 import { WeatherAlert } from '../types';
 import { supabase } from './supabase';
 import { sendPushNotification, PushResult } from './apns';
-import { isAlertRelevantForPoint } from '../utils/alertGeo';
+import { alertSignature, isAlertRelevantForPoint } from '../utils/alertGeo';
 import crypto from 'crypto';
+
+/** Codice PostgreSQL per violazione di vincolo di unicità */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Identifica un device senza conservarne il token in chiaro.
+ * Stesso schema usato in `alert_delivery_log`.
+ */
+function hashDeviceToken(deviceToken: string): string {
+	return crypto.createHash('sha256').update(deviceToken).digest('hex').slice(0, 16);
+}
 
 /**
  * Mappa la severity di WeatherKit a quella usata nella tabella weather_alerts
@@ -180,35 +191,62 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				? alert.description.substring(0, 197) + '...'
 				: alert.description;
 
+			const signature = alertSignature(alert);
+
 			for (const sub of recipients) {
-				// Deduplicazione per destinatario: la stessa allerta non viene inviata
-				// due volte allo stesso device, ma resta disponibile per gli altri.
-				const { data: alreadySent } = await supabase
-					.from('weather_alerts')
-					.select('id')
-					.eq('external_alert_id', alert.id)
-					.eq('subscription_id', sub.id)
-					.limit(1);
+				const tokenHash = hashDeviceToken(sub.device_token);
 
-				if (alreadySent && alreadySent.length > 0) {
-					console.log(`${logPrefix} Alert ${alert.id} già inviata a sub=${sub.id} (dedup), skipping`);
-					stats.skippedDuplicate++;
-					continue;
-				}
-
-				// Cooldown: controlla se questa subscription ha già ricevuto un'allerta simile di recente
+				// Cooldown: questo device ha già ricevuto un'allerta di pari gravità
+				// di recente? Legato al device e non alla subscription, che viene
+				// ricreata a ogni spostamento del telefono.
 				const cooldownSince = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
 				const { data: recentAlerts } = await supabase
 					.from('weather_alerts')
 					.select('id')
-					.eq('subscription_id', sub.id)
+					.eq('device_token_hash', tokenHash)
 					.eq('alert_type', alert.severity)
 					.gte('sent_at', cooldownSince)
 					.limit(1);
 
 				if (recentAlerts && recentAlerts.length > 0) {
-					console.log(`${logPrefix} Cooldown active: sub=${sub.id} already received ${alert.severity} alert in last ${COOLDOWN_HOURS}h, skipping`);
+					console.log(`${logPrefix} Cooldown active: device=${tokenHash} ha già ricevuto un'allerta ${alert.severity} nelle ultime ${COOLDOWN_HOURS}h, skipping`);
 					stats.skippedCooldown++;
+					continue;
+				}
+
+				// Prenotazione dell'invio PRIMA della push: l'indice unico
+				// (device_token_hash, alert_signature) è ciò che rende atomica la
+				// deduplicazione. Un controllo in lettura seguito da una scrittura
+				// non basta, perché più invocazioni concorrenti lo superano tutte.
+				const { error: claimError } = await supabase.from('weather_alerts').insert({
+					subscription_id: sub.id,
+					device_token_hash: tokenHash,
+					alert_signature: signature,
+					external_alert_id: alert.id,
+					alert_type: alert.severity,
+					message: alert.description,
+					severity: mapSeverityToDb(alert.severity),
+					area_id: alert.areaId,
+					area_name: alert.areaName,
+					country_code: alert.countryCode,
+					location_lat: sub.location_lat,
+					location_lon: sub.location_lon,
+					event_source: alert.eventSource || alert.source,
+					effective_time: alert.effectiveTime,
+					expire_time: alert.expireTime,
+					delivery_status: 'pending'
+				});
+
+				if (claimError) {
+					if (claimError.code === UNIQUE_VIOLATION) {
+						console.log(`${logPrefix} Alert ${alert.id} (${signature}) già inviata a device=${tokenHash} (dedup), skipping`);
+						stats.skippedDuplicate++;
+					} else {
+						// Fail-closed: senza la riga di dedup la notifica ripartirebbe
+						// a ogni giro, quindi si rinuncia all'invio.
+						stats.dedupWriteFailed++;
+						console.error(`${logPrefix} DEDUP WRITE FAILED per alert ${alert.id} device=${tokenHash}: ${claimError.message} — push non inviata (migration non applicata?)`);
+					}
 					continue;
 				}
 
@@ -227,33 +265,26 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 				const pushResult: PushResult = await sendPushNotification(sub.device_token, title, body, payload);
 
-				// Salva il record dell'allerta inviata: è ciò su cui si basano dedup e
-				// cooldown, quindi un fallimento silenzioso qui significa rispedire la
-				// stessa notifica a ogni giro.
-				const { error: dedupError } = await supabase.from('weather_alerts').insert({
-					subscription_id: sub.id,
-					external_alert_id: alert.id,
-					alert_type: alert.severity,
-					message: alert.description,
-					severity: mapSeverityToDb(alert.severity),
-					area_id: alert.areaId,
-					area_name: alert.areaName,
-					country_code: alert.countryCode,
-					location_lat: sub.location_lat,
-					location_lon: sub.location_lon,
-					event_source: alert.eventSource || alert.source,
-					effective_time: alert.effectiveTime,
-					expire_time: alert.expireTime
-				});
+				const deliveryStatus = pushResult.sent ? 'sent' : (pushResult.isExpiredToken ? 'expired_token' : 'failed');
 
-				if (dedupError) {
-					stats.dedupWriteFailed++;
-					console.error(`${logPrefix} DEDUP WRITE FAILED per alert ${alert.id} sub=${sub.id}: ${dedupError.message} — la notifica verrà rispedita al prossimo giro finché non si risolve (migration non applicata?)`);
+				if (!pushResult.sent && !pushResult.isExpiredToken) {
+					// Fallimento transitorio di APNs: la prenotazione viene rilasciata,
+					// altrimenti l'allerta resterebbe marcata come presa in carico e non
+					// verrebbe mai più tentata. Il prossimo giro del poller riprova.
+					await supabase
+						.from('weather_alerts')
+						.delete()
+						.eq('device_token_hash', tokenHash)
+						.eq('alert_signature', signature);
+				} else {
+					await supabase
+						.from('weather_alerts')
+						.update({ delivery_status: deliveryStatus })
+						.eq('device_token_hash', tokenHash)
+						.eq('alert_signature', signature);
 				}
 
 				// Log delivery nella tabella di audit
-				const tokenHash = crypto.createHash('sha256').update(sub.device_token).digest('hex').slice(0, 16);
-				const deliveryStatus = pushResult.sent ? 'sent' : (pushResult.isExpiredToken ? 'expired_token' : 'failed');
 				await supabase.from('alert_delivery_log').insert({
 					alert_id: alert.id,
 					subscription_id: sub.id,
