@@ -131,14 +131,14 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 							disabled={!enabled}
 							aria-pressed={isSelected}
 							onClick={() => setSelectedDate(date)}
-							className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-full transition-colors ${
-								isSelected ? 'bg-white/20' : enabled ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'
+							className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition-colors ${
+								isSelected ? 'bg-white/15' : enabled ? 'bg-white/5 hover:bg-white/10' : 'opacity-40 cursor-not-allowed'
 							}`}
 						>
-							<span className="text-[10px] uppercase text-white/60">
+							<span className="text-[10px] uppercase tracking-wider text-white/40">
 								{dt.toLocaleDateString('it-IT', { weekday: 'narrow' })}
 							</span>
-							<span className={`text-sm ${isSelected ? 'text-white font-semibold' : 'text-white/80'}`}>
+							<span className={`text-sm ${isSelected ? 'text-white font-semibold' : 'text-white/90'}`}>
 								{dt.getDate()}
 							</span>
 						</button>
@@ -146,7 +146,7 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 				})}
 			</div>
 
-			<p className="text-center text-sm text-white/70 mb-4">{dateLabel}</p>
+			<p className="text-center text-sm text-white/50 mb-4">{dateLabel}</p>
 
 			{!hasAnyHour ? (
 				<p className="text-center text-sm text-white/50 py-8">
@@ -156,17 +156,17 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 				<>
 					{/* Grafico quantità in mm */}
 					{hasMmData ? (
-						<section className="mb-6">
+						<section className="mb-4 rounded-lg bg-white/5 p-3">
 							<header className="text-center mb-1">
-								<p className="text-xs text-white/60">{active?.time ? formatHourRange(active.time) : '—'}</p>
-								<p className="text-3xl font-light text-white leading-tight">
+								<p className="text-xs text-white/40">{active?.time ? formatHourRange(active.time) : '—'}</p>
+								<p className="text-3xl font-light text-white/90 leading-tight">
 									{active?.time === undefined
 										? 'Dato non disponibile'
 										: activeIntensity.level === 'none'
 											? formatPrecipMm(active?.mm)
 											: activeIntensity.label}
 								</p>
-								<p className="text-xs text-white/50">
+								<p className="text-xs text-blue-200/80">
 									{active?.condition_code
 										? getWMOWeatherInfo(active.condition_code).label
 										: ''}
@@ -207,16 +207,16 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 							</div>
 						</section>
 					) : (
-						<p className="text-center text-xs text-white/50 mb-6">
+						<p className="text-center text-xs text-white/40 mb-4">
 							Quantità in mm non disponibile per questa località
 						</p>
 					)}
 
 					{/* Grafico probabilità */}
-					<section>
+					<section className="rounded-lg bg-white/5 p-3">
 						<header className="text-center mb-1">
-							<p className="text-xs text-white/60">{active?.time ? formatHourRange(active.time) : '—'}</p>
-							<p className="text-3xl font-light text-white leading-tight">
+							<p className="text-xs text-white/40">{active?.time ? formatHourRange(active.time) : '—'}</p>
+							<p className="text-3xl font-light text-blue-300 leading-tight">
 								{active?.prob != null ? `${Math.round(active.prob)}%` : '—%'}
 							</p>
 							<p className="text-xs text-white/50">Probabilità</p>
@@ -233,7 +233,7 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 							]}
 							bands={[]}
 							valueOf={(s) => s.prob}
-							colorOf={() => 'rgba(96,165,250,0.85)'}
+							colorOf={() => 'rgba(147,197,253,0.85)'}
 							ariaLabel="Probabilità oraria di precipitazione"
 						/>
 					</section>
