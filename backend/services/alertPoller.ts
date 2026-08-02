@@ -5,6 +5,7 @@ import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
+import { aggregateAlerts } from '../utils/alertGeo';
 
 /**
  * Raggruppa le subscription per cluster geografico (~0.5° gradi).
@@ -40,44 +41,6 @@ async function getSubscriptionClusters(): Promise<{ lat: number; lon: number; co
 		lon: Number((c.lons.reduce((a, b) => a + b, 0) / c.lons.length).toFixed(4)),
 		count: c.count,
 	}));
-}
-
-/**
- * Deduplicazione allerte multi-source (stessa logica di smartEngine).
- */
-function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
-	if (alerts.length <= 1) return alerts;
-
-	const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-	const deduplicated: WeatherAlert[] = [];
-	const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
-
-	for (const alert of alerts) {
-		const existingIdx = deduplicated.findIndex(existing => {
-			const eventA = (existing.event || existing.description || '').toLowerCase();
-			const eventB = (alert.event || alert.description || '').toLowerCase();
-			const eventSimilar = eventA.includes(eventB.slice(0, 10)) || eventB.includes(eventA.slice(0, 10));
-
-			const timeA = new Date(existing.effectiveTime).getTime();
-			const timeB = new Date(alert.effectiveTime).getTime();
-			const timeSimilar = Math.abs(timeA - timeB) < TWO_HOURS_MS;
-
-			return eventSimilar && timeSimilar;
-		});
-
-		if (existingIdx >= 0) {
-			const existing = deduplicated[existingIdx]!;
-			const existingSev = severityRank[existing.severity] || 2;
-			const newSev = severityRank[alert.severity] || 2;
-			if (newSev > existingSev) {
-				deduplicated[existingIdx] = alert;
-			}
-		} else {
-			deduplicated.push(alert);
-		}
-	}
-
-	return deduplicated;
 }
 
 /**
@@ -118,15 +81,14 @@ export async function pollAlerts(): Promise<{ clusters: number; alertsFound: num
 
 			if (allAlerts.length === 0) continue;
 
-			const deduplicated = deduplicateAlerts(allAlerts).filter(
-				a => !a.expireTime || new Date(a.expireTime) > new Date()
-			);
+			// Scarta le scadute, quelle di aree che non riguardano il cluster, e deduplica
+			const deduplicated = aggregateAlerts(allAlerts, cluster.lat, cluster.lon);
 
 			totalFound += allAlerts.length;
 			totalProcessed += deduplicated.length;
 
 			if (deduplicated.length > 0) {
-				console.log(`${logPrefix} Cluster ${cluster.lat},${cluster.lon}: ${allAlerts.length} raw → ${deduplicated.length} deduplicated alert(s)`);
+				console.log(`${logPrefix} Cluster ${cluster.lat},${cluster.lon}: ${allAlerts.length} raw → ${deduplicated.length} allerte pertinenti`);
 				await processWeatherAlerts(deduplicated, cluster.lat, cluster.lon);
 			}
 		} catch (err: any) {

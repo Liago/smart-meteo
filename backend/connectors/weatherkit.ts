@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { UnifiedForecast, normalizeCondition } from '../utils/formatter';
 import { WeatherAlert, ForecastNextHour } from '../types';
+import { getCountryCode } from '../utils/alertGeo';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -84,24 +85,6 @@ function mapConditionCode(appleCondition: string): string {
 }
 
 /**
- * Determina il codice paese ISO Alpha-2 dalle coordinate.
- * Usa una lookup semplificata per i paesi europei principali, con fallback a 'IT'.
- * Apple WeatherKit richiede countryCode per il dataset weatherAlerts.
- */
-function getCountryCodeFromCoords(lat: number, lon: number): string {
-    // Bounding box approssimative per i paesi europei principali
-    if (lat >= 35.5 && lat <= 47.1 && lon >= 6.6 && lon <= 18.5) return 'IT';
-    if (lat >= 41.3 && lat <= 51.1 && lon >= -5.1 && lon <= 9.6) return 'FR';
-    if (lat >= 47.3 && lat <= 55.1 && lon >= 5.9 && lon <= 15.0) return 'DE';
-    if (lat >= 36.0 && lat <= 43.8 && lon >= -9.5 && lon <= 3.3) return 'ES';
-    if (lat >= 45.8 && lat <= 47.8 && lon >= 5.9 && lon <= 10.5) return 'CH';
-    if (lat >= 46.4 && lat <= 49.0 && lon >= 9.5 && lon <= 17.2) return 'AT';
-    if (lat >= 49.5 && lat <= 61.0 && lon >= -8.2 && lon <= 1.8) return 'GB';
-    // Fallback: Italia (target principale dell'app)
-    return 'IT';
-}
-
-/**
  * Mappa i severity di Apple WeatherKit
  */
 function mapAlertSeverity(severity: string): string {
@@ -181,7 +164,7 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
     const token = generateAppleJWT();
     if (!token) return null;
 
-    const countryCode = getCountryCodeFromCoords(lat, lon);
+    const countryCode = getCountryCode(lat, lon);
     const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts&countryCode=${countryCode}`;
 
     try {
@@ -287,7 +270,7 @@ export async function fetchFromWeatherKitWithAlerts(lat: number, lon: number): P
     const token = generateAppleJWT();
     if (!token) return null;
 
-    const countryCode = getCountryCodeFromCoords(lat, lon);
+    const countryCode = getCountryCode(lat, lon);
     const url = `https://weatherkit.apple.com/api/v1/weather/it/${lat}/${lon}?dataSets=currentWeather,forecastDaily,forecastHourly,forecastNextHour,weatherAlerts&countryCode=${countryCode}`;
 
     try {
