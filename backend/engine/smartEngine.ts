@@ -11,6 +11,7 @@ import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
+import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
@@ -30,8 +31,9 @@ import { aggregateAlerts } from '../utils/alertGeo';
  * risposta.
  *   1 → forma originale
  *   2 → aggiunge precipitation_mm su hourly e daily
+ *   3 → aggiunge feels_like, wind_direction e wind_gust su hourly
  */
-const FORECAST_SCHEMA_VERSION = 2;
+const FORECAST_SCHEMA_VERSION = 3;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -418,21 +420,26 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		return normalizedTime.slice(0, 13) + ':00';
 	};
 
-	const hourlyMap = new Map<string, { temps: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[]; precip_mm: { val: number; weight: number }[] }>();
+	const hourlyMap = new Map<string, { temps: number[]; feels_like: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[]; precip_mm: { val: number; weight: number }[]; wind_directions: { val: number; weight: number }[]; wind_gusts: { val: number; weight: number }[] }>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
 			const sourceWeight = weightOf(f.source);
 			f.hourly.forEach(h => {
 				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [] });
+					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push(h.temp);
+				if (h.feels_like != null) entry.feels_like.push(h.feels_like);
 				if (h.precipitation_prob != null) entry.probs.push(h.precipitation_prob);
 				if (h.humidity != null) entry.humidities.push(h.humidity);
 				if (h.wind_speed != null) entry.wind_speeds.push(h.wind_speed);
 				if (h.uv_index != null) entry.uv_indices.push(h.uv_index);
+				// Direzione e raffica non sono medie aritmetiche: la prima è circolare,
+				// la seconda va presa al massimo. Entrambe portano quindi il peso della fonte.
+				if (h.wind_direction != null) entry.wind_directions.push({ val: h.wind_direction, weight: sourceWeight });
+				if (h.wind_gust != null) entry.wind_gusts.push({ val: h.wind_gust, weight: sourceWeight });
 				// NB: openweathermap non popola precipitation_mm sull'hourly perché i suoi
 				// slot sono totali su 3 ore e non sono confrontabili con gli accumuli orari
 				// delle altre fonti. Contribuisce solo alla somma giornaliera.
@@ -459,8 +466,11 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				precipitation_prob: avgSimple(data.probs) ?? 0,
 				condition_code: bestCode,
 				condition_text: bestCode.toUpperCase(),
+				...(data.feels_like.length > 0 && { feels_like: avgSimple(data.feels_like) }),
 				...(data.humidities.length > 0 && { humidity: avgSimple(data.humidities) }),
 				...(data.wind_speeds.length > 0 && { wind_speed: avgSimple(data.wind_speeds) }),
+				...(data.wind_directions.length > 0 && { wind_direction: aggregateWindDirection(data.wind_directions) }),
+				...(data.wind_gusts.length > 0 && { wind_gust: aggregateWindGust(data.wind_gusts) }),
 				...(data.uv_indices.length > 0 && { uv_index: avgSimple(data.uv_indices) }),
 				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
 			};
@@ -494,7 +504,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	const aggTemp = avg(aggregation.temp);
 	const aggHumidity = avg(aggregation.humidity);
-	const aggWindDir = avg(aggregation.wind_direction);
+	// Media circolare: la media aritmetica di 350° e 10° darebbe sud invece di nord.
+	const aggWindDir = aggregateWindDirection(aggregation.wind_direction);
 
 	const result = {
 		location: { lat, lon },

@@ -11,7 +11,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,cloud_cover,visibility,dew_point_2m',
 			// NB: `precipitation` include già l'equivalente in acqua della neve;
 			// aggiungere anche `snowfall` (in cm) porterebbe a un doppio conteggio.
-			hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,uv_index',
+			hourly: 'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index',
 			daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max',
 			timezone: 'auto'
 		};
@@ -51,8 +51,11 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 				precipitation_prob: hourly.precipitation_probability[realIndex],
 				condition_code: String(hourly.weather_code[realIndex]),
 				condition_text: `Code ${hourly.weather_code[realIndex]}`,
+				feels_like: hourly.apparent_temperature?.[realIndex] ?? null,
 				humidity: hourly.relative_humidity_2m?.[realIndex] ?? null,
 				wind_speed: hourly.wind_speed_10m?.[realIndex] != null ? Number((hourly.wind_speed_10m[realIndex] / 3.6).toFixed(2)) : null, // km/h → m/s
+				wind_direction: hourly.wind_direction_10m?.[realIndex] ?? null,
+				wind_gust: hourly.wind_gusts_10m?.[realIndex] != null ? Number((hourly.wind_gusts_10m[realIndex] / 3.6).toFixed(2)) : null, // km/h → m/s
 				uv_index: hourly.uv_index?.[realIndex] ?? null,
 				precipitation_mm: hourly.precipitation?.[realIndex] ?? null,
 			};

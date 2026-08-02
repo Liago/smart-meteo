@@ -12,8 +12,10 @@ import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
 import AuthButton from '@/components/AuthButton';
 import WeatherAlerts, { AlertBadge } from '@/components/WeatherAlerts';
-import PrecipitationDetail from '@/components/PrecipitationDetail';
+import HourlyDetail from '@/components/HourlyDetail';
 import Modal from '@/components/ui/Modal';
+import MetricSelect from '@/components/ui/MetricSelect';
+import type { MetricId } from '@/lib/metrics';
 import { useForecast, useAlerts } from '@/lib/hooks';
 import type { WeatherAlert } from '@/lib/types';
 import { useLocations } from '@/lib/useLocations';
@@ -22,8 +24,10 @@ import { getConditionLabel, isDaytime } from '@/lib/weather-utils';
 export default function Home() {
 	const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
 	const [locationName, setLocationName] = useState('');
-	/** Data (YYYY-MM-DD) aperta nel dettaglio precipitazioni; null = modale chiuso. */
+	/** Data (YYYY-MM-DD) aperta nel dettaglio orario; null = modale chiuso. */
 	const [precipDate, setPrecipDate] = useState<string | null>(null);
+	/** Metrica mostrata nel modale. Gli entry point sono sulla pioggia, quindi si parte da lì. */
+	const [metric, setMetric] = useState<MetricId>('precipitation');
 	const { data, error, isLoading, mutate } = useForecast(
 		coords?.lat ?? null,
 		coords?.lon ?? null
@@ -225,21 +229,18 @@ export default function Home() {
 						{/* Il modale vive in un portal su document.body: la posizione qui è indifferente */}
 						<Modal
 							isOpen={precipDate !== null}
-							onClose={() => setPrecipDate(null)}
-							title={
-								<>
-									<svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-										<path d="M12 2.5c-.3 0-.6.14-.79.39C10.6 3.7 5.5 10.4 5.5 14a6.5 6.5 0 0 0 13 0c0-3.6-5.1-10.3-5.71-11.11a.99.99 0 0 0-.79-.39z" />
-									</svg>
-									Precipitazioni
-								</>
-							}
+							onClose={() => {
+								setPrecipDate(null);
+								setMetric('precipitation');
+							}}
+							title={<MetricSelect value={metric} onChange={setMetric} />}
 						>
 							{data.hourly && precipDate && (
-								<PrecipitationDetail
+								<HourlyDetail
 									hourly={data.hourly}
 									daily={data.daily}
 									initialDate={precipDate}
+									metric={metric}
 								/>
 							)}
 						</Modal>

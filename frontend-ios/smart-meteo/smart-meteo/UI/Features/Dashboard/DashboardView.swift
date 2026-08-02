@@ -269,7 +269,7 @@ struct DashboardView: View {
         .sheet(item: $precipTarget) { target in
             // Solo .large: due grafici impilati più la strip dei giorni
             // verrebbero tagliati a .medium.
-            PrecipitationDetailView(
+            HourlyDetailView(
                 hourly: currentForecast?.hourly ?? [],
                 daily: currentForecast?.daily,
                 initialDate: target.id

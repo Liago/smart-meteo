@@ -118,9 +118,20 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 							onClick={(e) => e.stopPropagation()}
 						>
 							<div className="flex items-center justify-between mb-4">
-								<h2 id={titleId} className="flex items-center gap-2 text-base font-medium text-white">
+								{/*
+								  Non un <h2>: il titolo può contenere controlli (la dropdown
+								  di selezione della metrica porta con sé una listbox), che in
+								  un heading sarebbero flow content dentro phrasing content.
+								  role="heading" conserva la semantica per gli screen reader.
+								*/}
+								<div
+									id={titleId}
+									role="heading"
+									aria-level={2}
+									className="flex items-center gap-2 text-base font-medium text-white"
+								>
 									{title}
-								</h2>
+								</div>
 								<button
 									type="button"
 									onClick={onClose}
