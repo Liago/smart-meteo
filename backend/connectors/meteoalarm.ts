@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { WeatherAlert } from '../types';
+import { getCountryCode, matchAreaToPoint } from '../utils/alertGeo';
 
 /**
  * Connettore MeteoAlarm (EUMETNET) — fonte ufficiale delle allerte meteo europee.
@@ -20,56 +21,11 @@ const COUNTRY_FEED_NAMES: Record<string, string> = {
 	GB: 'united-kingdom',
 };
 
-// Mappa area MeteoAlarm (EMMA_ID) → bounding box approssimativo [latMin, latMax, lonMin, lonMax]
-const ITALY_REGIONS: Record<string, { name: string; bbox: [number, number, number, number] }> = {
-	'IT001': { name: 'Piemonte', bbox: [44.1, 46.5, 6.6, 9.2] },
-	'IT002': { name: "Valle d'Aosta", bbox: [45.5, 46.0, 6.8, 7.9] },
-	'IT003': { name: 'Lombardia', bbox: [45.0, 46.6, 8.5, 11.4] },
-	'IT004': { name: 'Trentino-Alto Adige', bbox: [45.7, 47.1, 10.4, 12.5] },
-	'IT005': { name: 'Veneto', bbox: [44.8, 46.7, 10.6, 13.1] },
-	'IT006': { name: 'Friuli Venezia Giulia', bbox: [45.6, 46.6, 12.3, 13.9] },
-	'IT007': { name: 'Liguria', bbox: [43.8, 44.7, 7.5, 10.1] },
-	'IT008': { name: 'Emilia e Romagna', bbox: [43.7, 45.1, 9.2, 12.8] },
-	'IT009': { name: 'Toscana', bbox: [42.2, 44.5, 9.7, 12.4] },
-	'IT010': { name: 'Umbria', bbox: [42.4, 43.6, 12.1, 13.3] },
-	'IT011': { name: 'Marche', bbox: [42.7, 43.9, 12.1, 13.9] },
-	'IT012': { name: 'Lazio', bbox: [41.2, 42.9, 11.4, 14.0] },
-	'IT013': { name: 'Abruzzo', bbox: [41.7, 42.9, 13.0, 14.8] },
-	'IT014': { name: 'Molise', bbox: [41.4, 41.9, 14.1, 15.2] },
-	'IT015': { name: 'Campania', bbox: [40.0, 41.5, 13.8, 15.8] },
-	'IT016': { name: 'Puglia', bbox: [39.8, 42.0, 15.0, 18.5] },
-	'IT017': { name: 'Basilicata', bbox: [39.9, 41.1, 15.3, 16.9] },
-	'IT018': { name: 'Calabria', bbox: [37.9, 39.9, 15.6, 17.1] },
-	'IT019': { name: 'Sardegna', bbox: [38.8, 41.3, 8.1, 9.8] },
-	'IT020': { name: 'Sicilia', bbox: [36.6, 38.3, 12.4, 15.7] },
-};
-
 const xmlParser = new XMLParser({
 	ignoreAttributes: false,
 	attributeNamePrefix: '@_',
 	isArray: (name) => name === 'entry', // force entries to always be array
 });
-
-/**
- * Determina il codice paese dalle coordinate.
- */
-function getCountryCode(lat: number, lon: number): string {
-	if (lat >= 35.5 && lat <= 47.1 && lon >= 6.6 && lon <= 18.5) return 'IT';
-	if (lat >= 41.3 && lat <= 51.1 && lon >= -5.1 && lon <= 9.6) return 'FR';
-	if (lat >= 47.3 && lat <= 55.1 && lon >= 5.9 && lon <= 15.0) return 'DE';
-	if (lat >= 36.0 && lat <= 43.8 && lon >= -9.5 && lon <= 3.3) return 'ES';
-	if (lat >= 45.8 && lat <= 47.8 && lon >= 5.9 && lon <= 10.5) return 'CH';
-	if (lat >= 46.4 && lat <= 49.0 && lon >= 9.5 && lon <= 17.2) return 'AT';
-	if (lat >= 49.5 && lat <= 61.0 && lon >= -8.2 && lon <= 1.8) return 'GB';
-	return 'IT';
-}
-
-/**
- * Verifica se un punto (lat, lon) è dentro il bounding box di una regione.
- */
-function isInBbox(lat: number, lon: number, bbox: [number, number, number, number]): boolean {
-	return lat >= bbox[0] && lat <= bbox[1] && lon >= bbox[2] && lon <= bbox[3];
-}
 
 /**
  * Mappa severity da MeteoAlarm (Yellow/Orange/Red) al nostro formato.
@@ -181,7 +137,8 @@ export async function fetchMeteoAlarmAlerts(lat: number, lon: number): Promise<W
 }
 
 /**
- * Verifica se un'allerta corrisponde alla regione dell'utente.
+ * Verifica se un'allerta del feed corrisponde alla posizione dell'utente.
+ * Il match per regione è delegato a `alertGeo` (EMMA_ID o nome dell'area).
  */
 function matchRegion(
 	areaId: string,
@@ -191,29 +148,15 @@ function matchRegion(
 	countryCode: string
 ): { name: string } | null {
 	if (countryCode === 'IT') {
-		// 1. Match diretto per EMMA_ID (es. "IT008") — verifica che la posizione sia nel bbox
-		const region = ITALY_REGIONS[areaId];
-		if (region && isInBbox(lat, lon, region.bbox)) {
-			return { name: region.name };
-		}
-
-		// 2. Fallback: cerca la regione che contiene la posizione tra tutte
-		//    e verifica se l'areaId o areaDesc corrisponde
-		for (const [id, reg] of Object.entries(ITALY_REGIONS)) {
-			if (isInBbox(lat, lon, reg.bbox)) {
-				// Match se areaId corrisponde O se il nome regione appare nell'areaDesc
-				if (areaId === id ||
-					areaDesc.toLowerCase().includes(reg.name.toLowerCase().slice(0, 5)) ||
-					reg.name.toLowerCase().includes(areaDesc.toLowerCase().slice(0, 5))) {
-					return { name: reg.name };
-				}
-			}
-		}
+		const region = matchAreaToPoint(areaId, areaDesc, lat, lon);
+		if (region) return { name: region.name };
 	}
 
-	// Fallback generico: accetta se l'area è nazionale o se contiene "all"
+	// Fallback: accetta solo le allerte esplicitamente nazionali.
+	// Un'area non riconosciuta NON viene accettata: il feed è nazionale e
+	// lasciarla passare significherebbe mostrare allerte di altre regioni.
 	const descLower = (areaDesc || '').toLowerCase();
-	if (descLower.includes('national') || descLower.includes('tutto') || descLower === '') {
+	if (descLower.includes('national') || descLower.includes('tutto il paese')) {
 		return { name: areaDesc || countryCode };
 	}
 

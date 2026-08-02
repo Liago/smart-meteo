@@ -1,9 +1,43 @@
 # Analisi Sistema Allerte Meteo — Smart Meteo
 
 **Data:** 2026-03-17
-**Ultimo aggiornamento:** 2026-04-01
+**Ultimo aggiornamento:** 2026-08-02
 **Problema originale:** Il 16 marzo 2026 era attiva un'allerta meteo per vento, ma l'app non ha segnalato nulla.
 **Problema successivo (risolto 2026-04-01):** ID allerta non-deterministici (Date.now/Math.random) nei connettori WeatherKit, WeatherAPI e OWM causavano bypass della deduplicazione, generando 57 notifiche duplicate in un giorno. Fix: ID deterministici basati su area/severity/effectiveTime + cooldown 6h per subscription.
+
+---
+
+## 0. Allerte di località non pertinenti (risolto 2026-08-02)
+
+**Sintomo:** a Bormio (Lombardia) arrivavano notifiche e comparivano in lista 13 allerte di
+Sicilia, Emilia e Romagna, Molise, Umbria.
+
+**Tre cause indipendenti:**
+
+1. **Nessun filtro geografico sulle allerte dei provider.** WeatherAPI (e in parte WeatherKit)
+   restituisce le allerte *nazionali* per qualsiasi coordinata; i connettori le mappavano 1:1.
+   Solo MeteoAlarm filtrava, ma accettava qualsiasi entry con `areaDesc` vuoto.
+2. **`GET /api/alerts/active` restituiva l'intera tabella `weather_alerts`**, senza vincolo
+   geografico: ogni allerta salvata da qualsiasi cluster finiva a tutti gli utenti.
+3. **Le push non venivano verificate sulla posizione del destinatario:** l'allerta trovata per il
+   centro del cluster veniva inviata a tutte le subscription nel raggio di ±0.5°.
+
+**Fix:**
+
+- Nuovo modulo `backend/utils/alertGeo.ts`: regioni italiane (EMMA_ID + bbox + alias di nome),
+  `isAlertRelevantForPoint()` e `aggregateAlerts()` (scarta scadute → filtra per area → deduplica),
+  usato da smart engine, `/api/alerts/*`, poller e connettore MeteoAlarm. La deduplicazione, prima
+  triplicata, vive ora in un unico posto. Le allerte di cui non si riesce a determinare l'area
+  (es. OpenWeatherMap) vengono **mantenute**, per non silenziare allerte legittime.
+- Migrazione `020_weather_alerts_location.sql`: `location_lat/lon`, `area_id`, `country_code` su
+  `weather_alerts`, valorizzate da `alertProcessor` e usate per filtrare la query di `/active`.
+- `alertProcessor`: controllo di pertinenza per singola subscription e deduplica per
+  `external_alert_id` **per destinatario** (prima era globale: la prima allerta nazionale vista da
+  un cluster senza iscritti impediva la notifica a chiunque altro).
+- iOS: `activeAlerts` non si accumula più tra località e la subscription push viene aggiornata
+  quando il dispositivo si sposta di oltre ~10 km.
+
+**Verifica:** `cd backend && npm run test:alerts`.
 
 ---
 

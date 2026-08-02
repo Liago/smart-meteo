@@ -64,15 +64,24 @@ class AppState: ObservableObject {
             .first() // Auto-fetch on first location update
             .sink { [weak self] location in
                 self?.fetchWeather(for: location)
-                // Registra push SOLO per la posizione GPS reale del device
-                PushNotificationService.shared.registerPendingTokenIfNeeded(
+            }
+            .store(in: &cancellables)
+
+        // Le allerte push seguono la posizione GPS reale del device, non la località
+        // selezionata a mano: la subscription viene aggiornata a ogni spostamento
+        // significativo (la soglia dei ~10 km è gestita dal service).
+        locationManager.$location
+            .compactMap { $0 }
+            .sink { [weak self] location in
+                let name = self?.currentLocationName ?? ""
+                PushNotificationService.shared.updateSubscriptionLocationIfNeeded(
                     lat: location.coordinate.latitude,
                     lon: location.coordinate.longitude,
-                    locationName: self?.currentLocationName ?? ""
+                    locationName: AppState.invalidLocationNames.contains(name) ? "" : name
                 )
             }
             .store(in: &cancellables)
-        
+
         // Trigger location request on startup
         requestLocation()
     }
@@ -131,10 +140,10 @@ class AppState: ObservableObject {
                 await MainActor.run {
                     self.weatherState = .success(forecast)
 
-                    // Estrai le allerte dalla risposta forecast
-                    if let alerts = forecast.alerts, !alerts.isEmpty {
-                        self.activeAlerts = alerts.filter { $0.isActive }
-                    }
+                    // Estrai le allerte dalla risposta forecast.
+                    // Assegnazione sempre, anche a vuoto: le allerte sono relative
+                    // alla località corrente e non devono sopravvivere al cambio.
+                    self.activeAlerts = (forecast.alerts ?? []).filter { $0.isActive }
                     // Condividi dati con il widget via App Group
                     self.updateWidgetData(forecast: forecast, location: location)
                 }
@@ -352,10 +361,24 @@ extension AppState {
 
     // MARK: - Weather Alerts
 
+    /// Verifica che le coordinate corrispondano ancora alla località visualizzata
+    /// (tolleranza ~100m), per non applicare risposte fuori ordine.
+    private func isCurrentLocation(lat: Double, lon: Double) -> Bool {
+        guard let current = currentLocation else { return false }
+        return abs(current.coordinate.latitude - lat) < 0.001
+            && abs(current.coordinate.longitude - lon) < 0.001
+    }
+
     func fetchAlerts(lat: Double, lon: Double) async {
         do {
             let alerts = try await APIService.shared.fetchActiveAlerts(lat: lat, lon: lon)
             await MainActor.run {
+                // Scarta le risposte arrivate in ritardo per una località ormai abbandonata
+                guard self.isCurrentLocation(lat: lat, lon: lon) else {
+                    print("Ignoring alerts for stale location \(lat),\(lon)")
+                    return
+                }
+
                 // Unisci le allerte dal forecast e dal DB, deduplicando per id
                 var merged: [String: WeatherAlert] = [:]
                 for a in self.activeAlerts { merged[a.id] = a }

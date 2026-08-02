@@ -15,6 +15,7 @@ import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
 import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
 import { processWeatherAlerts } from '../services/alertProcessor';
+import { aggregateAlerts } from '../utils/alertGeo';
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -77,51 +78,6 @@ function degreesToCompass(deg: number): string {
 	return directions[index] ?? 'N';
 }
 
-/**
- * Deduplicazione allerte multi-source.
- * Allerte simili (stesso evento, finestra temporale ±2h) vengono unificate
- * mantenendo la versione con severity più alta.
- */
-function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
-	if (alerts.length <= 1) return alerts;
-
-	const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-	const deduplicated: WeatherAlert[] = [];
-	const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
-
-	for (const alert of alerts) {
-		const existingIdx = deduplicated.findIndex(existing => {
-			// Check evento simile (normalizzato)
-			const eventA = (existing.event || existing.description || '').toLowerCase();
-			const eventB = (alert.event || alert.description || '').toLowerCase();
-			const eventSimilar = eventA.includes(eventB.slice(0, 10)) || eventB.includes(eventA.slice(0, 10))
-				|| (existing.headline || '').toLowerCase().includes((alert.event || '').toLowerCase())
-				|| (alert.headline || '').toLowerCase().includes((existing.event || '').toLowerCase());
-
-			// Check finestra temporale simile (±2 ore)
-			const timeA = new Date(existing.effectiveTime).getTime();
-			const timeB = new Date(alert.effectiveTime).getTime();
-			const timeSimilar = Math.abs(timeA - timeB) < TWO_HOURS_MS;
-
-			return eventSimilar && timeSimilar;
-		});
-
-		if (existingIdx >= 0) {
-			// Mantieni la versione con severity più alta
-			const existing = deduplicated[existingIdx]!;
-			const existingSev = severityRank[existing.severity] || 2;
-			const newSev = severityRank[alert.severity] || 2;
-			if (newSev > existingSev) {
-				deduplicated[existingIdx] = alert;
-			}
-		} else {
-			deduplicated.push(alert);
-		}
-	}
-
-	return deduplicated;
-}
-
 async function upsertLocation(lat: number, lon: number): Promise<string | null> {
 	const { data, error } = await supabase.rpc('upsert_location', {
 		p_name: null,
@@ -171,10 +127,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 						if (result.status === 'fulfilled') freshAlertsRaw.push(...result.value);
 					}
 
-					const freshAlerts = deduplicateAlerts(freshAlertsRaw).filter(
-						(a: WeatherAlert) => !a.expireTime || new Date(a.expireTime) > new Date()
-					);
-					console.log(`[AlertPipeline] Cache bypass alerts check: raw=${freshAlertsRaw.length} deduplicated=${freshAlerts.length} from ${[...new Set(freshAlertsRaw.map(a => a.providerSource))].join(',') || 'none'}`);
+					// Filtro geografico + deduplica: i provider restituiscono anche allerte
+					// nazionali che non riguardano questa posizione.
+					const freshAlerts = aggregateAlerts(freshAlertsRaw, lat, lon);
+					console.log(`[AlertPipeline] Cache bypass alerts check: raw=${freshAlertsRaw.length} rilevanti=${freshAlerts.length} from ${[...new Set(freshAlertsRaw.map(a => a.providerSource))].join(',') || 'none'}`);
 
 					cached.full_data.alerts = freshAlerts;
 
@@ -523,11 +479,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		console.warn(`[AlertPipeline] OWM alerts fetch failed: ${err.message}`);
 	}
 
-	// 5d. Deduplicazione allerte multi-source
-	const deduplicatedAlerts = deduplicateAlerts(allAlerts);
-	result.alerts = deduplicatedAlerts.filter(a => !a.expireTime || new Date(a.expireTime) > new Date());
+	// 5d. Filtro geografico + deduplicazione allerte multi-source
+	result.alerts = aggregateAlerts(allAlerts, lat, lon);
 
-	console.log(`[AlertPipeline] Multi-source alerts: total=${allAlerts.length} deduplicated=${deduplicatedAlerts.length} active=${result.alerts.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',')}`);
+	console.log(`[AlertPipeline] Multi-source alerts: total=${allAlerts.length} attive e rilevanti=${result.alerts.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',')}`);
 
 	// 6. Save Aggregated Result to DB
 	if (locationId) {

@@ -7,6 +7,7 @@ import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
+import { aggregateAlerts, isAlertRelevantForPoint } from '../utils/alertGeo';
 
 /**
  * Cache in-memory per le allerte live, evita di chiamare le API ad ogni richiesta.
@@ -17,38 +18,6 @@ const LIVE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minuti
 
 function getLiveCacheKey(lat: number, lon: number): string {
     return `${Math.round(lat * 10) / 10}_${Math.round(lon * 10) / 10}`;
-}
-
-/**
- * Deduplicazione allerte multi-source (stessa logica di smartEngine).
- */
-function deduplicateAlerts(alerts: WeatherAlert[]): WeatherAlert[] {
-    if (alerts.length <= 1) return alerts;
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    const deduplicated: WeatherAlert[] = [];
-    const severityRank: Record<string, number> = { minor: 1, moderate: 2, severe: 3, extreme: 4 };
-
-    for (const alert of alerts) {
-        const existingIdx = deduplicated.findIndex(existing => {
-            const eventA = (existing.event || existing.description || '').toLowerCase();
-            const eventB = (alert.event || alert.description || '').toLowerCase();
-            const eventSimilar = eventA.includes(eventB.slice(0, 10)) || eventB.includes(eventA.slice(0, 10));
-            const timeA = new Date(existing.effectiveTime).getTime();
-            const timeB = new Date(alert.effectiveTime).getTime();
-            const timeSimilar = Math.abs(timeA - timeB) < TWO_HOURS_MS;
-            return eventSimilar && timeSimilar;
-        });
-
-        if (existingIdx >= 0) {
-            const existing = deduplicated[existingIdx]!;
-            if ((severityRank[alert.severity] || 2) > (severityRank[existing.severity] || 2)) {
-                deduplicated[existingIdx] = alert;
-            }
-        } else {
-            deduplicated.push(alert);
-        }
-    }
-    return deduplicated;
 }
 
 /**
@@ -108,14 +77,13 @@ async function fetchLiveAlerts(lat: number, lon: number, includeDebug = false): 
         }
     }
 
-    const deduplicated = deduplicateAlerts(allAlerts).filter(
-        a => !a.expireTime || new Date(a.expireTime) > new Date()
-    );
+    // Scarta le scadute, quelle di aree che non riguardano il punto, e deduplica
+    const deduplicated = aggregateAlerts(allAlerts, lat, lon);
 
     debugInfo.rawTotal = allAlerts.length;
     debugInfo.deduplicatedTotal = deduplicated.length;
 
-    console.log(`[AlertsRoute] Live fetch for ${lat},${lon}: raw=${allAlerts.length} deduplicated=${deduplicated.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',') || 'none'}`);
+    console.log(`[AlertsRoute] Live fetch for ${lat},${lon}: raw=${allAlerts.length} rilevanti=${deduplicated.length} sources=${[...new Set(allAlerts.map(a => a.providerSource))].join(',') || 'none'}`);
 
     liveAlertsCache.set(cacheKey, { alerts: deduplicated, fetchedAt: Date.now() });
 
@@ -220,7 +188,9 @@ alertsRouter.get('/active', async (req, res) => {
         // 1. Fetch allerte live dalle fonti (con cache 5 min)
         const { alerts: liveAlerts, debug: debugInfo } = await fetchLiveAlerts(lat, lon, includeDebug);
 
-        // 2. Fetch allerte dal DB (con filtro geografico)
+        // 2. Fetch allerte dal DB, vincolate all'area richiesta.
+        //    Le righe legacy senza coordinate non superano il confronto di range
+        //    e restano quindi escluse: prima venivano restituite a chiunque.
         const now = new Date().toISOString();
         const { data: dbAlerts, error } = await supabase
             .from('weather_alerts')
@@ -228,6 +198,10 @@ alertsRouter.get('/active', async (req, res) => {
             .gt('expire_time', now)
             .not('external_alert_id', 'is', null)
             .gte('effective_time', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()) // ultimi 2 giorni
+            .gte('location_lat', lat - radius)
+            .lte('location_lat', lat + radius)
+            .gte('location_lon', lon - radius)
+            .lte('location_lon', lon + radius)
             .order('sent_at', { ascending: false });
 
         if (error) {
@@ -251,17 +225,24 @@ alertsRouter.get('/active', async (req, res) => {
                 seen.add(key);
                 if (!merged.has(key)) {
                     // Mappa formato DB → formato WeatherAlert
-                    merged.set(key, {
+                    const mapped: WeatherAlert = {
                         id: key,
                         description: dbAlert.message || '',
                         severity: dbAlert.severity === 'critical' ? 'extreme' : dbAlert.severity === 'warning' ? 'moderate' : 'minor',
                         effectiveTime: dbAlert.effective_time || '',
                         expireTime: dbAlert.expire_time || '',
+                        areaId: dbAlert.area_id,
                         areaName: dbAlert.area_name,
+                        countryCode: dbAlert.country_code,
                         eventSource: dbAlert.event_source,
                         certainty: 'possible',
                         providerSource: dbAlert.event_source,
-                    });
+                    };
+                    // Seconda barriera: il cluster di raccolta può essere più ampio
+                    // dell'area effettiva dell'allerta.
+                    if (isAlertRelevantForPoint(mapped, lat, lon)) {
+                        merged.set(key, mapped);
+                    }
                 }
             }
         }

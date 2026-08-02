@@ -1,6 +1,7 @@
 import { WeatherAlert } from '../types';
 import { supabase } from './supabase';
 import { sendPushNotification, PushResult } from './apns';
+import { isAlertRelevantForPoint } from '../utils/alertGeo';
 import crypto from 'crypto';
 
 /**
@@ -64,7 +65,7 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 
 	console.log(`${logPrefix} Processing ${alerts.length} alert(s) for area ${lat},${lon}`);
 
-	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, skippedCooldown: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
+	const stats = { processed: 0, skippedExpired: 0, skippedUnlikely: 0, skippedDuplicate: 0, skippedCooldown: 0, skippedOutOfArea: 0, pushSent: 0, pushFailed: 0, noSubscribers: 0, expiredTokens: 0 };
 
 	for (const alert of alerts) {
 		// Salta allerte scadute
@@ -82,19 +83,6 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 		}
 
 		try {
-			// Controlla se questa allerta è già stata processata (deduplicazione per external_alert_id)
-			const { data: existing } = await supabase
-				.from('weather_alerts')
-				.select('id')
-				.eq('external_alert_id', alert.id)
-				.limit(1);
-
-			if (existing && existing.length > 0) {
-				console.log(`${logPrefix} Alert ${alert.id} already processed (dedup), skipping`);
-				stats.skippedDuplicate++;
-				continue;
-			}
-
 			// Trova tutte le sottoscrizioni nella zona dell'allerta
 			const { data: subscriptions, error: subError } = await supabase
 				.from('alert_subscriptions')
@@ -110,24 +98,46 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				continue;
 			}
 
-			if (!subscriptions || subscriptions.length === 0) {
-				console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — 0 subscriptions in radius ±${LOCATION_RADIUS_DEG}° of ${lat},${lon}`);
+			// Il raggio di ricerca (±0.5°) è più ampio dell'area dell'allerta:
+			// verifica ogni dispositivo sulle SUE coordinate prima di notificarlo.
+			const recipients = (subscriptions || []).filter(sub => {
+				if (isAlertRelevantForPoint(alert, sub.location_lat, sub.location_lon)) return true;
+				console.log(`${logPrefix} Alert ${alert.id} area=${alert.areaName || alert.areaId || 'unknown'} non pertinente per sub=${sub.id} (${sub.location_lat},${sub.location_lon}), skipping`);
+				stats.skippedOutOfArea++;
+				return false;
+			});
+
+			if (recipients.length === 0) {
+				console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — 0 destinatari nel raggio ±${LOCATION_RADIUS_DEG}° di ${lat},${lon}`);
 				stats.noSubscribers++;
-				// Salva comunque l'allerta per deduplicazione (senza subscription_id)
-				await supabase.from('weather_alerts').insert({
-					external_alert_id: alert.id,
-					alert_type: alert.severity,
-					message: alert.description,
-					severity: mapSeverityToDb(alert.severity),
-					area_name: alert.areaName,
-					event_source: alert.eventSource || alert.source,
-					effective_time: alert.effectiveTime,
-					expire_time: alert.expireTime
-				});
+				// Salva comunque l'allerta come storico (senza subscription_id), una volta sola
+				const { data: alreadyLogged } = await supabase
+					.from('weather_alerts')
+					.select('id')
+					.eq('external_alert_id', alert.id)
+					.is('subscription_id', null)
+					.limit(1);
+
+				if (!alreadyLogged || alreadyLogged.length === 0) {
+					await supabase.from('weather_alerts').insert({
+						external_alert_id: alert.id,
+						alert_type: alert.severity,
+						message: alert.description,
+						severity: mapSeverityToDb(alert.severity),
+						area_id: alert.areaId,
+						area_name: alert.areaName,
+						country_code: alert.countryCode,
+						location_lat: lat,
+						location_lon: lon,
+						event_source: alert.eventSource || alert.source,
+						effective_time: alert.effectiveTime,
+						expire_time: alert.expireTime
+					});
+				}
 				continue;
 			}
 
-			console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — ${subscriptions.length} subscriber(s) found`);
+			console.log(`${logPrefix} Alert ${alert.id} severity=${alert.severity} area=${alert.areaName || 'unknown'} — ${recipients.length} subscriber(s) found`);
 			stats.processed++;
 
 			const title = alertTitle(alert.severity);
@@ -136,7 +146,22 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 				? alert.description.substring(0, 197) + '...'
 				: alert.description;
 
-			for (const sub of subscriptions) {
+			for (const sub of recipients) {
+				// Deduplicazione per destinatario: la stessa allerta non viene inviata
+				// due volte allo stesso device, ma resta disponibile per gli altri.
+				const { data: alreadySent } = await supabase
+					.from('weather_alerts')
+					.select('id')
+					.eq('external_alert_id', alert.id)
+					.eq('subscription_id', sub.id)
+					.limit(1);
+
+				if (alreadySent && alreadySent.length > 0) {
+					console.log(`${logPrefix} Alert ${alert.id} già inviata a sub=${sub.id} (dedup), skipping`);
+					stats.skippedDuplicate++;
+					continue;
+				}
+
 				// Cooldown: controlla se questa subscription ha già ricevuto un'allerta simile di recente
 				const cooldownSince = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
 				const { data: recentAlerts } = await supabase
@@ -175,7 +200,11 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 					alert_type: alert.severity,
 					message: alert.description,
 					severity: mapSeverityToDb(alert.severity),
+					area_id: alert.areaId,
 					area_name: alert.areaName,
+					country_code: alert.countryCode,
+					location_lat: sub.location_lat,
+					location_lon: sub.location_lon,
 					event_source: alert.eventSource || alert.source,
 					effective_time: alert.effectiveTime,
 					expire_time: alert.expireTime
@@ -218,5 +247,5 @@ export async function processWeatherAlerts(alerts: WeatherAlert[], lat: number, 
 		}
 	}
 
-	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedDuplicate=${stats.skippedDuplicate} skippedCooldown=${stats.skippedCooldown}`);
+	console.log(`${logPrefix} Summary for ${lat},${lon}: total=${alerts.length} processed=${stats.processed} pushSent=${stats.pushSent} pushFailed=${stats.pushFailed} expiredTokens=${stats.expiredTokens} noSubscribers=${stats.noSubscribers} skippedExpired=${stats.skippedExpired} skippedUnlikely=${stats.skippedUnlikely} skippedOutOfArea=${stats.skippedOutOfArea} skippedDuplicate=${stats.skippedDuplicate} skippedCooldown=${stats.skippedCooldown}`);
 }
