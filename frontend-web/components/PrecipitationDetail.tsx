@@ -182,10 +182,18 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 									onActiveIndexChange={setActiveIndex}
 									height={150}
 									yMax={Math.max(PRECIP_THRESHOLDS.heavy * 1.25, ...mmValues.map((v) => v * 1.15))}
+									// Le linee marcano i confini fra le fasce; le etichette
+									// stanno dentro alla fascia che nominano, come nel
+									// riferimento. Una linea a 0,1 mm sarebbe appiccicata
+									// alla base e illeggibile.
 									gridLines={[
-										{ value: PRECIP_THRESHOLDS.light, label: 'Debole' },
-										{ value: PRECIP_THRESHOLDS.moderate, label: 'Moderata' },
-										{ value: PRECIP_THRESHOLDS.heavy, label: 'Forte' },
+										{ value: PRECIP_THRESHOLDS.moderate },
+										{ value: PRECIP_THRESHOLDS.heavy },
+									]}
+									bands={[
+										{ from: 0, to: PRECIP_THRESHOLDS.moderate, label: 'Debole' },
+										{ from: PRECIP_THRESHOLDS.moderate, to: PRECIP_THRESHOLDS.heavy, label: 'Moderata' },
+										{ from: PRECIP_THRESHOLDS.heavy, to: Infinity, label: 'Forte' },
 									]}
 									valueOf={(s) => s.mm}
 									colorOf={(v) => getPrecipIntensity(v).color}
@@ -223,6 +231,7 @@ export default function PrecipitationDetail({ hourly, daily, initialDate }: Prec
 								{ value: 80, label: '80%' },
 								{ value: 100, label: '100%' },
 							]}
+							bands={[]}
 							valueOf={(s) => s.prob}
 							colorOf={() => 'rgba(96,165,250,0.85)'}
 							ariaLabel="Probabilità oraria di precipitazione"
@@ -248,7 +257,10 @@ interface BarChartProps {
 	onActiveIndexChange: (i: number) => void;
 	height: number;
 	yMax: number;
-	gridLines: { value: number; label: string }[];
+	/** Linee orizzontali di riferimento; `label` opzionale, scritto sulla linea. */
+	gridLines: { value: number; label?: string }[];
+	/** Etichette di fascia, centrate verticalmente nella regione che nominano. */
+	bands: { from: number; to: number; label: string }[];
 	valueOf: (s: HourSlot) => number | null | undefined;
 	colorOf: (v: number) => string;
 	ariaLabel: string;
@@ -269,6 +281,7 @@ function BarChart({
 	height,
 	yMax,
 	gridLines,
+	bands,
 	valueOf,
 	colorOf,
 	ariaLabel,
@@ -306,9 +319,9 @@ function BarChart({
 			role="img"
 			aria-label={ariaLabel}
 		>
-			{/* Gridline con etichette di banda */}
+			{/* Linee di riferimento */}
 			{gridLines.map((g) => (
-				<g key={g.label}>
+				<g key={`grid-${g.value}`}>
 					<line
 						x1={PAD_L}
 						x2={W - PAD_R}
@@ -317,11 +330,30 @@ function BarChart({
 						stroke="rgba(255,255,255,0.12)"
 						strokeDasharray="2 3"
 					/>
-					<text x={4} y={y(g.value) + 3} className="fill-white/40" fontSize={9}>
-						{g.label}
-					</text>
+					{g.label && (
+						<text x={4} y={y(g.value) + 3} className="fill-white/40" fontSize={9}>
+							{g.label}
+						</text>
+					)}
 				</g>
 			))}
+
+			{/* Etichette di fascia, centrate nella regione che nominano */}
+			{bands.map((b) => {
+				const top = y(Math.min(b.to, yMax));
+				const bottom = y(b.from);
+				return (
+					<text
+						key={b.label}
+						x={4}
+						y={(top + bottom) / 2 + 3}
+						className="fill-white/40"
+						fontSize={9}
+					>
+						{b.label}
+					</text>
+				);
+			})}
 
 			{/* Linea di base */}
 			<line x1={PAD_L} x2={W - PAD_R} y1={baselineY} y2={baselineY} stroke="rgba(255,255,255,0.2)" />

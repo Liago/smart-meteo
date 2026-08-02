@@ -723,7 +723,8 @@ struct AirQualityBalloon: View {
             precipitationProb: 0,
             conditionCode: "0",
             conditionText: "Clear",
-            uvIndexMax: 8
+            uvIndexMax: 8,
+            precipitationMm: 0
         ), astronomy: AstronomyData(
             sunrise: "2026-03-02T06:45:00Z",
             sunset: "2026-03-02T18:10:00Z",

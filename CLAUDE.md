@@ -226,6 +226,8 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Precipitation amount (mm)** (backend + web + iOS): `precipitation_mm` on hourly and daily forecasts, aggregated in `backend/utils/precipitation.ts` with a wet-fraction-gated weighted mean. Tap/click an hour or a daily rain cell to open a detail view with a day strip, an mm bar chart with Light/Moderate/Heavy bands, and a probability chart. Intensity thresholds (NWS: 0.1 / 2.5 / 7.6 mm/h) live in `frontend-web/lib/weather-utils.ts` and `UI/DesignSystem/PrecipitationScale.swift`. OpenWeatherMap contributes only to the daily total — its slots are 3-hour sums, not hourly accumulations.
+- **Hourly timezone bucketing fix** (backend): `smartEngine` used to key hourly slots by truncating the timestamp string, treating tomorrow.io's and WeatherKit's UTC times as local. Now offset-bearing timestamps are converted using `utc_offset_seconds` from Open-Meteo.
 - **Sun & Wind card** (web + iOS): semi-circle sun arc showing sunrise/sunset position, wind speed/direction with turbine animation, barometric pressure display
 - **7-day forecast details** (web): expandable daily cards with hourly drill-down per day
 - **WMO weather code mapping** (iOS): proper icon display in DailyForecastView based on WMO codes

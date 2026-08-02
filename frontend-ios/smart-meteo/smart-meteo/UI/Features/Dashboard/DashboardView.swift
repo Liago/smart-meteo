@@ -5,7 +5,14 @@ struct DashboardView: View {
     @State private var isSidebarPresented = false
     @State private var isSearchPresented = false
     @State private var isAlertsPresented = false
-    
+    /// Giorno aperto nel dettaglio precipitazioni; nil = foglio chiuso.
+    @State private var precipTarget: PrecipTarget?
+
+    /// Wrapper Identifiable: serve `.sheet(item:)` perché la data va passata al foglio.
+    private struct PrecipTarget: Identifiable {
+        let id: String // "yyyy-MM-dd"
+    }
+
     // Computed helpers that delegate to appState
     private var isCurrentLocationHome: Bool {
         appState.homeLocation?.name == appState.currentLocationName
@@ -14,7 +21,14 @@ struct DashboardView: View {
     private var isCurrentLocationFavorite: Bool {
         appState.isFavorite(name: appState.currentLocationName)
     }
-    
+
+    /// Previsione corrente, se già caricata. Serve ai fogli, che sono fuori
+    /// dallo `switch` sullo stato dentro al body.
+    private var currentForecast: ForecastResponse? {
+        if case .success(let forecast) = appState.weatherState { return forecast }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -170,13 +184,23 @@ struct DashboardView: View {
                             
                             // Hourly Forecast
                             if let hourly = forecast.hourly {
-                                HourlyForecastView(hourly: hourly, astronomy: forecast.astronomy, current: forecast.current, daily: forecast.daily)
+                                HourlyForecastView(
+                                    hourly: hourly,
+                                    astronomy: forecast.astronomy,
+                                    current: forecast.current,
+                                    daily: forecast.daily,
+                                    onPrecipitationTap: { date in precipTarget = PrecipTarget(id: date) }
+                                )
                                     .padding(.horizontal)
                             }
-                            
+
                             // Daily Forecast
                             if let daily = forecast.daily {
-                                DailyForecastView(daily: daily, hourly: forecast.hourly)
+                                DailyForecastView(
+                                    daily: daily,
+                                    hourly: forecast.hourly,
+                                    onPrecipitationTap: { date in precipTarget = PrecipTarget(id: date) }
+                                )
                                     .padding(.horizontal)
                             }
                             
@@ -240,6 +264,17 @@ struct DashboardView: View {
         .sheet(isPresented: $isAlertsPresented) {
             WeatherAlertsView(alerts: appState.activeAlerts)
                 .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $precipTarget) { target in
+            // Solo .large: due grafici impilati più la strip dei giorni
+            // verrebbero tagliati a .medium.
+            PrecipitationDetailView(
+                hourly: currentForecast?.hourly ?? [],
+                daily: currentForecast?.daily,
+                initialDate: target.id
+            )
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .onReceive(appState.$showAlertsModal) { show in

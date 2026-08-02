@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Corallo, accento della dashboard.
+private let precipAccent = Color(red: 236/255, green: 104/255, blue: 90/255)
+
 private func precipitationColor(for prob: Double) -> Color {
     if prob >= 60 {
         return Color(red: 236/255, green: 104/255, blue: 90/255)
@@ -15,7 +18,9 @@ struct HourlyForecastView: View {
     let astronomy: AstronomyData?
     let current: ForecastCurrent?
     let daily: [DailyForecast]?
-    
+    /// Apre il dettaglio precipitazioni sulla data passata (formato "yyyy-MM-dd").
+    var onPrecipitationTap: ((String) -> Void)? = nil
+
     // MARK: - Processed Data
     struct DayPeriod: Identifiable {
         let id = UUID()
@@ -58,11 +63,31 @@ struct HourlyForecastView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Prossime 24 Ore")
-                .font(.system(size: 28, weight: .bold, design: .serif))
-                .foregroundColor(.black)
-                .padding(.horizontal, 8)
-            
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Prossime 24 Ore")
+                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .foregroundColor(.black)
+
+                // I punti del grafico non sono tappabili: il loro layer ha
+                // l'hit-testing disattivato per non litigare con il drag della
+                // ScrollView orizzontale. L'ingresso è quindi qui nel titolo.
+                if let onPrecipitationTap {
+                    Button {
+                        HapticManager.selection()
+                        let firstDate = hourly.first.map { String($0.time.prefix(10)) } ?? ""
+                        onPrecipitationTap(firstDate)
+                    } label: {
+                        Image(systemName: "drop.fill")
+                            .font(.system(size: 15))
+                            .foregroundColor(precipAccent)
+                    }
+                    .accessibilityLabel("Dettaglio precipitazioni")
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+
             // Generate dynamic description
             let dynamicDesc = WeatherDescriptionEngine.generateEnhancedDescription(
                 current: current, hourly: hourly, daily: daily, astronomy: astronomy
@@ -209,10 +234,6 @@ struct HourlyForecastView: View {
         // Weather Items
         let weatherItems = hourly.compactMap { h -> TimelineItem? in
             guard let date = parseDate(h.time) else { return nil }
-            // Debug: log precipitazione per verificare dati dall'API
-            if let prob = h.precipitationProb, prob > 0 {
-                print("[HourlyForecast] \(h.time) — precipitationProb: \(prob)%")
-            }
             return TimelineItem(time: date, type: .weather(h), temp: h.temp)
         }
         
