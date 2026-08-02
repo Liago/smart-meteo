@@ -24,12 +24,13 @@ const useIsClient = () =>
 	);
 
 /**
- * Bottom sheet modale. È l'unico dialog dell'app, quindi implementa qui il
- * minimo indispensabile per essere corretto: portal, ESC, blocco dello scroll,
- * gestione del focus e ruoli ARIA.
+ * Modale centrata nella pagina. È l'unico dialog dell'app, quindi implementa
+ * qui il minimo indispensabile per essere corretto: portal, ESC, blocco dello
+ * scroll, gestione del focus e ruoli ARIA.
  *
  * Il pannello sta a z-101 perché il dropdown della SearchBar occupa z-50, che
- * era finora il massimo usato nell'app.
+ * era finora il massimo usato nell'app. La superficie usa `.glass`, la stessa
+ * della card "Dettagli previsione", così i due contesti hanno lo stesso tono.
  */
 export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
 	const isClient = useIsClient();
@@ -98,36 +99,42 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 						onClick={onClose}
 						aria-hidden="true"
 					/>
-					<motion.div
-						ref={panelRef}
-						role="dialog"
-						aria-modal="true"
-						aria-labelledby={titleId}
-						tabIndex={-1}
-						className="fixed bottom-0 inset-x-0 z-[101] max-w-lg mx-auto glass-strong rounded-t-3xl rounded-b-none max-h-[90dvh] overflow-y-auto p-4 outline-none"
-						initial={{ y: '100%' }}
-						animate={{ y: 0 }}
-						exit={{ y: '100%' }}
-						transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-						onClick={(e) => e.stopPropagation()}
-					>
-						<div className="flex items-center justify-between mb-4">
-							<h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold text-white">
-								{title}
-							</h2>
-							<button
-								type="button"
-								onClick={onClose}
-								aria-label="Chiudi"
-								className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-							>
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-									<path d="M18 6L6 18M6 6l12 12" />
-								</svg>
-							</button>
-						</div>
-						{children}
-					</motion.div>
+					{/*
+					  Il contenitore centra il pannello e lascia passare i click
+					  all'overlay sottostante, che è quello che chiude la modale.
+					*/}
+					<div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+						<motion.div
+							ref={panelRef}
+							role="dialog"
+							aria-modal="true"
+							aria-labelledby={titleId}
+							tabIndex={-1}
+							className="w-full max-w-lg glass max-h-[85dvh] overflow-y-auto p-4 sm:p-6 text-white outline-none pointer-events-auto"
+							initial={{ opacity: 0, scale: 0.95, y: 12 }}
+							animate={{ opacity: 1, scale: 1, y: 0 }}
+							exit={{ opacity: 0, scale: 0.95, y: 12 }}
+							transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+							onClick={(e) => e.stopPropagation()}
+						>
+							<div className="flex items-center justify-between mb-4">
+								<h2 id={titleId} className="flex items-center gap-2 text-base font-medium text-white">
+									{title}
+								</h2>
+								<button
+									type="button"
+									onClick={onClose}
+									aria-label="Chiudi"
+									className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+								>
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+										<path d="M18 6L6 18M6 6l12 12" />
+									</svg>
+								</button>
+							</div>
+							{children}
+						</motion.div>
+					</div>
 				</>
 			)}
 		</AnimatePresence>,
