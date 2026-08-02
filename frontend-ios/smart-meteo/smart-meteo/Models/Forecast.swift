@@ -173,8 +173,15 @@ struct HourlyForecast: Codable, Identifiable {
     /// mm accumulati nell'ora. Opzionale: manca sulle risposte in cache scritte
     /// prima dell'introduzione del campo e sulle fonti che non lo forniscono.
     let precipitationMm: Double?
+    /// Temperatura percepita in °C. Opzionale come i campi qui sotto: manca
+    /// sulle risposte in cache scritte prima della sua introduzione.
+    let feelsLike: Double?
     let humidity: Double?
     let windSpeed: Double?
+    /// Direzione del vento in gradi, 0 = da nord.
+    let windDirection: Double?
+    /// Raffica in m/s, come `windSpeed`.
+    let windGust: Double?
     let uvIndex: Double?
 
     enum CodingKeys: String, CodingKey {
@@ -184,8 +191,11 @@ struct HourlyForecast: Codable, Identifiable {
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case precipitationMm = "precipitation_mm"
+        case feelsLike = "feels_like"
         case humidity
         case windSpeed = "wind_speed"
+        case windDirection = "wind_direction"
+        case windGust = "wind_gust"
         case uvIndex = "uv_index"
     }
 }

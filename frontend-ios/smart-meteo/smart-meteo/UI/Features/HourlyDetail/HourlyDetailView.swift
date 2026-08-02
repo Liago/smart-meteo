@@ -1,20 +1,24 @@
 import SwiftUI
 import Charts
 
-/// Dettaglio delle precipitazioni previste: strip dei giorni, grafico a barre
-/// dei millimetri con le bande di intensità e grafico della probabilità.
+/// Dettaglio orario di una metrica: strip dei giorni, grafico a barre con le
+/// bande di intensità ed eventuale grafico secondario.
+///
+/// La metrica si sceglie da un menu nell'intestazione; cosa disegnare per
+/// ciascuna è descritto in `MetricScale.swift`, così la view resta agnostica.
 ///
 /// È l'unica schermata dell'app che usa Swift Charts. Gli altri grafici sono
 /// `Canvas` scritti a mano e restano tali: qui serve la selezione per tap e
 /// trascinamento, che `.chartXSelection` risolve con un hit-testing corretto,
 /// mentre a mano andrebbe costruita dentro una ScrollView orizzontale.
-struct PrecipitationDetailView: View {
+struct HourlyDetailView: View {
     let hourly: [HourlyForecast]
     let daily: [DailyForecast]?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate: String
     @State private var selectedHour: Int?
+    @State private var metric: HourlyMetric = .precipitation
 
     private let cream = Color(red: 252 / 255, green: 249 / 255, blue: 246 / 255)
     private let coral = Color(red: 236 / 255, green: 104 / 255, blue: 90 / 255)
@@ -30,14 +34,12 @@ struct PrecipitationDetailView: View {
 
     // MARK: - Dati
 
-    /// Slot orario del giorno selezionato. `mm`/`prob` nil = ora non coperta.
-    private struct PrecipPoint: Identifiable {
+    /// Slot orario del giorno selezionato. Ora non coperta = `forecast` nil.
+    private struct HourPoint: Identifiable {
         let hour: Int
-        var mm: Double? = nil
-        var prob: Double? = nil
-        var conditionCode: String? = nil
-        var isCovered: Bool = false
+        var forecast: HourlyForecast? = nil
         var id: Int { hour }
+        var isCovered: Bool { forecast != nil }
     }
 
     private var days: [String] {
@@ -56,56 +58,40 @@ struct PrecipitationDetailView: View {
     /// `ISO8601DateFormatter`: il backend garantisce il formato
     /// `YYYY-MM-DDTHH:00` già in ora locale della località, e parsarlo come data
     /// lo sposterebbe nel fuso del dispositivo.
-    private var points: [PrecipPoint] {
-        var slots = (0..<24).map { PrecipPoint(hour: $0) }
+    private var points: [HourPoint] {
+        var slots = (0..<24).map { HourPoint(hour: $0) }
         for h in hourly where h.time.hasPrefix(selectedDate) {
             guard let hour = Int(h.time.dropFirst(11).prefix(2)), (0..<24).contains(hour) else { continue }
-            slots[hour] = PrecipPoint(
-                hour: hour,
-                mm: h.precipitationMm,
-                prob: h.precipitationProb,
-                conditionCode: h.conditionCode,
-                isCovered: true
-            )
+            slots[hour] = HourPoint(hour: hour, forecast: h)
         }
         return slots
     }
 
-    private var mmValues: [Double] { points.compactMap(\.mm) }
-    /// Il backend omette la chiave quando nessuna fonte l'ha fornita.
-    private var hasMmData: Bool { !mmValues.isEmpty }
-    private var isAllDry: Bool { hasMmData && mmValues.allSatisfy { $0 == 0 } }
     private var hasAnyHour: Bool { points.contains(where: \.isCovered) }
 
-    private var mmAxisMax: Double {
-        max(PrecipIntensity.Threshold.heavy * 1.25, (mmValues.max() ?? 0) * 1.15)
-    }
-
-    /// Punto medio di ciascuna fascia, dove va scritta la sua etichetta.
-    private var bandLabelPositions: [Double] {
-        let light = PrecipIntensity.Threshold.light
-        let moderate = PrecipIntensity.Threshold.moderate
-        let heavy = PrecipIntensity.Threshold.heavy
-        return [
-            (light + moderate) / 2,
-            (moderate + heavy) / 2,
-            (heavy + mmAxisMax) / 2
-        ]
-    }
-
-    private var activePoint: PrecipPoint? {
+    private var activePoint: HourPoint? {
         guard let hour = selectedHour else { return defaultPoint }
         return points.first { $0.hour == hour }
     }
 
-    /// Ora corrente se il giorno è oggi, altrimenti la più piovosa.
-    private var defaultPoint: PrecipPoint? {
+    /// Ora corrente se il giorno è oggi, altrimenti quella col valore massimo
+    /// della metrica principale (la più piovosa, la più ventosa…).
+    private var defaultPoint: HourPoint? {
         if selectedDate == Self.todayKey {
             let hour = Calendar.current.component(.hour, from: Date())
             return points.first { $0.hour == hour }
         }
-        if hasMmData && !isAllDry {
-            return points.max { ($0.mm ?? -1) < ($1.mm ?? -1) }
+
+        guard let primary = metric.sections.first else { return points.first(where: \.isCovered) }
+        let values = points.compactMap { $0.forecast.flatMap(primary.valueOf) }
+        // Un giorno piatto (tutto asciutto, tutto uguale) non ha un'ora
+        // "notevole": meglio la prima coperta che una scelta arbitraria.
+        let isFlat = values.isEmpty || values.allSatisfy { $0 == values[0] }
+        if !isFlat {
+            return points.max {
+                ($0.forecast.flatMap(primary.valueOf) ?? -.infinity)
+                    < ($1.forecast.flatMap(primary.valueOf) ?? -.infinity)
+            }
         }
         return points.first(where: \.isCovered)
     }
@@ -138,24 +124,44 @@ struct PrecipitationDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
                     } else {
-                        mmSection
-                        probabilitySection
+                        ForEach(metric.sections) { section in
+                            chartSection(section)
+                        }
                     }
                 }
                 .padding(20)
             }
         }
         .onChange(of: selectedDate) { _, _ in selectedHour = nil }
+        // Cambiando metrica l'ora torna al default della nuova serie: l'ora più
+        // piovosa non è quella più ventosa.
+        .onChange(of: metric) { _, _ in selectedHour = nil }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: 8) {
-            Image(systemName: "drop.fill")
-                .font(.system(size: 20))
-                .foregroundColor(coral)
-            Text("Precipitazioni")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundColor(.black)
+            Menu {
+                Picker("Metrica", selection: $metric) {
+                    ForEach(HourlyMetric.allCases) { option in
+                        Label(option.label, systemImage: option.systemImage).tag(option)
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: metric.systemImage)
+                        .font(.system(size: 20))
+                        .foregroundColor(coral)
+                    Text(metric.label)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundColor(.black)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.gray)
+                }
+            }
+            .accessibilityLabel("Metrica: \(metric.label)")
+            .accessibilityHint("Tocca per cambiare il dato visualizzato")
+
             Spacer()
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark.circle.fill")
@@ -196,60 +202,87 @@ struct PrecipitationDetailView: View {
         }
     }
 
-    // MARK: - Sezione millimetri
+    // MARK: - Sezione di grafico
 
     @ViewBuilder
-    private var mmSection: some View {
-        if hasMmData {
-            VStack(spacing: 4) {
-                let point = activePoint
-                let intensity = PrecipIntensity.classify(point?.mm)
+    private func chartSection(_ section: MetricSection) -> some View {
+        let values = points.compactMap { $0.forecast.flatMap(section.valueOf) }
+        let secondaries = section.secondaryOf.map { extract in
+            points.compactMap { $0.forecast.flatMap(extract) }
+        } ?? []
 
+        if values.isEmpty {
+            // Cache scritta prima dell'introduzione del campo, o nessuna fonte
+            // con questo dato per la località.
+            Text(section.emptyMessage)
+                .font(.system(size: 12))
+                .foregroundColor(.gray)
+                .frame(maxWidth: .infinity)
+        } else {
+            let domain = section.domain(values + secondaries)
+            let point = activePoint
+
+            VStack(spacing: 4) {
                 Text(point.map { Self.hourRange($0.hour) } ?? "—")
                     .font(.system(size: 13))
                     .foregroundColor(.gray)
-                Text(headlineText(for: point, intensity: intensity))
+                Text(section.headline(point?.forecast))
                     .font(.system(size: 34, weight: .light))
                     .foregroundColor(.black)
-                Text(subtitleText(for: point, intensity: intensity))
+                Text(section.caption(point?.forecast))
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
 
                 ZStack {
                     Chart {
                         ForEach(points) { p in
-                            if let mm = p.mm {
+                            if let value = p.forecast.flatMap(section.valueOf) {
                                 BarMark(
                                     x: .value("Ora", p.hour),
-                                    y: .value("mm", mm),
+                                    y: .value(section.id, value),
                                     width: .fixed(9)
                                 )
-                                .foregroundStyle(PrecipIntensity.classify(mm).color)
+                                .foregroundStyle(section.colorOf(value))
                                 .cornerRadius(3)
                             }
+                            // Serie secondaria (raffica): una tacca sopra la barra,
+                            // non una seconda barra. Pari o sotto al valore
+                            // principale non aggiungerebbe informazione.
+                            if let extract = section.secondaryOf,
+                               let secondary = p.forecast.flatMap(extract),
+                               let primary = p.forecast.flatMap(section.valueOf),
+                               secondary > primary {
+                                RectangleMark(
+                                    x: .value("Ora", p.hour),
+                                    y: .value(section.id, secondary),
+                                    width: .fixed(9),
+                                    height: .fixed(2)
+                                )
+                                .foregroundStyle(.black.opacity(0.35))
+                            }
                         }
-                        if let hour = activePoint?.hour {
+                        if let hour = point?.hour {
                             RuleMark(x: .value("Ora", hour))
                                 .foregroundStyle(.black.opacity(0.35))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         }
                     }
                     .chartXScale(domain: 0...23)
-                    .chartYScale(domain: 0.0...mmAxisMax)
+                    .chartYScale(domain: domain)
                     .chartYAxis {
-                        // Le linee marcano i confini fra le fasce…
-                        AxisMarks(values: [
-                            PrecipIntensity.Threshold.moderate,
-                            PrecipIntensity.Threshold.heavy
-                        ]) { _ in
+                        AxisMarks(values: section.gridValues(domain)) { value in
                             AxisGridLine()
+                            if let raw = value.as(Double.self), let label = section.gridLabel(raw) {
+                                AxisValueLabel {
+                                    Text(label)
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.gray)
+                                }
+                            }
                         }
-                        // …e le etichette stanno al centro della fascia che
-                        // nominano. Una linea a 0,1 mm sarebbe appiccicata alla
-                        // base e illeggibile.
-                        AxisMarks(values: bandLabelPositions) { value in
+                        AxisMarks(values: section.bandValues(domain)) { value in
                             AxisValueLabel {
-                                Text(PrecipIntensity.classify(value.as(Double.self)).label)
+                                Text(section.bandLabel(value.as(Double.self) ?? 0))
                                     .font(.system(size: 9))
                                     .foregroundColor(.gray)
                             }
@@ -257,89 +290,16 @@ struct PrecipitationDetailView: View {
                     }
                     .chartXAxis { hourAxis }
                     .chartXSelection(value: $selectedHour)
-                    .frame(height: 160)
+                    .frame(height: section.height)
 
-                    if isAllDry {
-                        Text("Nessuna precipitazione prevista")
+                    if let flatMessage = section.flatMessage, values.allSatisfy({ $0 == 0 }) {
+                        Text(flatMessage)
                             .font(.system(size: 13))
                             .foregroundColor(.gray.opacity(0.7))
                             .allowsHitTesting(false)
                     }
                 }
             }
-        } else {
-            // Cache scritta prima dell'introduzione del campo, o nessuna fonte
-            // con i millimetri per questa località: resta la probabilità.
-            Text("Quantità in mm non disponibile per questa località")
-                .font(.system(size: 12))
-                .foregroundColor(.gray)
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    private func headlineText(for point: PrecipPoint?, intensity: PrecipIntensity) -> String {
-        guard let point, point.isCovered else { return "Dato non disponibile" }
-        return intensity == .none ? formatPrecipMm(point.mm) : intensity.label
-    }
-
-    private func subtitleText(for point: PrecipPoint?, intensity: PrecipIntensity) -> String {
-        guard let point, point.isCovered else { return "" }
-        if intensity != .none, let mm = point.mm {
-            return formatPrecipMm(mm)
-        }
-        return ""
-    }
-
-    // MARK: - Sezione probabilità
-
-    private var probabilitySection: some View {
-        VStack(spacing: 4) {
-            let point = activePoint
-
-            Text(point.map { Self.hourRange($0.hour) } ?? "—")
-                .font(.system(size: 13))
-                .foregroundColor(.gray)
-            Text(point?.prob.map { "\(Int($0.rounded()))%" } ?? "—%")
-                .font(.system(size: 34, weight: .light))
-                .foregroundColor(.black)
-            Text("Probabilità")
-                .font(.system(size: 12))
-                .foregroundColor(.gray)
-
-            Chart {
-                ForEach(points) { p in
-                    if let prob = p.prob {
-                        BarMark(
-                            x: .value("Ora", p.hour),
-                            y: .value("Probabilità", prob),
-                            width: .fixed(9)
-                        )
-                        .foregroundStyle(Color(hex: "60A5FA").opacity(0.85))
-                        .cornerRadius(3)
-                    }
-                }
-                if let hour = activePoint?.hour {
-                    RuleMark(x: .value("Ora", hour))
-                        .foregroundStyle(.black.opacity(0.35))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-            }
-            .chartXScale(domain: 0...23)
-            .chartYScale(domain: 0.0...100.0)
-            .chartYAxis {
-                // Double, non Int: la scala Y è quella dei valori di probabilità.
-                AxisMarks(values: [80.0, 100.0]) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        Text("\(Int(value.as(Double.self) ?? 0))%")
-                            .font(.system(size: 9))
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .chartXAxis { hourAxis }
-            .chartXSelection(value: $selectedHour)
-            .frame(height: 110)
         }
     }
 
