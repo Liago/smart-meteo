@@ -3,6 +3,9 @@ import {
   getConditionIcon,
   windDegreesToDirection,
   conditionGradients,
+  getPrecipIntensity,
+  formatPrecipMm,
+  formatHourRange,
 } from '@/lib/weather-utils';
 
 describe('Weather Utils', () => {
@@ -61,6 +64,62 @@ describe('Weather Utils', () => {
       conditions.forEach(c => {
         expect(conditionGradients[c as keyof typeof conditionGradients]).toBeTruthy();
       });
+    });
+  });
+
+  describe('getPrecipIntensity', () => {
+    it('should classify mm at the band boundaries', () => {
+      // Soglie NWS: debole 0.1, moderata 2.5, forte 7.6 mm/h
+      expect(getPrecipIntensity(0).level).toBe('none');
+      expect(getPrecipIntensity(0.05).level).toBe('none');
+      expect(getPrecipIntensity(0.1).level).toBe('light');
+      expect(getPrecipIntensity(2.4).level).toBe('light');
+      expect(getPrecipIntensity(2.5).level).toBe('moderate');
+      expect(getPrecipIntensity(7.5).level).toBe('moderate');
+      expect(getPrecipIntensity(7.6).level).toBe('heavy');
+      expect(getPrecipIntensity(20).level).toBe('heavy');
+    });
+
+    it('should treat missing data as none', () => {
+      expect(getPrecipIntensity(null).level).toBe('none');
+      expect(getPrecipIntensity(undefined).level).toBe('none');
+      expect(getPrecipIntensity(NaN).level).toBe('none');
+    });
+
+    it('should return Italian labels and a colour', () => {
+      expect(getPrecipIntensity(1).label).toBe('Debole');
+      expect(getPrecipIntensity(5).label).toBe('Moderata');
+      expect(getPrecipIntensity(10).label).toBe('Forte');
+      expect(getPrecipIntensity(1).color).toBeTruthy();
+    });
+  });
+
+  describe('formatPrecipMm', () => {
+    it('should format with one decimal in Italian', () => {
+      expect(formatPrecipMm(0.5)).toBe('0,5 mm');
+      expect(formatPrecipMm(12)).toBe('12,0 mm');
+    });
+
+    it('should show a dash when data is missing', () => {
+      expect(formatPrecipMm(null)).toBe('—');
+      expect(formatPrecipMm(undefined)).toBe('—');
+    });
+  });
+
+  describe('formatHourRange', () => {
+    it('should build the hour range from the ISO string', () => {
+      expect(formatHourRange('2026-08-04T17:00')).toBe('17:00 - 18:00');
+      expect(formatHourRange('2026-08-04T00:00:00')).toBe('00:00 - 01:00');
+    });
+
+    it('should wrap around at midnight', () => {
+      expect(formatHourRange('2026-08-04T23:00')).toBe('23:00 - 00:00');
+    });
+
+    it('should not shift the hour into the browser timezone', () => {
+      // I timestamp del backend sono già in ora locale della località:
+      // passarli da Date li sposterebbe nel fuso del browser.
+      expect(formatHourRange('2026-08-04T17:00:00Z')).toBe('17:00 - 18:00');
     });
   });
 });

@@ -36,6 +36,7 @@ export interface DailyForecast {
 	condition_code: string;
 	condition_text: string | null;
 	uv_index_max?: number | null;
+	precipitation_mm?: number | null; // mm totali del giorno
 }
 
 export interface HourlyForecast {
@@ -44,6 +45,10 @@ export interface HourlyForecast {
 	precipitation_prob: number | null;
 	condition_code: string;
 	condition_text: string | null;
+	humidity?: number | null;
+	wind_speed?: number | null;       // m/s
+	uv_index?: number | null;
+	precipitation_mm?: number | null; // mm accumulati nell'ora
 }
 
 export interface AstronomyData {

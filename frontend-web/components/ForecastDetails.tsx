@@ -12,9 +12,11 @@ interface ForecastDetailsProps {
 	daily?: DailyForecast[];
 	hourly?: HourlyForecastType[];
 	astronomy?: AstronomyData;
+	/** Se passata, la cella pioggia di ogni giorno apre il dettaglio precipitazioni. */
+	onPrecipitationClick?: (date: string) => void;
 }
 
-export default function ForecastDetails({ data, daily, hourly, astronomy }: ForecastDetailsProps) {
+export default function ForecastDetails({ data, daily, hourly, astronomy, onPrecipitationClick }: ForecastDetailsProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
@@ -87,38 +89,73 @@ export default function ForecastDetails({ data, daily, hourly, astronomy }: Fore
 										*/}
 										{daily.slice(1).map((day) => (
 											<div key={day.date} className="rounded-lg bg-white/5 overflow-hidden transition-colors hover:bg-white/10">
-												<button
-													onClick={() => toggleDay(day.date)}
-													className="w-full flex items-center justify-between p-3"
-												>
-													<div className="w-16 font-medium text-white/90 text-left">{formatDate(day.date)}</div>
+												{/*
+												  La riga è divisa in tre bottoni fratelli invece di uno solo:
+												  la cella precipitazioni apre il dettaglio, e un bottone dentro
+												  un altro bottone non sarebbe HTML valido.
+												*/}
+												<div className="w-full flex items-center justify-between p-3">
+													<button
+														onClick={() => toggleDay(day.date)}
+														className="flex-1 flex items-center min-w-0"
+														aria-expanded={expandedDate === day.date}
+													>
+														<div className="w-16 font-medium text-white/90 text-left">{formatDate(day.date)}</div>
 
-													<div className="flex-1 flex flex-col items-center">
-														{(() => {
-															const info = getWMOWeatherInfo(day.condition_code);
-															return (
-																<div className="flex items-center gap-2">
-																	<WeatherIcon code={day.condition_code} className="w-6 h-6 text-white/90" />
-																	<span className="text-sm text-white/90 hidden sm:inline">{info.label}</span>
+														<div className="flex-1 flex flex-col items-center">
+															{(() => {
+																const info = getWMOWeatherInfo(day.condition_code);
+																return (
+																	<div className="flex items-center gap-2">
+																		<WeatherIcon code={day.condition_code} className="w-6 h-6 text-white/90" />
+																		<span className="text-sm text-white/90 hidden sm:inline">{info.label}</span>
+																	</div>
+																);
+															})()}
+														</div>
+													</button>
+
+													{(() => {
+														const cell =
+															day.precipitation_prob !== null && day.precipitation_prob > 0 ? (
+																<div className="flex flex-col items-center">
+																	<div className="flex items-center text-sm text-blue-300 font-medium">
+																		<svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+																		</svg>
+																		{Math.round(day.precipitation_prob)}%
+																	</div>
+																	{day.precipitation_mm != null && day.precipitation_mm > 0 && (
+																		<span className="text-[10px] text-blue-200/80">
+																			{day.precipitation_mm.toLocaleString('it-IT', { maximumFractionDigits: 1 })} mm
+																		</span>
+																	)}
 																</div>
+															) : (
+																<span className="text-white/20 text-sm">-</span>
 															);
-														})()}
-													</div>
 
-													<div className="w-16 flex justify-center">
-														{day.precipitation_prob !== null && day.precipitation_prob > 0 ? (
-															<div className="flex items-center text-sm text-blue-300 font-medium">
-																<svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																	<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-																</svg>
-																{Math.round(day.precipitation_prob)}%
-															</div>
-														) : (
-															<span className="text-white/20 text-sm">-</span>
-														)}
-													</div>
+														if (!onPrecipitationClick) {
+															return <div className="w-16 flex justify-center">{cell}</div>;
+														}
+														return (
+															<button
+																type="button"
+																onClick={() => onPrecipitationClick(day.date.slice(0, 10))}
+																aria-label={`Dettaglio precipitazioni di ${formatDate(day.date)}`}
+																className="w-16 flex justify-center py-1 rounded-lg hover:bg-white/10 transition-colors"
+															>
+																{cell}
+															</button>
+														);
+													})()}
 
-													<div className="w-20 text-right flex items-center justify-end gap-2">
+													<button
+														onClick={() => toggleDay(day.date)}
+														className="w-20 text-right flex items-center justify-end gap-2"
+														aria-expanded={expandedDate === day.date}
+														aria-label={`Mostra dettaglio orario di ${formatDate(day.date)}`}
+													>
 														<span className="font-bold text-lg">{Math.round(day.temp_max ?? 0)}°</span>
 														<span className="text-white/40 text-sm">{Math.round(day.temp_min ?? 0)}°</span>
 														<motion.svg
@@ -131,8 +168,8 @@ export default function ForecastDetails({ data, daily, hourly, astronomy }: Fore
 														>
 															<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
 														</motion.svg>
-													</div>
-												</button>
+													</button>
+												</div>
 
 												<AnimatePresence>
 													{expandedDate === day.date && (

@@ -109,6 +109,7 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 					condition_code: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
 					condition_text: tomorrowCodeToText(day.values.weatherCodeMax ?? day.values.weatherCode),
 					uv_index_max: day.values.uvIndexMax ?? day.values.uvIndex ?? null,
+					precipitation_mm: day.values.rainAccumulationSum ?? null,
 				}));
 			}
 
@@ -123,6 +124,8 @@ export async function fetchFromTomorrow(lat: number, lon: number): Promise<Unifi
 					humidity: h.values.humidity ?? null,
 					wind_speed: h.values.windSpeed ?? null, // m/s
 					uv_index: h.values.uvIndex ?? null,
+					// Su timestep di 1h l'accumulo (mm) e l'intensità (mm/h) coincidono
+					precipitation_mm: h.values.rainAccumulation ?? h.values.rainIntensity ?? null,
 				}));
 			}
 		} else {

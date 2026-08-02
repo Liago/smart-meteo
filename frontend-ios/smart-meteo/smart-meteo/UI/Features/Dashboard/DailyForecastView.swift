@@ -3,7 +3,10 @@ import SwiftUI
 struct DailyForecastView: View {
     let daily: [DailyForecast]
     let hourly: [HourlyForecast]?
-    
+    /// Apre il dettaglio precipitazioni sulla data passata (formato "yyyy-MM-dd").
+    var onPrecipitationTap: (String) -> Void = { _ in }
+
+
     @State private var expandedDate: String?
     @State private var showLegend = false
     
@@ -77,7 +80,8 @@ struct DailyForecastView: View {
                                     expandedDate = day.date
                                 }
                             }
-                        }
+                        },
+                        onPrecipitationTap: onPrecipitationTap
                     )
                 }
             }
@@ -118,7 +122,8 @@ struct DailyRow: View {
     let isExpanded: Bool
     let hourly: [HourlyForecast]
     let onTap: () -> Void
-    
+    let onPrecipitationTap: (String) -> Void
+
     private var hasEnoughHourly: Bool { hourly.count >= 6 }
 
     private var displayDate: String {
@@ -147,13 +152,30 @@ struct DailyRow: View {
                             .foregroundColor(.black)
                         
                         if let precip = day.precipitationProb, precip > 0 {
-                            HStack(spacing: 2) {
-                                Image(systemName: "drop.fill")
-                                    .font(.system(size: 10))
-                                Text("\(Int(precip))%")
-                                    .font(.system(size: 12, weight: .medium))
+                            VStack(spacing: 0) {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "drop.fill")
+                                        .font(.system(size: 10))
+                                    Text("\(Int(precip))%")
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .foregroundColor(.blue.opacity(0.8))
+
+                                if let mm = day.precipitationMm, mm > 0 {
+                                    Text(formatPrecipMm(mm))
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.blue.opacity(0.6))
+                                }
                             }
-                            .foregroundColor(.blue.opacity(0.8))
+                            // Con PlainButtonStyle sul Button che avvolge la riga,
+                            // il tap gesture interno ha la precedenza: due Button
+                            // annidati non scatterebbero entrambi.
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticManager.selection()
+                                onPrecipitationTap(day.date)
+                            }
+                            .accessibilityLabel("Dettaglio precipitazioni di \(displayDate)")
                         } else {
                             HStack(spacing: 2) {
                                 Image(systemName: "drop.fill")

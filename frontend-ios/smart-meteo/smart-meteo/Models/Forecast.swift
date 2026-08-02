@@ -146,6 +146,9 @@ struct DailyForecast: Codable, Identifiable {
     let conditionCode: String
     let conditionText: String?
     let uvIndexMax: Double?
+    /// mm totali previsti per il giorno. Opzionale: manca sulle risposte in
+    /// cache scritte prima dell'introduzione del campo.
+    let precipitationMm: Double?
 
     enum CodingKeys: String, CodingKey {
         case date
@@ -155,6 +158,7 @@ struct DailyForecast: Codable, Identifiable {
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case uvIndexMax = "uv_index_max"
+        case precipitationMm = "precipitation_mm"
     }
 }
 
@@ -166,13 +170,23 @@ struct HourlyForecast: Codable, Identifiable {
     let precipitationProb: Double?
     let conditionCode: String
     let conditionText: String?
-    
+    /// mm accumulati nell'ora. Opzionale: manca sulle risposte in cache scritte
+    /// prima dell'introduzione del campo e sulle fonti che non lo forniscono.
+    let precipitationMm: Double?
+    let humidity: Double?
+    let windSpeed: Double?
+    let uvIndex: Double?
+
     enum CodingKeys: String, CodingKey {
         case time
         case temp
         case precipitationProb = "precipitation_prob"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
+        case precipitationMm = "precipitation_mm"
+        case humidity
+        case windSpeed = "wind_speed"
+        case uvIndex = "uv_index"
     }
 }
 

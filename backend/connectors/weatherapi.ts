@@ -95,6 +95,7 @@ function buildForecastFromData(data: any, lat: number, lon: number): UnifiedFore
 			precipitation_prob: day.day.daily_chance_of_rain,
 			condition_code: normalizeCondition(day.day.condition.text),
 			condition_text: day.day.condition.text,
+			precipitation_mm: day.day.totalprecip_mm ?? null,
 		})) ?? [];
 
 		// Map hourly forecasts from ALL forecast days
@@ -111,6 +112,7 @@ function buildForecastFromData(data: any, lat: number, lon: number): UnifiedFore
 						humidity: h.humidity ?? null,
 						wind_speed: h.wind_kph != null ? Number((h.wind_kph / 3.6).toFixed(2)) : null,
 						uv_index: h.uv ?? null,
+						precipitation_mm: h.precip_mm ?? null,
 					}));
 					hourly.push(...dayHourly);
 				}
