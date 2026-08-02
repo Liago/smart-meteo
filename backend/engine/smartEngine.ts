@@ -18,6 +18,21 @@ import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
 import { processWeatherAlerts } from '../services/alertProcessor';
 import { aggregateAlerts } from '../utils/alertGeo';
 
+/**
+ * Versione della forma della risposta salvata in `smart_forecasts.full_data`.
+ *
+ * Una riga di cache con una versione diversa viene ignorata e rigenerata:
+ * senza questo, dopo un deploy che aggiunge campi i client continuerebbero a
+ * ricevere la forma vecchia per tutta la durata della cache, a meno di
+ * svuotare la tabella a mano.
+ *
+ * Va incrementata ogni volta che si aggiungono o rinominano campi della
+ * risposta.
+ *   1 → forma originale
+ *   2 → aggiunge precipitation_mm su hourly e daily
+ */
+const FORECAST_SCHEMA_VERSION = 2;
+
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
 	'open-meteo': 1.1,
@@ -112,7 +127,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 		if (cached && !error) {
 			// If full_data is available, return the complete cached result
-			if (cached.full_data) {
+			if (cached.full_data && cached.full_data.schema_version === FORECAST_SCHEMA_VERSION) {
 				console.log('Cache HIT: returning full smart forecast from DB (with fresh alerts check)');
 
 				// Bypass cache per allerte: fetch allerte fresche da tutte le fonti
@@ -144,10 +159,18 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 					console.warn('[AlertPipeline] Failed to fetch fresh alerts on cache hit:', alertErr.message);
 				}
 
+				delete cached.full_data.schema_version;
 				return cached.full_data;
 			}
-			// Legacy cache without full_data — skip and re-fetch
-			console.log('Cache HIT but no full_data — re-fetching for complete response');
+			// Cache inutilizzabile: manca full_data, oppure è stata scritta con una
+			// forma di risposta precedente (es. prima di precipitation_mm). In
+			// entrambi i casi si rigenera, così un cambio di schema non richiede di
+			// svuotare la tabella a mano dopo il deploy.
+			console.log(
+				cached.full_data
+					? `Cache HIT but schema_version=${cached.full_data.schema_version ?? 'assente'} (atteso ${FORECAST_SCHEMA_VERSION}) — re-fetching`
+					: 'Cache HIT but no full_data — re-fetching for complete response'
+			);
 		}
 	}
 
@@ -539,7 +562,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			sources_used: result.sources_used,
 			sources_count: result.sources_used.length,
 			confidence_score: null,
-			full_data: result // Store entire result for cache
+			// Lo schema_version viaggia solo nella cache: viene rimosso prima di
+			// restituire la risposta, così l'API non cambia forma.
+			full_data: { ...result, schema_version: FORECAST_SCHEMA_VERSION }
 		});
 		if (smartError) console.error('Error saving smart forecast:', smartError);
 	}
