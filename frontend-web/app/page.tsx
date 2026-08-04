@@ -5,6 +5,7 @@ import Link from 'next/link';
 import DynamicBackground from '@/components/DynamicBackground';
 import SearchBar from '@/components/SearchBar';
 import CurrentWeather from '@/components/CurrentWeather';
+import DayNarrative from '@/components/DayNarrative';
 import ForecastDetails from '@/components/ForecastDetails';
 import HourlyForecast from '@/components/HourlyForecast';
 import SourcesIndicator from '@/components/SourcesIndicator';
@@ -208,6 +209,12 @@ export default function Home() {
 							locationName={locationName}
 							sourcesCount={data.sources_used.length}
 							isDay={isDay}
+						/>
+						<DayNarrative
+							current={data.current}
+							hourly={data.hourly}
+							daily={data.daily}
+							astronomy={data.astronomy}
 						/>
 						{data.hourly && (
 							<HourlyForecast
