@@ -220,6 +220,12 @@ export function formatHourRange(iso: string): string {
 // la usano come classe di testo.
 
 /**
+ * Il backend espone il vento in m/s (`wind_speed`, `wind_gust`), ma le soglie e
+ * le etichette sono tarate in km/h: ogni consumer converte con questo fattore.
+ */
+export const MS_TO_KMH = 3.6;
+
+/**
  * Soglie di intensità del vento in km/h, semplificazione della scala Beaufort:
  * fino a 20 km/h è brezza (Beaufort ≤ 3), fino a 40 km/h vento teso (4-5),
  * oltre è vento forte (6+, rami che si muovono, ombrelli inutilizzabili).

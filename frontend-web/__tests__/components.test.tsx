@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CurrentWeather from '@/components/CurrentWeather';
+import DayNarrative from '@/components/DayNarrative';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import ErrorFallback from '@/components/ErrorFallback';
 import SkeletonLoader from '@/components/SkeletonLoader';
-import type { ForecastCurrent } from '@/lib/types';
+import type { DailyForecast, ForecastCurrent, HourlyForecast } from '@/lib/types';
 
 // Mock framer-motion to avoid animation issues in tests (see __mocks__/framer-motion.tsx)
 jest.mock('framer-motion');
@@ -167,5 +168,59 @@ describe('SkeletonLoader', () => {
     const { container } = render(<SkeletonLoader />);
     const skeletons = container.querySelectorAll('.skeleton');
     expect(skeletons.length).toBeGreaterThan(0);
+  });
+});
+
+describe('DayNarrative', () => {
+  const buildDay = (date: string, patch: Partial<HourlyForecast> = {}): HourlyForecast[] =>
+    Array.from({ length: 24 }, (_, h) => ({
+      time: `${date}T${String(h).padStart(2, '0')}:00`,
+      temp: 20,
+      precipitation_prob: 0,
+      condition_code: '0',
+      condition_text: 'CLEAR',
+      ...patch,
+    }));
+
+  const daily: DailyForecast[] = ['2026-08-04', '2026-08-05'].map(date => ({
+    date,
+    temp_max: 28,
+    temp_min: 18,
+    precipitation_prob: 20,
+    condition_code: '0',
+    condition_text: null,
+  }));
+
+  const hourly = [...buildDay('2026-08-04'), ...buildDay('2026-08-05')];
+
+  it('should render one row per part of the day', () => {
+    render(<DayNarrative current={mockForecastData} hourly={hourly} daily={daily} />);
+    expect(screen.getByText('Mattina')).toBeInTheDocument();
+    expect(screen.getByText('Pomeriggio')).toBeInTheDocument();
+    expect(screen.getByText('Sera')).toBeInTheDocument();
+  });
+
+  it('should render the section for tomorrow', () => {
+    render(<DayNarrative current={mockForecastData} hourly={hourly} daily={daily} />);
+    expect(screen.getByRole('heading', { name: 'Domani' })).toBeInTheDocument();
+    expect(screen.getByText('Sereno, 18-28°, temperature stabili.')).toBeInTheDocument();
+  });
+
+  it('should render the advice block only when a rule fires', () => {
+    render(<DayNarrative current={mockForecastData} hourly={hourly} daily={daily} />);
+    expect(screen.queryByRole('heading', { name: 'Consigli' })).not.toBeInTheDocument();
+
+    // 31° reali e 35° percepiti al 62% di umidità: la regola dell'afa scatta.
+    const muggy = { ...mockForecastData, temperature: 31, feels_like: 35, humidity: 62 };
+    render(<DayNarrative current={muggy} hourly={hourly} daily={daily} />);
+    expect(screen.getByRole('heading', { name: 'Consigli' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Umidità al 62%: la percepita supera la reale di 4°.')
+    ).toBeInTheDocument();
+  });
+
+  it('should render nothing when the forecast has no hourly data', () => {
+    const { container } = render(<DayNarrative current={mockForecastData} daily={daily} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

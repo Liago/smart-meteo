@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { CloudRain, Droplets, Sun, Thermometer, Wind } from 'lucide-react';
 import type { HourlyForecast } from './types';
 import {
+	MS_TO_KMH,
 	PRECIP_THRESHOLDS,
 	UV_THRESHOLDS,
 	WIND_THRESHOLDS,
@@ -69,8 +70,6 @@ export interface MetricSpec {
 	icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
 	sections: MetricSection[];
 }
-
-const MS_TO_KMH = 3.6;
 
 /** Multipli di `step` interni al dominio, per gli assi senza soglie naturali. */
 function niceTicks(d: MetricDomain, step: number): number[] {
