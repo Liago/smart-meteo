@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ForecastCurrent } from '@/lib/types';
 import { getConditionLabel, getUvLabel, getUvColor } from '@/lib/weather-utils';
+import { getAqiScale } from '@/lib/air-quality';
 import WeatherIcon from './WeatherIcon';
+import AirQualityPanel from './AirQualityPanel';
+import Modal from './ui/Modal';
 
 import WeatherEffects from './WeatherEffects';
 
@@ -15,25 +18,15 @@ interface CurrentWeatherProps {
 	isDay: boolean;
 }
 
-function getAqiLabel(aqi: number): string {
-	if (aqi <= 1) return 'Buono';
-	if (aqi <= 2) return 'Moderato';
-	if (aqi <= 3) return 'Discreto';
-	if (aqi <= 4) return 'Scarso';
-	if (aqi <= 5) return 'Molto scarso';
-	return 'Pericoloso';
-}
-
-function getAqiColor(aqi: number): string {
-	if (aqi <= 1) return 'text-green-300';
-	if (aqi <= 2) return 'text-yellow-300';
-	if (aqi <= 3) return 'text-orange-300';
-	if (aqi <= 4) return 'text-red-300';
-	if (aqi <= 5) return 'text-purple-300';
-	return 'text-rose-300';
-}
-
 export default function CurrentWeather({ data, locationName, sourcesCount, isDay }: CurrentWeatherProps) {
+	const [showAirQuality, setShowAirQuality] = useState(false);
+
+	// La tile mostra `aqi` (media pesata fra le sorgenti), il badge della modale
+	// l'indice EPA verbatim di WeatherAPI: sono due campi distinti e possono
+	// differire di poco. Stessa scelta dell'app iOS.
+	const tileAqi = getAqiScale(data.aqi);
+	const detailAqi = getAqiScale(data.air_quality?.aqi_us_epa);
+
 	return (
 		<motion.section
 			initial={{ opacity: 0, y: 20 }}
@@ -121,7 +114,28 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 						frontValue={`${Math.round(data.precipitation_prob)}%`}
 						backLabel="Qualita aria"
 						backValue={data.aqi !== null ? `${Math.round(data.aqi)}` : '--'}
-						backExtra={data.aqi !== null ? { text: getAqiLabel(data.aqi), className: getAqiColor(data.aqi) } : undefined}
+						backExtra={data.aqi !== null ? { text: tileAqi.label, className: tileAqi.className } : undefined}
+						backAction={
+							data.air_quality ? (
+								<button
+									type="button"
+									onClick={(e) => {
+										// Il contenitore della tile gira la card al click:
+										// senza questo il dettaglio si aprirebbe e la card
+										// tornerebbe sulla faccia "Precipitaz.".
+										e.stopPropagation();
+										setShowAirQuality(true);
+									}}
+									aria-label="Dettaglio qualità dell'aria"
+									className="w-5 h-5 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+								>
+									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<circle cx="12" cy="12" r="9" strokeWidth={1.5} />
+										<path strokeLinecap="round" strokeWidth={1.5} d="M12 11v5M12 8h.01" />
+									</svg>
+								</button>
+							) : undefined
+						}
 						icon={
 							<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
@@ -195,6 +209,24 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 					Aggregato da {sourcesCount} fonti
 				</div>
 			</div>
+
+			<Modal
+				isOpen={showAirQuality}
+				onClose={() => setShowAirQuality(false)}
+				title={
+					<>
+						<span>Qualità dell&apos;aria</span>
+						<span
+							className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-white"
+							style={{ backgroundColor: detailAqi.color }}
+						>
+							{detailAqi.label}
+						</span>
+					</>
+				}
+			>
+				{data.air_quality && <AirQualityPanel data={data.air_quality} />}
+			</Modal>
 		</motion.section>
 	);
 }
@@ -208,9 +240,11 @@ interface FlippableStatProps {
 	backExtra?: { text: string; className: string };
 	icon: React.ReactNode;
 	backIcon: React.ReactNode;
+	/** Controllo mostrato in alto a destra quando la card è girata. */
+	backAction?: React.ReactNode;
 }
 
-function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValue, backExtra, icon, backIcon }: FlippableStatProps) {
+function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValue, backExtra, icon, backIcon, backAction }: FlippableStatProps) {
 	const [flipped, setFlipped] = useState(false);
 
 	return (
@@ -260,8 +294,16 @@ function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValu
 				</AnimatePresence>
 			</motion.div>
 
-			{/* Tap hint dot */}
-			<div className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-white/20" />
+			{/*
+			  Tap hint dot, oppure l'azione della faccia posteriore quando c'è:
+			  occupano lo stesso angolo, e l'azione sta fuori dal sottoalbero
+			  con `preserve-3d` per non essere specchiata dal rotateY.
+			*/}
+			{flipped && backAction ? (
+				<div className="absolute -top-2 -right-2">{backAction}</div>
+			) : (
+				<div className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-white/20" />
+			)}
 		</div>
 	);
 }

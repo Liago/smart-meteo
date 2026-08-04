@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import CurrentWeather from '@/components/CurrentWeather';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -55,6 +56,77 @@ describe('CurrentWeather', () => {
       <CurrentWeather data={mockForecastData} locationName="Milano" sourcesCount={3} isDay={true} />
     );
     expect(screen.getByText('Sereno')).toBeInTheDocument();
+  });
+});
+
+describe('CurrentWeather air quality', () => {
+  const withAirQuality: ForecastCurrent = {
+    ...mockForecastData,
+    air_quality: {
+      aqi_us_epa: 1,
+      pm2_5: 7.8,
+      pm10: 17.7,
+      no2: 0.2,
+      o3: 76.0,
+      co: 111.0,
+      so2: 0.4,
+    },
+  };
+
+  // La tile "Precipitaz." mostra la qualità dell'aria sul retro: va girata
+  // prima di poter raggiungere il bottone di dettaglio.
+  const flipAqiTile = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByText('Precipitaz.'));
+  };
+
+  it('labels the AQI value with the same wording as the iOS app', async () => {
+    const user = userEvent.setup();
+    render(
+      <CurrentWeather data={withAirQuality} locationName="Milano" sourcesCount={5} isDay={true} />
+    );
+    await flipAqiTile(user);
+    expect(screen.getByText('Moderata')).toBeInTheDocument(); // aqi: 2
+  });
+
+  it('hides the detail button when no source provides air quality', async () => {
+    const user = userEvent.setup();
+    render(
+      <CurrentWeather data={mockForecastData} locationName="Milano" sourcesCount={5} isDay={true} />
+    );
+    await flipAqiTile(user);
+    expect(
+      screen.queryByRole('button', { name: /Dettaglio qualità dell'aria/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the detail with every pollutant and the generated description', async () => {
+    const user = userEvent.setup();
+    render(
+      <CurrentWeather data={withAirQuality} locationName="Milano" sourcesCount={5} isDay={true} />
+    );
+    await flipAqiTile(user);
+    await user.click(screen.getByRole('button', { name: /Dettaglio qualità dell'aria/ }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Qualità buona. Tutti i valori nella norma.')).toBeInTheDocument();
+    for (const label of ['PM2.5', 'PM10', 'NO₂', 'O₃', 'CO', 'SO₂']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText('7.8')).toBeInTheDocument();
+    expect(screen.getAllByText('µg/m³')).toHaveLength(6);
+    // Il badge usa aqi_us_epa (1), non la media pesata aqi (2).
+    expect(screen.getByText('Buona')).toBeInTheDocument();
+  });
+
+  it('closes the detail from the close button', async () => {
+    const user = userEvent.setup();
+    render(
+      <CurrentWeather data={withAirQuality} locationName="Milano" sourcesCount={5} isDay={true} />
+    );
+    await flipAqiTile(user);
+    await user.click(screen.getByRole('button', { name: /Dettaglio qualità dell'aria/ }));
+    await user.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
