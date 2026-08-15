@@ -40,18 +40,19 @@ export default function AuthButton() {
 	};
 
 	if (loading) {
-		return <div className="h-9 w-20 bg-white/10 animate-pulse rounded-lg"></div>;
+		return <div className="h-9 w-20 rounded-lg animate-pulse" style={{ background: 'var(--color-duet-bg)' }}></div>;
 	}
 
 	if (user) {
 		return (
 			<div className="flex items-center gap-3">
-				<span className="text-white/80 text-sm hidden sm:block">
+				<span className="text-sm hidden sm:block" style={{ color: 'var(--color-duet-ink-soft)' }}>
 					{user.email}
 				</span>
 				<button
 					onClick={handleSignOut}
-					className="px-3 py-1.5 text-xs font-medium text-white/90 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/10"
+					className="dt-secondary px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors"
+					style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)', color: 'var(--color-duet-accent)' }}
 				>
 					Logout
 				</button>
@@ -62,7 +63,8 @@ export default function AuthButton() {
 	return (
 		<Link
 			href="/login"
-			className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-lg shadow-blue-500/20"
+			className="dt-primary px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
+			style={{ background: 'var(--color-duet-accent)' }}
 		>
 			Accedi
 		</Link>

@@ -124,14 +124,15 @@ export default function HourlyDetail({ hourly, daily, initialDate, metric }: Hou
 							disabled={!enabled}
 							aria-pressed={isSelected}
 							onClick={() => setSelectedDate(date)}
-							className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition-colors ${
-								isSelected ? 'bg-white/15' : enabled ? 'bg-white/5 hover:bg-white/10' : 'opacity-40 cursor-not-allowed'
-							}`}
+							className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition-colors ${!enabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+							style={{
+								background: isSelected ? 'var(--color-duet-accent-soft)' : enabled ? 'var(--color-duet-bg)' : undefined,
+							}}
 						>
-							<span className="text-[10px] uppercase tracking-wider text-white/40">
+							<span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-duet-faint)' }}>
 								{dt.toLocaleDateString('it-IT', { weekday: 'narrow' })}
 							</span>
-							<span className={`text-sm ${isSelected ? 'text-white font-semibold' : 'text-white/90'}`}>
+							<span className={`text-sm ${isSelected ? 'font-bold' : ''}`} style={{ color: isSelected ? 'var(--color-duet-accent)' : 'var(--color-duet-ink)' }}>
 								{dt.getDate()}
 							</span>
 						</button>
@@ -139,10 +140,10 @@ export default function HourlyDetail({ hourly, daily, initialDate, metric }: Hou
 				})}
 			</div>
 
-			<p className="text-center text-sm text-white/50 mb-4">{dateLabel}</p>
+			<p className="text-center text-sm mb-4" style={{ color: 'var(--color-duet-muted)' }}>{dateLabel}</p>
 
 			{!hasAnyHour ? (
-				<p className="text-center text-sm text-white/50 py-8">
+				<p className="text-center text-sm py-8" style={{ color: 'var(--color-duet-muted)' }}>
 					Dati orari non disponibili per questa data
 				</p>
 			) : (
@@ -186,16 +187,16 @@ function Section({ section, slots, active, activeIndex, onActiveIndexChange, isL
 	// Il backend omette la chiave quando nessuna fonte l'ha fornita (cache vecchia,
 	// fonti senza il dato): in quel caso il grafico non va proprio disegnato.
 	if (values.length === 0) {
-		return <p className="text-center text-xs text-white/40 mb-4">{section.emptyMessage}</p>;
+		return <p className="text-center text-xs mb-4" style={{ color: 'var(--color-duet-faint)' }}>{section.emptyMessage}</p>;
 	}
 
 	const isFlatZero = values.every((v) => v === 0);
 	const domain = section.domain([...values, ...secondaries]);
 
 	return (
-		<section className={`rounded-lg bg-white/5 p-3 ${isLast ? '' : 'mb-4'}`}>
+		<section className={`rounded-lg p-3 ${isLast ? '' : 'mb-4'}`} style={{ background: 'var(--color-duet-bg)', border: '1px solid var(--color-duet-border)' }}>
 			<header className="text-center mb-1">
-				<p className="text-xs text-white/40">{active?.h ? formatHourRange(active.h.time) : '—'}</p>
+				<p className="text-xs" style={{ color: 'var(--color-duet-faint)' }}>{active?.h ? formatHourRange(active.h.time) : '—'}</p>
 				<p className={`text-3xl font-light leading-tight ${section.headlineClassName}`}>
 					{section.headline(active?.h)}
 				</p>
@@ -219,7 +220,7 @@ function Section({ section, slots, active, activeIndex, onActiveIndexChange, isL
 					ariaLabel={section.ariaLabel}
 				/>
 				{isFlatZero && section.flatMessage && (
-					<p className="absolute inset-0 flex items-center justify-center text-sm text-white/40 pointer-events-none">
+					<p className="absolute inset-0 flex items-center justify-center text-sm pointer-events-none" style={{ color: 'var(--color-duet-faint)' }}>
 						{section.flatMessage}
 					</p>
 				)}
@@ -323,11 +324,11 @@ function BarChart({
 							x2={W - PAD_R}
 							y1={y(g.value)}
 							y2={y(g.value)}
-							stroke="rgba(255,255,255,0.12)"
+							stroke="var(--color-duet-border)"
 							strokeDasharray="2 3"
 						/>
 						{g.label && (
-							<text x={4} y={y(g.value) + 3} className="fill-white/40" fontSize={9}>
+							<text x={4} y={y(g.value) + 3} fill="var(--color-duet-faint)" fontSize={9}>
 								{g.label}
 							</text>
 						)}
@@ -345,7 +346,7 @@ function BarChart({
 							key={b.label}
 							x={4}
 							y={(top + bottom) / 2 + 3}
-							className="fill-white/40"
+							fill="var(--color-duet-faint)"
 							fontSize={9}
 						>
 							{b.label}
@@ -354,7 +355,7 @@ function BarChart({
 				})}
 
 			{/* Linea di base */}
-			<line x1={PAD_L} x2={W - PAD_R} y1={baselineY} y2={baselineY} stroke="rgba(255,255,255,0.2)" />
+			<line x1={PAD_L} x2={W - PAD_R} y1={baselineY} y2={baselineY} stroke="var(--color-duet-border-strong)" />
 
 			{/* Barre */}
 			{slots.map((s, i) => {
@@ -368,7 +369,7 @@ function BarChart({
 							x2={x(i) + barW}
 							y1={baselineY}
 							y2={baselineY}
-							stroke="rgba(255,255,255,0.2)"
+							stroke="var(--color-duet-border-strong)"
 							strokeWidth={2}
 							strokeDasharray="1 2"
 						/>
@@ -384,7 +385,7 @@ function BarChart({
 							y={baselineY - 2}
 							width={barW}
 							height={2}
-							fill="rgba(255,255,255,0.08)"
+							fill="var(--color-duet-border)"
 						/>
 					);
 				}
@@ -417,7 +418,7 @@ function BarChart({
 							x2={x(i) + barW}
 							y1={y(sec)}
 							y2={y(sec)}
-							stroke="rgba(255,255,255,0.55)"
+							stroke="var(--color-duet-ink-soft)"
 							strokeWidth={1.5}
 							strokeLinecap="round"
 						/>
@@ -430,7 +431,7 @@ function BarChart({
 				x2={indicatorX}
 				y1={PAD_T}
 				y2={baselineY}
-				stroke="rgba(255,255,255,0.85)"
+				stroke="var(--color-duet-accent)"
 				strokeWidth={1}
 				strokeDasharray="3 3"
 			/>
@@ -442,7 +443,7 @@ function BarChart({
 					x={PAD_L + (h + 0.5) * slotW}
 					y={height - 6}
 					textAnchor="middle"
-					className="fill-white/40"
+					fill="var(--color-duet-faint)"
 					fontSize={9}
 				>
 					{String(h).padStart(2, '0')}

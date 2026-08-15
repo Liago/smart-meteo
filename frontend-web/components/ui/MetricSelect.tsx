@@ -92,12 +92,14 @@ export default function MetricSelect({ value, onChange }: MetricSelectProps) {
 				aria-expanded={isOpen}
 				aria-controls={isOpen ? listboxId : undefined}
 				onClick={() => (isOpen ? setIsOpen(false) : open())}
-				className="flex items-center gap-2 -ml-2 px-2 py-1 rounded-lg text-base font-medium text-white hover:bg-white/10 transition-colors"
+				className="dt-icon-btn flex items-center gap-2 -ml-2 px-2 py-1 rounded-lg text-base font-bold transition-colors"
+				style={{ color: 'var(--color-duet-ink)' }}
 			>
-				<CurrentIcon className="w-5 h-5" aria-hidden />
+				<CurrentIcon className="w-5 h-5 text-[var(--color-duet-accent)]" aria-hidden />
 				{current.label}
 				<motion.svg
-					className="w-4 h-4 text-white/60"
+					className="w-4 h-4"
+					style={{ color: 'var(--color-duet-muted)' }}
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
@@ -140,11 +142,13 @@ export default function MetricSelect({ value, onChange }: MetricSelectProps) {
 									tabIndex={-1}
 									onClick={() => select(id)}
 									onMouseEnter={() => setHighlighted(i)}
-									className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
-										isSelected ? 'text-white font-medium' : 'text-white/80'
-									} ${i === highlighted ? 'bg-white/10' : ''}`}
+									className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${isSelected ? 'font-semibold' : ''}`}
+									style={{
+										color: isSelected ? 'var(--color-duet-ink)' : 'var(--color-duet-ink-soft)',
+										background: i === highlighted ? 'var(--color-duet-bg)' : undefined,
+									}}
 								>
-									<Icon className="w-4 h-4 shrink-0" aria-hidden />
+									<Icon className="w-4 h-4 shrink-0 text-[var(--color-duet-accent)]" aria-hidden />
 									{spec.label}
 								</button>
 							);

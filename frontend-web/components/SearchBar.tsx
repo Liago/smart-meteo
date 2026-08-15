@@ -131,10 +131,13 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 	const showSavedMap = query.length < 2 && (savedLocations.length > 0 || homeLocation);
 
 	return (
-		<div ref={containerRef} className="relative w-full max-w-lg mx-auto">
-			<div className="glass-strong flex items-center gap-2 px-4 py-3">
-				<svg className="w-5 h-5 text-white/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+		<div ref={containerRef} className="relative w-full">
+			<div
+				className="dt-input flex items-center gap-2.5 h-[42px] px-3.5 rounded-md"
+				style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)' }}
+			>
+				<svg className="w-[17px] h-[17px] shrink-0" fill="none" stroke="var(--color-duet-muted)" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 				</svg>
 				<input
 					type="text"
@@ -142,12 +145,14 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 					onChange={(e) => handleSearch(e.target.value)}
 					onFocus={() => setShowResults(true)}
 					placeholder="Cerca una localita..."
-					className="flex-1 bg-transparent text-white placeholder-white/40 outline-none text-base"
+					className="flex-1 bg-transparent outline-none text-[15px]"
+					style={{ color: 'var(--color-duet-ink)' }}
 				/>
 				{query && (
 					<button
 						onClick={() => handleSearch('')}
-						className="p-1 rounded-full hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+						className="dt-icon-btn p-1 rounded-full transition-colors"
+						style={{ color: 'var(--color-duet-faint)' }}
 						title="Cancella ricerca"
 					>
 						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,7 +163,8 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 				<button
 					onClick={handleGeolocate}
 					disabled={geoLoading}
-					className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white disabled:opacity-50"
+					className="dt-icon-btn p-1.5 rounded-lg transition-colors disabled:opacity-50"
+					style={{ color: 'var(--color-duet-muted)' }}
 					title="Usa la tua posizione"
 				>
 					{geoLoading ? (
@@ -174,7 +180,7 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 					)}
 				</button>
 				{isLoading && (
-					<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+					<div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--color-duet-border)', borderTopColor: 'var(--color-duet-accent)' }} />
 				)}
 			</div>
 
@@ -190,12 +196,13 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 						{showSavedMap && (
 							<div className="py-2">
 								{homeLocation && (
-									<div className="flex items-center hover:bg-white/10 transition-colors group">
+									<div className="dt-row flex items-center transition-colors group">
 										<button
 											onClick={() => handleSelect(homeLocation.lat, homeLocation.lon, homeLocation.name)}
-											className="flex-1 text-left px-4 py-2 text-white/90 flex items-center gap-2 min-w-0"
+											className="flex-1 text-left px-4 py-2 flex items-center gap-2 min-w-0"
+											style={{ color: 'var(--color-duet-ink)' }}
 										>
-											<svg className="w-4 h-4 text-yellow-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+											<svg className="w-4 h-4 shrink-0" fill="#f7b228" viewBox="0 0 20 20">
 												<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
 											</svg>
 											<span className="truncate">{homeLocation.name} (Home)</span>
@@ -203,7 +210,8 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 										{onRemoveHome && (
 											<button
 												onClick={(e) => { e.stopPropagation(); onRemoveHome(); }}
-												className="p-1.5 mr-2 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+												className="dt-icon-btn p-1.5 mr-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+												style={{ color: 'var(--color-duet-faint)' }}
 												title="Rimuovi Home"
 											>
 												<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,12 +222,13 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 									</div>
 								)}
 								{savedLocations.map((loc) => (
-									<div key={loc.id} className="flex items-center hover:bg-white/10 transition-colors group">
+									<div key={loc.id} className="dt-row flex items-center transition-colors group">
 										<button
 											onClick={() => handleSelect(loc.lat, loc.lon, loc.name)}
-											className="flex-1 text-left px-4 py-2 text-white/90 flex items-center gap-2 min-w-0"
+											className="flex-1 text-left px-4 py-2 flex items-center gap-2 min-w-0"
+											style={{ color: 'var(--color-duet-ink)' }}
 										>
-											<svg className="w-4 h-4 text-white/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<svg className="w-4 h-4 shrink-0" fill="none" stroke="var(--color-duet-muted)" viewBox="0 0 24 24">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
 											</svg>
@@ -228,7 +237,8 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 										{onRemoveSaved && (
 											<button
 												onClick={(e) => { e.stopPropagation(); onRemoveSaved(loc.id); }}
-												className="p-1.5 mr-2 rounded-full text-white/30 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+												className="dt-icon-btn p-1.5 mr-2 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+												style={{ color: 'var(--color-duet-faint)' }}
 												title="Rimuovi dai preferiti"
 											>
 												<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +248,10 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 										)}
 									</div>
 								))}
-								<div className="border-t border-white/10 my-1 font-medium text-xs text-white/40 px-4 py-1 uppercase tracking-wider">
+								<div
+									className="my-1 font-medium text-xs px-4 py-1 uppercase tracking-wider"
+									style={{ borderTop: '1px solid var(--color-duet-border)', color: 'var(--color-duet-faint)' }}
+								>
 									Risultati Ricerca
 								</div>
 							</div>
@@ -250,17 +263,18 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 								onClick={() => handleSelect(result.lat, result.lon,
 									result.state ? `${result.name}, ${result.state}` : `${result.name}, ${result.country}`
 								)}
-								className="w-full text-left px-4 py-3 text-white/90 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0"
+								className="dt-row w-full text-left px-4 py-3 transition-colors last:border-0"
+								style={{ color: 'var(--color-duet-ink)', borderBottom: '1px solid var(--color-duet-border)' }}
 							>
 								<div className="font-medium">{result.name}</div>
-								<div className="text-sm text-white/50">
+								<div className="text-sm" style={{ color: 'var(--color-duet-muted)' }}>
 									{result.state ? `${result.state}, ` : ''}{result.country}
 								</div>
 							</button>
 						))}
 
 						{results.length === 0 && !showSavedMap && (
-							<div className="px-4 py-3 text-white/50 text-sm">
+							<div className="px-4 py-3 text-sm" style={{ color: 'var(--color-duet-muted)' }}>
 								Nessun risultato trovato
 							</div>
 						)}

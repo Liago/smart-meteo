@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Figtree } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const figtree = Figtree({ subsets: ['latin'], variable: '--font-sans', weight: ['400', '500', '600', '700'] });
 
 export const metadata: Metadata = {
 	title: 'Smart Meteo - Previsioni Aggregate Intelligenti',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
 	width: 'device-width',
 	initialScale: 1,
-	themeColor: '#1e293b',
+	themeColor: '#0077b3',
 };
 
 export default function RootLayout({
@@ -38,7 +38,7 @@ export default function RootLayout({
 			<head>
 				<link rel="manifest" href="/manifest.json" />
 			</head>
-			<body className={`${inter.variable} antialiased font-sans`}>
+			<body className={`${figtree.variable} antialiased font-sans`}>
 				{children}
 			</body>
 		</html>

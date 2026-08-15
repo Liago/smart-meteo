@@ -149,11 +149,11 @@ export function getUvLabel(uv: number): string {
 }
 
 export function getUvColor(uv: number): string {
-	if (uv <= 2) return 'text-green-300';
-	if (uv <= 5) return 'text-yellow-300';
-	if (uv <= 7) return 'text-orange-300';
-	if (uv <= 10) return 'text-red-300';
-	return 'text-purple-300';
+	if (uv <= 2) return 'text-green-600';
+	if (uv <= 5) return 'text-yellow-600';
+	if (uv <= 7) return 'text-orange-600';
+	if (uv <= 10) return 'text-red-600';
+	return 'text-purple-600';
 }
 
 // --- Precipitazioni (quantità in mm) ---
@@ -174,7 +174,7 @@ export const PRECIP_THRESHOLDS = {
 } as const;
 
 const precipLevels: Record<PrecipLevel, { label: string; color: string }> = {
-	none: { label: '—', color: 'rgba(255,255,255,0.25)' },
+	none: { label: '—', color: 'rgba(8,42,77,0.18)' },
 	light: { label: 'Debole', color: '#7FB3E8' },
 	moderate: { label: 'Moderata', color: '#3B82F6' },
 	heavy: { label: 'Forte', color: '#EC685A' },
@@ -236,7 +236,7 @@ export const WIND_THRESHOLDS = {
 } as const;
 
 export function getWindScale(kmh: number | null | undefined): { label: string; color: string } {
-	if (kmh == null || isNaN(kmh)) return { label: '—', color: 'rgba(255,255,255,0.25)' };
+	if (kmh == null || isNaN(kmh)) return { label: '—', color: 'rgba(8,42,77,0.18)' };
 	if (kmh >= WIND_THRESHOLDS.strong) return { label: 'Forte', color: '#EC685A' };
 	if (kmh >= WIND_THRESHOLDS.moderate) return { label: 'Teso', color: '#3B82F6' };
 	return { label: 'Debole', color: '#7FB3E8' };
@@ -251,7 +251,7 @@ export const UV_THRESHOLDS = {
 } as const;
 
 export function getUvScale(uv: number | null | undefined): { label: string; color: string } {
-	if (uv == null || isNaN(uv)) return { label: '—', color: 'rgba(255,255,255,0.25)' };
+	if (uv == null || isNaN(uv)) return { label: '—', color: 'rgba(8,42,77,0.18)' };
 	if (uv >= UV_THRESHOLDS.extreme) return { label: 'Estremo', color: '#A855F7' };
 	if (uv >= UV_THRESHOLDS.veryHigh) return { label: 'Molto alto', color: '#EF4444' };
 	if (uv >= UV_THRESHOLDS.high) return { label: 'Alto', color: '#F97316' };
@@ -261,7 +261,7 @@ export function getUvScale(uv: number | null | undefined): { label: string; colo
 
 /** Colore per l'umidità relativa: dal secco ambrato all'afoso blu pieno. */
 export function getHumidityColor(pct: number | null | undefined): string {
-	if (pct == null || isNaN(pct)) return 'rgba(255,255,255,0.25)';
+	if (pct == null || isNaN(pct)) return 'rgba(8,42,77,0.18)';
 	if (pct >= 80) return '#3B82F6';
 	if (pct >= 60) return '#60A5FA';
 	if (pct >= 30) return '#7FB3E8';
@@ -270,7 +270,7 @@ export function getHumidityColor(pct: number | null | undefined): string {
 
 /** Colore per una temperatura in °C, dal freddo viola al caldo rosso. */
 export function getTempColor(celsius: number | null | undefined): string {
-	if (celsius == null || isNaN(celsius)) return 'rgba(255,255,255,0.25)';
+	if (celsius == null || isNaN(celsius)) return 'rgba(8,42,77,0.18)';
 	if (celsius >= 35) return '#DC2626';
 	if (celsius >= 28) return '#F97316';
 	if (celsius >= 20) return '#FBBF24';

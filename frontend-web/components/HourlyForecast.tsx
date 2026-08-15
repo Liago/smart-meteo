@@ -1,17 +1,15 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import type { HourlyForecast, AstronomyData, ForecastCurrent } from '@/lib/types';
+import type { HourlyForecast, AstronomyData } from '@/lib/types';
 import { useMemo } from 'react';
 import WeatherIcon from './WeatherIcon';
-import SunWindCard from './SunWindCard';
 
 interface HourlyForecastProps {
 	hourly: HourlyForecast[];
 	astronomy?: AstronomyData;
 	mode?: 'next-12' | 'exact';
 	title?: string;
-	current?: ForecastCurrent;
 	/** Se passata, ogni ora diventa cliccabile e apre il dettaglio precipitazioni. */
 	onPrecipitationClick?: (isoTime: string) => void;
 }
@@ -21,7 +19,7 @@ type TimelineItem =
 	| { type: 'weather'; time: number; data: HourlyForecast }
 	| { type: 'sun'; time: number; data: { label: string; icon: string } };
 
-export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Prossime 12 Ore', current, onPrecipitationClick }: HourlyForecastProps) {
+export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Andamento orario', onPrecipitationClick }: HourlyForecastProps) {
 	const chartData = useMemo(() => {
 		// 1. Merge and sort events
 		const events: TimelineItem[] = hourly.map(h => ({
@@ -77,23 +75,17 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		// 3. Calculate Geometry
 		if (filtered.length < 2) return null;
 
-
-
-		// Get min/max temps for scaling Y-axis
-		// Interpolate temp for 'sun' events based on neighbors? 
-		// For simplicity, we can ignore 'sun' events for the curve geometry (or interpolate).
-		// Let's interpolate for smoother curve interacting with sun markers.
+		// Get min/max temps for scaling Y-axis. Interpolate temp for 'sun' events
+		// based on neighbors for a smoother curve interacting with sun markers.
 		const weatherItems = filtered.filter(e => e.type === 'weather') as Array<{ type: 'weather', time: number, data: HourlyForecast }>;
 
 		const getTempAtTime = (t: number) => {
-			// Find closest before and after
 			const before = weatherItems.filter(w => w.time <= t).pop();
 			const after = weatherItems.find(w => w.time > t);
 			if (!before && !after) return 0;
 			if (!before) return after!.data.temp;
 			if (!after) return before.data.temp;
 
-			// Linear interpolation
 			const ratio = (t - before.time) / (after.time - before.time);
 			return before.data.temp + (after.data.temp - before.data.temp) * ratio;
 		};
@@ -104,47 +96,35 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		});
 
 		const temps = itemsWithTemp.map(i => i.temp);
-		const minTemp = Math.min(...temps) - 2; // Buffer
+		const minTemp = Math.min(...temps) - 2;
 		const maxTemp = Math.max(...temps) + 2;
 		const tempRange = maxTemp - minTemp || 1;
 
-		const minSpacing = 80; // Minimum px between points
-		const width = Math.max(filtered.length * minSpacing, 300); // Min 300px width
-		const height = 200; // Increased to fit icons
-		const paddingX = 40;
-		const paddingTop = 80;  // Space for icons
-		const paddingBottom = 40; // Space for labels
+		const minSpacing = 76;
+		const width = Math.max(filtered.length * minSpacing, 300);
+		const height = 150;
+		const paddingX = 24;
+		const paddingTop = 24;
+		const paddingBottom = 20;
 
 		const points = itemsWithTemp.map((item, index) => {
-			// Use equidistant spacing to prevent foreignObject overlap
 			const x = paddingX + (index / Math.max(itemsWithTemp.length - 1, 1)) * (width - 2 * paddingX);
 			const usableHeight = height - paddingTop - paddingBottom;
 			const y = height - paddingBottom - ((item.temp - minTemp) / tempRange) * usableHeight;
-
 			return { x, y, ...item };
 		});
 
-		// Create smooth path (Cubic Bezier)
-		// Simple smoothing: control points based on neighbors
+		// Smoothed path (simple midpoint cubic bezier)
 		let pathD = `M ${points[0].x} ${points[0].y}`;
 		for (let i = 0; i < points.length - 1; i++) {
 			const curr = points[i];
 			const next = points[i + 1];
-
-			// Control points
-			// Simple fallback: straight lines for now to ensure correctness, can enhance to curves.
-			// Let's try simple catmull-rom to cubic bezier conversion or just simple mid-points.
-			// Standard smoothing:
-			// const cp1x = curr.x + (next.x - curr.x) / 3;
-			// const cp1y = curr.y; // horizontal tension? No, temp varies.
-
-			// Let's use simple Q (Quadratic) or C (Cubic) with tension.
-			// For simplicity and "sinusoidal" look, accurate catmull-rom is best, but here's a simple approx:
 			const midX = (curr.x + next.x) / 2;
 			pathD += ` C ${midX} ${curr.y}, ${midX} ${next.y}, ${next.x} ${next.y}`;
 		}
+		const areaD = `${pathD} L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
 
-		return { width, height, points, pathD };
+		return { width, height, points, pathD, areaD, gridY1: Math.round(height * 0.32), gridY2: Math.round(height * 0.68) };
 	}, [hourly, astronomy, mode]);
 
 	if (!chartData) return null;
@@ -154,186 +134,91 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 	};
 
-
-
 	return (
-		<div className="glass p-4 sm:p-6 mb-4 overflow-hidden">
-			{title && <h3 className="text-sm font-medium text-white/50 mb-2 uppercase tracking-wider">{title}</h3>}
-
-			<div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-				<div style={{ width: chartData.width, height: chartData.height + 20, position: 'relative' }}>
-					<svg width={chartData.width} height={chartData.height} className="overflow-visible">
-						{/* Defs for gradients */}
-						<defs>
-							<linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-								<stop offset="0%" stopColor="rgba(255, 255, 255, 0.5)" />
-								<stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
-							</linearGradient>
-						</defs>
-
-						{/* The curve path */}
-						<motion.path
-							d={chartData.pathD}
-							fill="none"
-							stroke="rgba(255, 255, 255, 0.4)"
-							strokeWidth="3"
-							initial={{ pathLength: 0, opacity: 0 }}
-							animate={{ pathLength: 1, opacity: 1 }}
-							transition={{ duration: 1.5, ease: "easeInOut" }}
-						/>
-
-						{/* Area under curve (optional, tricky with bezier, skip for cleaner look) */}
-
-						{/* Points and Info */}
-						{chartData.points.map((p, i) => (
-							<g key={i}>
-								{/* Dot on line */}
-								<motion.circle
-									cx={p.x}
-									cy={p.y}
-									r={4}
-									fill={p.type === 'sun' ? '#FCD34D' : 'white'}
-									initial={{ scale: 0 }}
-									animate={{ scale: 1 }}
-									transition={{ delay: 0.5 + i * 0.05 }}
-								/>
-
-								{/* Info Group */}
-								<foreignObject x={p.x - 30} y={p.y - 80} width={60} height={70}>
-									<div className="flex flex-col items-center justify-end h-full">
-										{p.type === 'weather' ? (
-											<>
-												<div className="mb-1 drop-shadow-md">
-													<WeatherIcon code={p.data.condition_code} className="w-8 h-8 text-white" />
-												</div>
-												<span className="text-sm font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-													{Math.round(p.temp)}°
-												</span>
-											</>
-										) : (
-											<div className="flex flex-col items-center gap-1">
-												<span className="text-yellow-400 font-bold text-xs uppercase tracking-tighter shadow-black drop-shadow-sm">
-													{p.data.label}
-												</span>
-												<svg className="w-5 h-5 text-yellow-400 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={p.data.icon} />
-												</svg>
-											</div>
-										)}
-									</div>
-								</foreignObject>
-
-								{/* Time and Precip below line */}
-								<foreignObject x={p.x - 25} y={p.y + 15} width={50} height={70}>
-									{(() => {
-										const labels = (
-											<>
-												<span className={`text-sm ${p.type === 'sun' ? 'text-yellow-200' : 'text-white/50'}`}>
-													{formatHour(p.time)}
-												</span>
-												{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
-													<span className="text-xs text-blue-300 font-medium mt-1">
-														{Math.round(p.data.precipitation_prob)}%
-													</span>
-												)}
-												{p.type === 'weather' && p.data.precipitation_mm != null && p.data.precipitation_mm > 0 && (
-													<span className="text-[10px] text-blue-200/80 mt-0.5">
-														{p.data.precipitation_mm.toLocaleString('it-IT', { maximumFractionDigits: 1 })} mm
-													</span>
-												)}
-											</>
-										);
-
-										// L'istanza annidata dentro ForecastDetails non riceve la callback
-										// e resta volutamente inerte: un bottone dentro la riga-bottone
-										// del giorno sarebbe HTML non valido.
-										if (!onPrecipitationClick || p.type !== 'weather') {
-											return <div className="flex flex-col items-center justify-start h-full pt-1">{labels}</div>;
-										}
-
-										return (
-											<button
-												type="button"
-												onClick={() => onPrecipitationClick(p.data.time)}
-												aria-label={`Dettaglio precipitazioni delle ${formatHour(p.time)}`}
-												className="flex flex-col items-center justify-start h-full w-full pt-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-											>
-												{labels}
-											</button>
-										);
-									})()}
-								</foreignObject>
-							</g>
-						))}
-					</svg>
-				</div>
-			</div>
-
-			{/* Weather Details Section */}
-			{current && (
-				<div className="mt-6 space-y-4 pt-4 border-t border-white/10">
-					{/* Precipitation bar */}
-					<div>
-						<div className="flex justify-between text-sm mb-1.5">
-							<span className="text-white/60">Probabilita precipitazione (Oggi)</span>
-							<span className="font-medium text-white">{Math.round(current.precipitation_prob)}%</span>
-						</div>
-						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-							<motion.div
-								initial={{ width: 0 }}
-								animate={{ width: `${current.precipitation_prob}%` }}
-								transition={{ duration: 0.6, delay: 0.1 }}
-								className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600"
-							/>
-						</div>
-					</div>
-
-					{/* Humidity bar */}
-					<div>
-						<div className="flex justify-between text-sm mb-1.5">
-							<span className="text-white/60">Umidita</span>
-							<span className="font-medium text-white">{current.humidity !== null ? `${Math.round(current.humidity)}%` : '--'}</span>
-						</div>
-						<div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-							<motion.div
-								initial={{ width: 0 }}
-								animate={{ width: `${current.humidity ?? 0}%` }}
-								transition={{ duration: 0.6, delay: 0.2 }}
-								className="h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-500"
-							/>
-						</div>
-					</div>
-
-					{/* Sun & Wind Card */}
-					<div className="py-2">
-						<SunWindCard astronomy={astronomy} current={current} />
-					</div>
-
-					{/* Temperature detail */}
-					<div className="flex items-center justify-between py-2 border-t border-white/10">
-						<div className="flex items-center gap-3">
-							<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-								<svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-								</svg>
-							</div>
-							<div>
-								<div className="text-sm font-medium text-white">Temperatura (Oggi)</div>
-								<div className="text-xs text-white/50">Effettiva vs percepita</div>
-							</div>
-						</div>
-						<div className="text-right">
-							<div className="font-semibold text-white">
-								{current.temperature !== null ? `${current.temperature}°C` : '--'}
-							</div>
-							<div className="text-xs text-white/50">
-								Percepita {current.feels_like !== null ? `${current.feels_like}°C` : '--'}
-							</div>
-						</div>
-					</div>
-				</div>
+		<div className="glass p-6" style={{ color: 'var(--color-duet-ink)' }}>
+			{title && (
+				<h3 className="text-[13px] font-semibold uppercase tracking-wide mb-4" style={{ color: 'var(--color-duet-muted)' }}>{title}</h3>
 			)}
 
+			<div className="overflow-x-auto pb-1">
+				<svg
+					width={chartData.width}
+					height={chartData.height}
+					viewBox={`0 0 ${chartData.width} ${chartData.height}`}
+					preserveAspectRatio="none"
+					style={{ display: 'block', minWidth: '100%' }}
+				>
+					<line x1="0" y1={chartData.gridY1} x2={chartData.width} y2={chartData.gridY1} stroke="#eef2f6" strokeWidth="1" />
+					<line x1="0" y1={chartData.gridY2} x2={chartData.width} y2={chartData.gridY2} stroke="#eef2f6" strokeWidth="1" />
+					<path d={chartData.areaD} fill="var(--color-duet-accent-soft)" />
+					<motion.path
+						d={chartData.pathD}
+						fill="none"
+						stroke="var(--color-duet-accent)"
+						strokeWidth="2.5"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						initial={{ pathLength: 0, opacity: 0 }}
+						animate={{ pathLength: 1, opacity: 1 }}
+						transition={{ duration: 1.2, ease: 'easeInOut' }}
+					/>
+					{chartData.points.map((p, i) => (
+						<circle
+							key={i}
+							cx={p.x}
+							cy={p.y}
+							r={p.type === 'sun' ? 4 : 3.5}
+							fill={p.type === 'sun' ? '#f7b228' : '#fff'}
+							stroke="var(--color-duet-accent)"
+							strokeWidth="2"
+						/>
+					))}
+				</svg>
+
+				<div className="flex gap-0 pt-3.5 mt-1" style={{ borderTop: '1px solid var(--color-duet-border)', width: chartData.width }}>
+					{chartData.points.map((p, i) => {
+						const label = (
+							<>
+								{p.type === 'weather' ? (
+									<WeatherIcon code={p.data.condition_code} className="w-5 h-5 mx-auto" />
+								) : (
+									<span className="text-[18px] leading-none">{p.data.label === 'Alba' ? '🌅' : '🌇'}</span>
+								)}
+								<span className="font-bold text-sm mt-1 block" style={{ color: 'var(--color-duet-ink)' }}>
+									{p.type === 'weather' ? `${Math.round(p.temp)}°` : p.data.label}
+								</span>
+								<span className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>{formatHour(p.time)}</span>
+								{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
+									<span className="inline-flex items-center gap-0.5 text-[11px] font-semibold mt-0.5" style={{ color: 'var(--color-duet-accent)' }}>
+										{Math.round(p.data.precipitation_prob)}%
+									</span>
+								)}
+							</>
+						);
+
+						if (!onPrecipitationClick || p.type !== 'weather') {
+							return (
+								<div key={i} className="flex-none flex flex-col items-center gap-0.5 text-center" style={{ width: 76 }}>
+									{label}
+								</div>
+							);
+						}
+
+						return (
+							<button
+								key={i}
+								type="button"
+								onClick={() => onPrecipitationClick(p.data.time)}
+								aria-label={`Dettaglio precipitazioni delle ${formatHour(p.time)}`}
+								className="dt-row flex-none flex flex-col items-center gap-0.5 text-center rounded-lg py-1 transition-colors cursor-pointer"
+								style={{ width: 76 }}
+							>
+								{label}
+							</button>
+						);
+					})}
+				</div>
+			</div>
 		</div>
 	);
 }

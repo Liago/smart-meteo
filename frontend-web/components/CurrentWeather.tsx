@@ -9,16 +9,15 @@ import WeatherIcon from './WeatherIcon';
 import AirQualityPanel from './AirQualityPanel';
 import Modal from './ui/Modal';
 
-import WeatherEffects from './WeatherEffects';
-
 interface CurrentWeatherProps {
 	data: ForecastCurrent;
 	locationName: string;
 	sourcesCount: number;
-	isDay: boolean;
+	/** @deprecated non più usato (era per lo sfondo animato del tema scuro); mantenuto per compatibilità dei chiamanti. */
+	isDay?: boolean;
 }
 
-export default function CurrentWeather({ data, locationName, sourcesCount, isDay }: CurrentWeatherProps) {
+export default function CurrentWeather({ data, locationName, sourcesCount }: CurrentWeatherProps) {
 	const [showAirQuality, setShowAirQuality] = useState(false);
 
 	// La tile mostra `aqi` (media pesata fra le sorgenti), il badge della modale
@@ -32,20 +31,17 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 			initial={{ opacity: 0, y: 20 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.6 }}
-			className="glass-strong p-6 sm:p-8 text-white text-center relative overflow-hidden"
+			className="glass p-6 sm:p-8 text-center relative overflow-hidden"
+			style={{ color: 'var(--color-duet-ink)' }}
 		>
-			{/* Weather Effects Background */}
-			<WeatherEffects condition={data.condition} isDay={isDay} />
-
-			{/* Content Container - Ensure z-index is above effects */}
 			<div className="relative z-10">
 				{/* Location */}
-				<p className="text-white/70 text-sm mb-1 tracking-wide uppercase">{locationName}</p>
+				<p className="text-sm mb-2 tracking-wide uppercase font-semibold" style={{ color: 'var(--color-duet-muted)' }}>{locationName}</p>
 
 				{/* Condition icon & text */}
-				<div className="flex items-center justify-center gap-3 mb-2">
-					<WeatherIcon condition={data.condition} className="w-12 h-12 text-white/90 drop-shadow-lg" />
-					<span className="text-lg font-medium text-white/80">{getConditionLabel(data.condition)}</span>
+				<div className="flex items-center justify-center gap-3 mb-1.5">
+					<WeatherIcon condition={data.condition} className="w-8 h-8 text-[var(--color-duet-accent)]" />
+					<span className="text-lg font-medium" style={{ color: 'var(--color-duet-ink-soft)' }}>{getConditionLabel(data.condition)}</span>
 				</div>
 
 				{/* Main temperature - bolder */}
@@ -54,7 +50,7 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 					initial={{ scale: 0.8, opacity: 0 }}
 					animate={{ scale: 1, opacity: 1 }}
 					transition={{ duration: 0.4, type: 'spring' }}
-					className="mb-1"
+					className="mb-0.5"
 				>
 					<span className="text-8xl sm:text-9xl font-bold tracking-tighter">
 						{data.temperature !== null ? Math.round(data.temperature) : '--'}
@@ -63,16 +59,12 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 				</motion.div>
 
 				{/* Feels like */}
-				<p className="text-white/60 text-sm mb-6">
+				<p className="text-sm mb-6" style={{ color: 'var(--color-duet-muted)' }}>
 					Percepita: {data.feels_like !== null ? `${Math.round(data.feels_like)}°C` : '--'}
 				</p>
 
 				{/* Elegant separator */}
-				<div className="flex items-center gap-3 max-w-xs mx-auto mb-6">
-					<div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-					<div className="w-1.5 h-1.5 rounded-full bg-white/20" />
-					<div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-				</div>
+				<div className="h-px max-w-xs mx-auto mb-6" style={{ background: 'var(--color-duet-border)' }} />
 
 				{/* Interactive stats row */}
 				<div className="grid grid-cols-3 gap-4 max-w-sm mx-auto">
@@ -127,7 +119,8 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 										setShowAirQuality(true);
 									}}
 									aria-label="Dettaglio qualità dell'aria"
-									className="w-5 h-5 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+									className="w-5 h-5 flex items-center justify-center rounded-full transition-colors dt-icon-btn"
+									style={{ color: 'var(--color-duet-faint)' }}
 								>
 									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<circle cx="12" cy="12" r="9" strokeWidth={1.5} />
@@ -204,8 +197,11 @@ export default function CurrentWeather({ data, locationName, sourcesCount, isDay
 				</div>
 
 				{/* Sources badge */}
-				<div className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-xs text-white/60">
-					<div className="w-2 h-2 rounded-full bg-green-400" />
+				<div
+					className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
+					style={{ background: 'var(--color-duet-accent-soft)', color: 'var(--color-duet-accent)' }}
+				>
+					<div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-duet-green)' }} />
 					Aggregato da {sourcesCount} fonti
 				</div>
 			</div>
@@ -249,7 +245,7 @@ function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValu
 
 	return (
 		<div
-			className="relative cursor-pointer select-none"
+			className="relative cursor-pointer select-none rounded-lg dt-row py-2"
 			style={{ perspective: '600px' }}
 			onClick={() => setFlipped(f => !f)}
 		>
@@ -264,12 +260,12 @@ function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValu
 					className="flex flex-col items-center gap-1"
 					style={{ backfaceVisibility: 'hidden' }}
 				>
-					<div className="text-white/40">{icon}</div>
-					<span className="text-lg font-semibold">{frontValue}</span>
+					<div style={{ color: 'var(--color-duet-accent)' }}>{icon}</div>
+					<span className="text-lg font-bold" style={{ color: 'var(--color-duet-ink)' }}>{frontValue}</span>
 					{frontExtra && (
 						<span className={`text-[10px] font-medium ${frontExtra.className}`}>{frontExtra.text}</span>
 					)}
-					<span className="text-xs text-white/50">{frontLabel}</span>
+					<span className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>{frontLabel}</span>
 				</div>
 
 				{/* Back face */}
@@ -283,12 +279,12 @@ function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValu
 							className="absolute inset-0 flex flex-col items-center gap-1"
 							style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
 						>
-							<div className="text-white/40">{backIcon}</div>
-							<span className="text-lg font-semibold">{backValue}</span>
+							<div style={{ color: 'var(--color-duet-accent)' }}>{backIcon}</div>
+							<span className="text-lg font-bold" style={{ color: 'var(--color-duet-ink)' }}>{backValue}</span>
 							{backExtra && (
 								<span className={`text-[10px] font-medium ${backExtra.className}`}>{backExtra.text}</span>
 							)}
-							<span className="text-xs text-white/50">{backLabel}</span>
+							<span className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>{backLabel}</span>
 						</motion.div>
 					)}
 				</AnimatePresence>
@@ -300,9 +296,9 @@ function FlippableStat({ frontLabel, frontValue, frontExtra, backLabel, backValu
 			  con `preserve-3d` per non essere specchiata dal rotateY.
 			*/}
 			{flipped && backAction ? (
-				<div className="absolute -top-2 -right-2">{backAction}</div>
+				<div className="absolute -top-1 -right-1">{backAction}</div>
 			) : (
-				<div className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-white/20" />
+				<div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-duet-border)' }} />
 			)}
 		</div>
 	);
