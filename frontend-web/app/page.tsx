@@ -110,10 +110,10 @@ export default function Home() {
 	return (
 		<div className="min-h-screen" style={{ background: 'var(--color-duet-bg)' }}>
 			<header
-				className="flex items-center gap-4 sm:gap-6 px-4 sm:px-7 h-16 sticky top-0 z-10"
+				className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 lg:h-16 lg:flex-nowrap lg:gap-x-6 lg:px-7 lg:py-0"
 				style={{ background: 'var(--color-duet-surface)', borderBottom: '1px solid var(--color-duet-border)' }}
 			>
-				<Link href="/" className="flex items-center gap-2.5 shrink-0">
+				<Link href="/" className="order-1 flex shrink-0 items-center gap-2.5">
 					<span
 						className="flex items-center justify-center w-[34px] h-[34px] rounded-lg text-white"
 						style={{ background: 'var(--color-duet-accent)' }}
@@ -126,7 +126,13 @@ export default function Home() {
 					<span className="font-bold text-[19px] tracking-tight" style={{ color: 'var(--color-duet-ink)' }}>Smart Meteo</span>
 				</Link>
 
-				<div className="flex-1 max-w-[460px]">
+				{/*
+				  Sotto lg la ricerca va a capo su una riga intera (order-3, w-full):
+				  a 768px (tablet in modalità "sito desktop" di Safari iPadOS) la riga
+				  singola non ha abbastanza spazio per logo + ricerca + azioni.
+				  Da lg in su torna in linea fra logo e azioni con una larghezza massima.
+				*/}
+				<div className="order-3 w-full lg:order-2 lg:w-auto lg:flex-1 lg:max-w-[460px]">
 					<SearchBar
 						onLocationSelect={handleLocationSelect}
 						isLoading={isLoading}
@@ -137,7 +143,7 @@ export default function Home() {
 					/>
 				</div>
 
-				<div className="flex items-center gap-1.5">
+				<div className="order-2 ml-auto flex items-center gap-1.5 lg:order-3 lg:ml-0">
 					{allAlerts.length > 0 && <AlertBadge count={allAlerts.length} />}
 
 					<button
@@ -201,7 +207,7 @@ export default function Home() {
 					<>
 						{allAlerts.length > 0 && <WeatherAlerts alerts={allAlerts} />}
 
-						<div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-5 items-start">
+						<div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5 items-start">
 							<CurrentWeather
 								data={data.current}
 								locationName={locationName}
@@ -210,7 +216,7 @@ export default function Home() {
 							<SunWindCard astronomy={data.astronomy} current={data.current} />
 						</div>
 
-						<div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-5 items-start">
+						<div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5 items-start">
 							<DayNarrative
 								current={data.current}
 								hourly={data.hourly}
