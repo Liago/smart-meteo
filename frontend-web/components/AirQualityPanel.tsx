@@ -15,18 +15,18 @@ interface AirQualityPanelProps {
 export default function AirQualityPanel({ data }: AirQualityPanelProps) {
 	return (
 		<div>
-			<p className="text-sm text-white/70 mb-4">{generateAirQualityDescription(data)}</p>
+			<p className="text-sm mb-5" style={{ color: 'var(--color-duet-ink-soft)' }}>{generateAirQualityDescription(data)}</p>
 
-			<div className="grid grid-cols-3 gap-3">
+			<div className="grid grid-cols-3 gap-2.5">
 				{POLLUTANTS.map((p) => {
 					const value = data[p.key];
 					return (
-						<div key={p.key} className="rounded-lg bg-white/5 p-3 text-center">
-							<div className="text-xs text-white/50">{p.label}</div>
-							<div className="text-lg font-semibold text-white">
+						<div key={p.key} className="rounded-lg p-3.5 text-center" style={{ background: 'var(--color-duet-bg)', border: '1px solid var(--color-duet-border)' }}>
+							<div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--color-duet-muted)' }}>{p.label}</div>
+							<div className="text-lg font-bold mt-0.5" style={{ color: 'var(--color-duet-ink)' }}>
 								{value != null ? value.toFixed(1) : '--'}
 							</div>
-							<div className="text-[10px] text-white/40">µg/m³</div>
+							<div className="text-[10px]" style={{ color: 'var(--color-duet-faint)' }}>µg/m³</div>
 						</div>
 					);
 				})}

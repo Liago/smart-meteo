@@ -2,9 +2,9 @@
 
 export default function SkeletonLoader() {
   return (
-    <div className="space-y-4 w-full max-w-lg mx-auto">
+    <div className="space-y-5 w-full">
       {/* Hero skeleton */}
-      <div className="glass-strong p-8 text-center space-y-4">
+      <div className="glass p-8 text-center space-y-4">
         <div className="skeleton h-4 w-32 mx-auto" />
         <div className="skeleton h-8 w-20 mx-auto" />
         <div className="skeleton h-24 w-48 mx-auto" />
@@ -24,7 +24,7 @@ export default function SkeletonLoader() {
       </div>
 
       {/* Sources skeleton */}
-      <div className="glass p-5">
+      <div className="glass p-6">
         <div className="skeleton h-4 w-32 mb-3" />
         <div className="flex gap-2">
           <div className="skeleton h-8 w-28 rounded-full" />

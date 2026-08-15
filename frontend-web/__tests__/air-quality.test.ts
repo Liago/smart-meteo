@@ -43,7 +43,7 @@ describe('getAqiScale', () => {
     expect(getAqiScale(1)).toEqual({
       label: 'Buona',
       color: '#33B34D',
-      className: 'text-green-300',
+      className: 'text-green-600',
     });
   });
 });

@@ -91,7 +91,8 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 			{isOpen && (
 				<>
 					<motion.div
-						className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+						className="fixed inset-0 z-[100] backdrop-blur-sm"
+						style={{ background: 'rgba(8,42,77,.45)' }}
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
@@ -110,7 +111,8 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 							aria-modal="true"
 							aria-labelledby={titleId}
 							tabIndex={-1}
-							className="w-full max-w-lg glass max-h-[85dvh] overflow-y-auto p-4 sm:p-6 text-white outline-none pointer-events-auto"
+							className="w-full max-w-lg glass-strong max-h-[85dvh] overflow-y-auto p-4 sm:p-6 outline-none pointer-events-auto"
+							style={{ color: 'var(--color-duet-ink)' }}
 							initial={{ opacity: 0, scale: 0.95, y: 12 }}
 							animate={{ opacity: 1, scale: 1, y: 0 }}
 							exit={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -128,7 +130,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 									id={titleId}
 									role="heading"
 									aria-level={2}
-									className="flex items-center gap-2 text-base font-medium text-white"
+									className="flex items-center gap-2 text-base font-bold"
 								>
 									{title}
 								</div>
@@ -136,7 +138,8 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 									type="button"
 									onClick={onClose}
 									aria-label="Chiudi"
-									className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+									className="dt-icon-btn w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+									style={{ background: 'var(--color-duet-bg)', color: 'var(--color-duet-muted)' }}
 								>
 									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
 										<path d="M18 6L6 18M6 6l12 12" />

@@ -120,8 +120,8 @@ const precipitationMm: MetricSection = {
 				: '';
 		return `${conditionLabelOf(h)}${amount}`;
 	},
-	headlineClassName: 'text-white/90',
-	captionClassName: 'text-blue-200/80',
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#00619b]',
 	ariaLabel: 'Precipitazione oraria prevista in millimetri',
 	emptyMessage: 'Quantità in mm non disponibile per questa località',
 	flatMessage: 'Nessuna precipitazione prevista',
@@ -140,8 +140,8 @@ const precipitationProb: MetricSection = {
 	bands: () => [],
 	headline: (h) => (h?.precipitation_prob != null ? `${Math.round(h.precipitation_prob)}%` : '—%'),
 	caption: () => 'Probabilità',
-	headlineClassName: 'text-blue-300',
-	captionClassName: 'text-white/50',
+	headlineClassName: 'text-[#00619b]',
+	captionClassName: 'text-[#62798a]',
 	ariaLabel: 'Probabilità oraria di precipitazione',
 	emptyMessage: 'Probabilità non disponibile per questa località',
 };
@@ -174,8 +174,8 @@ const windSection: MetricSection = {
 		if (h.wind_gust != null) parts.push(`raffiche ${Math.round(h.wind_gust * MS_TO_KMH)} km/h`);
 		return parts.join(' · ');
 	},
-	headlineClassName: 'text-white/90',
-	captionClassName: 'text-blue-200/80',
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#00619b]',
 	ariaLabel: 'Velocità oraria del vento in chilometri orari',
 	emptyMessage: 'Dati del vento non disponibili per questa località',
 	flatMessage: 'Assenza di vento prevista',
@@ -200,8 +200,8 @@ const humiditySection: MetricSection = {
 		return h.humidity != null ? `${Math.round(h.humidity)}%` : '—';
 	},
 	caption: () => 'Umidità relativa',
-	headlineClassName: 'text-white/90',
-	captionClassName: 'text-white/50',
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#62798a]',
 	ariaLabel: 'Umidità relativa oraria',
 	emptyMessage: 'Umidità non disponibile per questa località',
 };
@@ -230,8 +230,8 @@ const feelsLikeSection: MetricSection = {
 		return h.feels_like != null ? `${Math.round(h.feels_like)}°` : '—';
 	},
 	caption: (h) => (h ? `Reale ${Math.round(h.temp)}° · ${conditionLabelOf(h)}` : ''),
-	headlineClassName: 'text-white/90',
-	captionClassName: 'text-blue-200/80',
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#00619b]',
 	ariaLabel: 'Temperatura percepita oraria',
 	emptyMessage: 'Temperatura percepita non disponibile per questa località',
 };
@@ -263,8 +263,8 @@ const uvSection: MetricSection = {
 		return h.uv_index != null ? `${Math.round(h.uv_index)}` : '—';
 	},
 	caption: (h) => (h?.uv_index != null ? `Indice UV · ${getUvScale(h.uv_index).label}` : ''),
-	headlineClassName: 'text-white/90',
-	captionClassName: 'text-blue-200/80',
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#00619b]',
 	ariaLabel: 'Indice UV orario',
 	emptyMessage: 'Indice UV non disponibile per questa località',
 	flatMessage: 'Nessuna radiazione UV prevista',

@@ -1,6 +1,27 @@
 @import "tailwindcss";
 
 @theme inline {
+  /* Duet design system tokens (see Claude Design handoff "Smart Meteo Dashboard (Duet)") */
+  --color-duet-bg: #f5f8fa;
+  --color-duet-surface: #ffffff;
+  --color-duet-border: #e4eaf0;
+  --color-duet-border-strong: #7f96a5;
+  --color-duet-ink: #082a4d;
+  --color-duet-ink-soft: #3e5466;
+  --color-duet-muted: #62798a;
+  --color-duet-faint: #7f96a5;
+  --color-duet-accent: #0077b3;
+  --color-duet-accent-hover: #004b81;
+  --color-duet-accent-soft: #f0f7fa;
+  --color-duet-accent-border: #d9ecf5;
+  --color-duet-amber-bg: #fff7dd;
+  --color-duet-amber-border: #ffd978;
+  --color-duet-amber-ink: #513709;
+  --color-duet-amber-strong: #7e5710;
+  --color-duet-green-bg: #e7f8ef;
+  --color-duet-green-ink: #1d6a58;
+  --color-duet-green: #308369;
+
   --color-glass-bg: rgba(255, 255, 255, 0.12);
   --color-glass-border: rgba(255, 255, 255, 0.2);
   --color-glass-bg-dark: rgba(0, 0, 0, 0.25);
@@ -13,7 +34,7 @@
   --color-weather-storm: #1e293b;
   --color-weather-fog: #94a3b8;
 
-  --font-sans: var(--font-sans), "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-sans), "Figtree", system-ui, -apple-system, sans-serif;
 }
 
 *,
@@ -25,45 +46,58 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--color-duet-bg);
+  color: var(--color-duet-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism base */
+a { color: var(--color-duet-accent); }
+a:hover { color: var(--color-duet-accent-hover); }
+::selection { background: var(--color-duet-accent-border); }
+
+/* Duet card surfaces (kept the .glass/.glass-strong names so every component
+   that already uses them picks up the new look without a rename pass) */
 .glass {
-  background: rgba(0, 0, 0, 0.15); /* Darker tint for contrast */
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+  background: var(--color-duet-surface);
+  border: 1px solid var(--color-duet-border);
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 3px rgba(8, 42, 77, 0.06);
 }
 
 .glass-strong {
-  background: rgba(0, 0, 0, 0.25); /* Stronger dark tint */
-  backdrop-filter: blur(30px) saturate(150%);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  background: var(--color-duet-surface);
+  border: 1px solid var(--color-duet-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 48px rgba(8, 42, 77, 0.16);
 }
 
 .glass-dark {
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
+  background: var(--color-duet-surface);
+  border: 1px solid var(--color-duet-border);
+  border-radius: 0.625rem;
 }
 
-/* Animated background */
+.dt-icon-btn { transition: background .15s ease, color .15s ease; }
+.dt-icon-btn:hover { background: var(--color-duet-accent-soft); color: var(--color-duet-accent); }
+.dt-row { transition: background .12s ease; }
+.dt-row:hover { background: var(--color-duet-bg); }
+.dt-secondary { transition: background .15s ease, border-color .15s ease; }
+.dt-secondary:hover:not(:disabled) { background: var(--color-duet-accent-soft); border-color: var(--color-duet-accent); }
+.dt-primary { transition: background .15s ease; }
+.dt-primary:hover:not(:disabled) { background: var(--color-duet-accent-hover); }
+.dt-input:focus-within { border-color: var(--color-duet-accent); box-shadow: 0 0 0 3px rgba(0,119,179,.15); }
+
+/* Animated background (kept for the pre-Duet dark theme; unused on the light dashboard) */
 .weather-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
   transition: background 1s ease-in-out;
 }
+
+@keyframes fadeUp { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
 
 /* Skeleton animation */
 @keyframes shimmer {
@@ -72,7 +106,7 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.06) 75%);
+  background: linear-gradient(90deg, rgba(8,42,77,0.06) 25%, rgba(8,42,77,0.12) 50%, rgba(8,42,77,0.06) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.5rem;

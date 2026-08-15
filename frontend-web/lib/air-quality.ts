@@ -22,18 +22,18 @@ interface AqiScale {
 }
 
 const AQI_CATEGORIES: Record<number, AqiScale> = {
-	1: { label: 'Buona', color: '#33B34D', className: 'text-green-300' },
-	2: { label: 'Moderata', color: '#E6CC33', className: 'text-yellow-300' },
-	3: { label: 'Malsana per sensibili', color: '#F28C26', className: 'text-orange-300' },
-	4: { label: 'Malsana', color: '#E64033', className: 'text-red-300' },
-	5: { label: 'Molto malsana', color: '#8C3399', className: 'text-purple-300' },
-	6: { label: 'Pericolosa', color: '#802626', className: 'text-rose-300' },
+	1: { label: 'Buona', color: '#33B34D', className: 'text-green-600' },
+	2: { label: 'Moderata', color: '#E6CC33', className: 'text-yellow-600' },
+	3: { label: 'Malsana per sensibili', color: '#F28C26', className: 'text-orange-600' },
+	4: { label: 'Malsana', color: '#E64033', className: 'text-red-600' },
+	5: { label: 'Molto malsana', color: '#8C3399', className: 'text-purple-600' },
+	6: { label: 'Pericolosa', color: '#802626', className: 'text-rose-700' },
 };
 
 const AQI_UNKNOWN: AqiScale = {
 	label: 'N/D',
-	color: 'rgba(255,255,255,0.25)',
-	className: 'text-white/50',
+	color: 'rgba(8,42,77,0.18)',
+	className: 'text-[var(--color-duet-muted)]',
 };
 
 /**
