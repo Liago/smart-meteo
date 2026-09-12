@@ -1,7 +1,7 @@
 # Riepilogo Stato Progetto — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-04-02
+> **Ultimo aggiornamento:** 2026-09-12
 > **Scopo:** Riepilogo dello stato di implementazione, gap identificati e migliorie future
 
 ---
@@ -27,9 +27,9 @@
 - 9 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack (disabilitato: HTTP), Meteostat, WWO, Apple WeatherKit
 - Smart Engine V1 con aggregazione pesata (pesi da 0.8 a 1.2) — Weatherstack escluso (peso 0, HTTP non sicuro)
 - Sistema allerte meteo completo: 4 fonti (WeatherKit, WeatherAPI, OWM, MeteoAlarm), push APNs, polling 15min, deduplicazione multi-source, cooldown 6h anti-spam
-- Migrazioni DB fino a 019 (push notifications, alert enhancement, delivery log)
-- API Express: `/api/forecast`, `/api/sources`, `/api/health`
-- Database Supabase con 12 migration, RLS, trigger, funzioni utility
+- Migrazioni DB fino a **021** (push notifications, alert enhancement, delivery log, localizzazione allerte, dedup per device) — prossimo numero libero: 022
+- API Express: `/api/forecast`, `/api/sources`, `/api/health`, `/api/alerts/*`
+- Database Supabase con **21 migration**, RLS, trigger, funzioni utility
 - Deploy su Netlify Functions (serverless)
 
 ### Fase 2 — Frontend Web
@@ -115,6 +115,14 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
+### Fase 6A — Dati già pagati, portati all'utente (2026-09-12)
+- **Nowcast al minuto** (web + iOS): `forecastNextHour` era propagato dall'engine dalla Fase 5E e **nessun client lo leggeva**. Nuovi `NextHourPrecipitation.tsx` e `NextHourPrecipitationView.swift`, con titolo dedotto dai minuti e non dal `summary` di WeatherKit
+- **Indice di consenso** (`backend/utils/consensus.ts`): deviazione standard pesata fra le fonti su temperatura e probabilità di pioggia, contratta verso 50 con `n/(n+2)`; esposta come `confidence` e scritta in `smart_forecasts.confidence_score`, che era `null` dalla migrazione 005. Mostrata in `SourcesIndicator` (solo web: iOS non ha un pannello fonti)
+- **`precipitation_intensity`** aggregato ed esposto su `current`: i mm/h in corso erano estratti da cinque connettori e mai aggregati
+- **Dati lunari sul web**: `moonrise`, `moonset`, `moon_illumination` erano sul filo e mostrati solo da iOS
+- Schema di cache portato a 4; `npm test` del backend include `verifyConsensus` (13 verifiche); suite web a **137 test** in 7 suite
+- Documentazione allineata al codice (`CLAUDE.md`, `AGENTS.md`, `.env.example`, `PHASE_1`, `PHASE_3`, `AUDIT`)
+
 ### Fase 5E — Hourly Arricchiti e ForecastNextHour
 - `HourlyForecast` esteso con `humidity`, `wind_speed`, `uv_index` — estratti da 7 connettori e aggregati nello Smart Engine
 - `ForecastNextHour` (previsione precipitazione minuto-per-minuto da WeatherKit) — nuovi tipi, parser, propagazione nel risultato finale
@@ -148,13 +156,15 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 23 test (3 suite) | Espansione in TODO_TESTING |
+| Frontend web unit test | ✅ 137 test (7 suite) | Espansione in TODO_TESTING §4 |
 | Frontend web E2E (Playwright) | ❌ Non implementato | → TODO_TESTING §3 |
-| Backend unit/integration test | ❌ Non implementato | → TODO_TESTING §2 |
+| Backend unit/integration test | ⚠️ 5 script `verify*.ts` (65 controlli) sulle sole funzioni pure; **nessun Jest, nessun test dei connettori o delle route** | → TODO_TESTING §2 |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5 |
 
-> **→ Pianificato in `TODO_TESTING.md` e `VALUTAZIONI_TECNICHE.md`**
+> **→ Pianificato in `TODO_TESTING.md` e `VALUTAZIONI_TECNICHE.md`. Il prossimo blocco
+> di lavoro è la Fase 6B della `GAP_ANALYSIS_2026-09.md`: rete di test sul backend
+> prima di rimettere mano all'engine.**
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -173,6 +183,25 @@
 - Fix critico (2026-04-01): risolto bug ID non-deterministici che causavano decine di notifiche duplicate
 
 ---
+
+### 3.6 Gap verificati sul codice il 2026-09-12
+
+Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`):
+
+| # | Gap | Gravità | Stato |
+|---|-----|:-------:|-------|
+| 1 | `forecastNextHour` servito dal backend e ignorato dai client | 🔴 | ✅ Risolto in Fase 6A |
+| 2 | Dati lunari assenti sul web | 🟡 | ✅ Risolto in Fase 6A |
+| 3 | `confidence_score` mai calcolato dalla migrazione 005 | 🟠 | ✅ Risolto in Fase 6A |
+| 4 | `precipitation_intensity` estratto e mai aggregato | 🟢 | ✅ Risolto in Fase 6A |
+| 5 | Meteostat nell'aggregazione: osservazioni passate mescolate a previsioni | 🔴 | ⏳ Fase 6C |
+| 6 | `source_accuracy` misura la conformità al consenso, non l'errore vs osservato | 🔴 | ⏳ Fase 6C |
+| 7 | AQI da una sola fonte, senza previsione né fallback | 🟠 | ⏳ Fase 6D |
+| 8 | `EMAIL_NOTIFICATIONS_PLAN.md` interamente non implementato | 🔴 | ⏳ Decisione pendente (Web Push come alternativa) |
+| 9 | Nessun Jest sul backend, nessun E2E, nessun test iOS, nessun Lighthouse | 🔴 | ⏳ Fase 6B |
+| 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Fase 6D |
+| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E |
+| 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |
 
 ## 4. Migliorie Future
 
@@ -219,6 +248,7 @@
 
 | Documento | Contenuto |
 |-----------|-----------|
+| **`GAP_ANALYSIS_2026-09.md`** | **Verifica di completezza sul codice, gap aperti, doc drift e roadmap Fase 6** |
 | `IMPLEMENTATION_PLAN.md` | Piano architetturale generale e roadmap |
 | `PHASE_1.md` | Checklist Fase 1 (Backend Core) — completata |
 | `PHASE_2.md` | Checklist Fase 2 (Frontend Web) — ~95% |

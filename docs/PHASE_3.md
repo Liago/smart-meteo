@@ -106,11 +106,22 @@ Replicare e migliorare l'esperienza web su mobile:
 *   [x] Aggiungere rifiniture UI (SplashView, Glassmorphism, SunWindCard con arco solare).
 
 ### Step 3.7: Widget & Extensions (Bonus/Fase 4)
-*   [ ] Creare target WidgetExtension.
-*   [ ] Widget "Current Weather" (Small & Medium).
-*   [ ] TimelineProvider per aggiornamento dati in background.
+*   [x] Creare target WidgetExtension (`SmartMedeoWidget/`).
+*   [x] Widget "Current Weather" (Small & Medium) — `SmartMedeoWidget.swift`.
+*   [x] Widget orario e settimanale — `HourlyForecastWidget.swift`, `WeeklyForecastWidget.swift`.
+*   [x] TimelineProvider per aggiornamento dati in background — `WidgetWeatherService.swift`.
 
-> **Nota (2026-03-10):** Gli Step 3.1-3.6 sono stati completati. Rimangono aperti: Step 3.7 (Widget iOS), l'aggiunta dei nuovi campi API (uv_index, visibility, cloud_cover, air_quality) ai modelli Swift e alla UI, e l'attivazione degli effetti particellari SpriteKit nel DynamicBackground.
+> **Nota (2026-09-12):** anche lo Step 3.7 è completato — il target widget esiste
+> con quattro widget e un proprio design system. Sono chiusi anche i due punti
+> rimasti nella nota precedente: i nuovi campi API sono nei modelli Swift e nella
+> UI (Fase 5B) e gli effetti particellari SpriteKit sono attivi
+> (`WeatherParticleScene.swift`). Il progetto Xcode usa
+> `fileSystemSynchronizedGroups`, quindi i file nuovi non vanno registrati a mano
+> nel `project.pbxproj`.
+>
+> Resta aperto per iOS: nessun test unitario (`docs/VALUTAZIONI_TECNICHE.md` §4) e
+> nessun pannello "fonti" dove mostrare l'indice di consenso già servito dall'API
+> (`docs/GAP_ANALYSIS_2026-09.md`).
 
 ## 6. Integrazione Backend
 L'app comunicherà con lo stesso backend Next.js (o serverless function) utilizzato dal web:

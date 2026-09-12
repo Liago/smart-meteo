@@ -7,6 +7,9 @@
 > **Metodo:** lettura di tutti i 18 documenti in `docs/` + `CLAUDE.md` / `AGENTS.md` / `README.md`,
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
+>
+> **Stato avanzamento roadmap:** Fase 6A ✅ completata (2026-09-12) · 6B → 6E da fare.
+> Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
 
@@ -18,6 +21,7 @@
 4. [Parte C — Disallineamenti della documentazione](#4-parte-c--disallineamenti-della-documentazione-doc-drift)
 5. [Parte D — Nuove implementazioni proposte](#5-parte-d--nuove-implementazioni-proposte)
 6. [Parte E — Roadmap proposta (Fase 6)](#6-parte-e--roadmap-proposta-fase-6)
+7. [Registro avanzamento](#7-registro-avanzamento)
 
 ---
 
@@ -38,9 +42,10 @@ aperti **quattro blocchi sostanziali**:
 | **Meteostat come ground truth** (`VALUTAZIONI_TECNICHE.md` §3, opzione B raccomandata) | Non fatto: le osservazioni passate continuano a entrare nelle previsioni future |
 | **Confidence score / accuratezza reale** (`IMPLEMENTATION_PLAN.md` Fase 4, `5D.1`) | Parziale e concettualmente diverso da quanto pianificato (vedi §3.4) |
 
-In più ci sono **due feature pagate e già in casa ma invisibili all'utente**:
+In più c'erano **due feature pagate e già in casa ma invisibili all'utente**:
 `forecastNextHour` (nowcast minutale WeatherKit) e i dati lunari `moonrise`/`moonset`/
-`moon_illumination` sul web — il backend li serve, nessun client li legge.
+`moon_illumination` sul web — il backend li serviva, nessun client li leggeva.
+**Entrambe risolte nella Fase 6A** (§7), insieme all'indice di consenso e ai mm/h correnti.
 
 **Ci sono ulteriori implementazioni interessanti?** Sì, e diverse a costo marginale zero: le API
 già a contratto espongono pollini, quota neve, radiazione solare, indici temporaleschi, onde,
@@ -55,20 +60,20 @@ Dettaglio in §5.
 | Documento | Dichiarato | Verificato in codice | Delta |
 |-----------|-----------|----------------------|-------|
 | `IMPLEMENTATION_PLAN.md` | 5 fonti fra cui **Meteomatics**; radar/satellite; MapKit radar su iOS; Fase 4 = accuratezza storica e tuning pesi | Meteomatics **non esiste** (`backend/connectors/` non ha il file); nessun radar/mappa su nessuna piattaforma; Fase 4 solo parziale | 🔴 3 punti del piano originale mai realizzati |
-| `PHASE_1.md` | `[x] Implementare Connector: Meteomatics` | Connettore inesistente; al suo posto Open-Meteo (mai citato nella checklist) | 🔴 checkbox errata |
+| `PHASE_1.md` | `[x] Implementare Connector: Meteomatics` | Connettore inesistente; al suo posto Open-Meteo (mai citato nella checklist) | ✅ corretto in 6A |
 | `PHASE_2.md` | tutto `[x]` tranne E2E Playwright | Coerente; E2E ancora assente | 🟡 1 punto aperto |
-| `PHASE_3.md` | Step 3.7 (Widget) `[ ]` | Widget **implementato** (`SmartMedeoWidget/`, 8 file) | 🟡 doc non aggiornato |
-| `AUDIT_API_DATA_SOURCES.md` | racc. #1-#9 risolte, #10-#14 aperte | #10 (cloud cover) e #11-#12 risolte; #13 risolto per disabilitazione; **#14 aperto** | 🟡 doc non aggiornato |
+| `PHASE_3.md` | Step 3.7 (Widget) `[ ]` | Widget **implementato** (`SmartMedeoWidget/`, 8 file) | ✅ corretto in 6A |
+| `AUDIT_API_DATA_SOURCES.md` | racc. #1-#9 risolte, #10-#14 aperte | #10 (cloud cover) e #11-#12 risolte; #13 risolto per disabilitazione; **#14 aperto** | ✅ corretto in 6A |
 | `IMPLEMENTATION_API_IMPROVEMENTS.md` / `CHANGELOG_API_IMPROVEMENTS.md` | 4 fasi complete | Coerente con il codice | ✅ |
 | `IMPLEMENTATION_PLAN_PHASE_5.md` | 5A-5D complete | 5A ✅, 5B ✅, 5C ✅ (file presenti), 5D ✅ tranne l'endpoint `GET /api/accuracy` e il cron di ricalcolo previsti in 5D.1 | 🟡 2 sotto-punti non fatti |
-| `WEATHERKIT_DATA_ANALYSIS.md` | punti 1-4 fatti, punto 5 (daily arricchiti) aperto | `precipitationAmount` **ora estratto** (`weatherkit.ts:196,307`); restano `snowfallAmount`, `windSpeedMax`, `windGustSpeedMax` daily e `pressure`/`visibility`/`cloudCover`/`snowfallIntensity` hourly. `precipitation_intensity` corrente estratto ma **mai aggregato** (`AggregationData` non lo contiene) | 🟡 parziale |
+| `WEATHERKIT_DATA_ANALYSIS.md` | punti 1-4 fatti, punto 5 (daily arricchiti) aperto | Il doc era obsoleto in due punti: `precipitationAmount` e `windDirection` risultavano non estratti ma sono in codice (`weatherkit.ts:196,210,307`). Restano `snowfallAmount`, `windSpeedMax`, `windGustSpeedMax` daily e `pressure`/`visibility`/`cloudCover`/`snowfallIntensity` hourly. `precipitation_intensity` corrente ora aggregato (6A) | ✅ corretto in 6A; 2 residui aperti |
 | `WEATHER_ALERTS_ANALYSIS.md` | Fasi 1-5 complete | Coerente e anzi superato (filtro geografico `alertGeo.ts`, migrazioni 020-021, dedup per device). Nota: la push ora è **solo** del poller, lo smart engine restituisce le allerte senza notificarle (`smartEngine.ts:578-584`) — corretto, ma il doc descrive ancora il vecchio flusso | ✅ / doc da aggiornare |
 | `EMAIL_NOTIFICATIONS_PLAN.md` | "Da implementare" | **0%**. Nessun `resend`, nessuna tabella `email_alert_subscriptions`, nessun endpoint `/api/alerts/email/*`. Inoltre il piano prevede la migrazione `020_email_alert_subscriptions.sql`, ma il numero 020 è già occupato da `020_weather_alerts_location.sql`: **primo numero libero = 022** | 🔴 intero piano aperto |
-| `TODO_TESTING.md` | "Da implementare" | Backend: nessun Jest, solo 4 script `ts-node` di verifica (`verifyAlertGeo`, `verifyAlertDedup`, `verifyPrecipitation`, `verifyWind`) — utili ma non sostituiscono le 8 suite connettore + engine + formatter + moon + supertest. Web: 6 suite (erano 3), ma `HourlyForecast`, `ForecastDetails`, `SunWindCard`, `SearchBar`, `DynamicBackground`, i 3 hook e `useLocations` restano non testati. E2E: 0. iOS: 0. Lighthouse: 0 | 🔴 ~80% aperto |
+| `TODO_TESTING.md` | "Da implementare" | Backend: nessun Jest, solo script `ts-node` di verifica (`verifyAlertGeo`, `verifyAlertDedup`, `verifyPrecipitation`, `verifyWind`, + `verifyConsensus` dalla 6A) — utili ma non sostituiscono le 9 suite connettore + engine + formatter + moon + supertest. Web: 7 suite dopo la 6A, ma `HourlyForecast`, `ForecastDetails`, `SunWindCard`, `SearchBar`, `DynamicBackground`, i 3 hook e `useLocations` restano non testati. E2E: 0. iOS: 0. Lighthouse: 0 | 🔴 ~80% aperto → **Fase 6B** |
 | `VALUTAZIONI_TECNICHE.md` | §1 risolto; §2-§4 aperti | §1 ✅ (Weatherstack peso 0, `smartEngine.ts:44`); §2 Lighthouse mai eseguito; §3 Meteostat **ancora nell'aggregazione** con peso 0.8 (`smartEngine.ts:45,57`), opzione B non implementata; §4 nessun test iOS | 🔴 3 su 4 aperti |
-| `BACKEND_DB_INTEGRATION.md` | caching + audit + config da DB | Implementato, con in più lo `schema_version` per invalidare la cache. `confidence_score` scritto sempre `null` (`smartEngine.ts:568`) | 🟡 1 campo mai calcolato |
+| `BACKEND_DB_INTEGRATION.md` | caching + audit + config da DB | Implementato, con in più lo `schema_version` per invalidare la cache. `confidence_score` era scritto sempre `null` | ✅ popolato in 6A |
 | `IOS_SETUP_GUIDE.md` / `WEATHERKIT_SETUP_GUIDE.md` | guide operative | Coerenti | ✅ |
-| `PROJECT_STATUS_SUMMARY.md` | riepilogo generale | Vedi §4: diverse cifre non più vere | 🟡 |
+| `PROJECT_STATUS_SUMMARY.md` | riepilogo generale | Diverse cifre non più vere (vedi §4) | ✅ corretto in 6A |
 
 ---
 
@@ -76,22 +81,30 @@ Dettaglio in §5.
 
 Ordinati per rapporto valore/costo, non per priorità dichiarata nei vecchi documenti.
 
-### 3.1 `forecastNextHour` esposto dal backend e ignorato da tutti i client 🔴
+### 3.1 `forecastNextHour` esposto dal backend e ignorato da tutti i client ✅ RISOLTO (6A)
 
-`smartEngine.ts:530-533` propaga il nowcast minutale di WeatherKit nella risposta. Nessun
-consumatore: `frontend-web/lib/types.ts` non dichiara il campo in `ForecastResponse`, e
-`Models/Forecast.swift` nemmeno. Stiamo pagando il dataset Apple, lo parsiamo
-(`weatherkit.ts:parseForecastNextHour`) e lo buttiamo.
+`smartEngine.ts` propagava il nowcast minutale di WeatherKit nella risposta senza alcun
+consumatore: né `frontend-web/lib/types.ts` né `Models/Forecast.swift` dichiaravano il campo.
+Pagavamo il dataset Apple, lo parsavamo (`weatherkit.ts:parseForecastNextHour`) e lo
+buttavamo.
 
-È il gap col miglior rapporto valore/costo del progetto: la feature "pioggia fra 12 minuti" è
-**solo UI**, zero lavoro backend.
+**Risolto:** `frontend-web/components/NextHourPrecipitation.tsx` e
+`UI/Features/Dashboard/NextHourPrecipitationView.swift`. Il titolo è dedotto dai minuti e non
+dal campo `summary` di WeatherKit — i due possono discordare e i minuti sono ciò che
+disegniamo — e una pausa deve durare almeno 3 minuti prima di annunciare che la pioggia è
+finita, altrimenti un buco isolato nei dati diventa una schiarita inesistente. Quando l'ora è
+asciutta il pannello si riduce a una riga: un istogramma di zeri occuperebbe spazio senza dire
+nulla. 13 test in `__tests__/next-hour.test.tsx`.
 
-### 3.2 Dati lunari assenti sul web 🟡
+### 3.2 Dati lunari assenti sul web ✅ RISOLTO (6A)
 
-Il backend serve `moonrise`, `moonset`, `moon_illumination` (`types.ts:AstronomyData`, aggregati in
-`smartEngine.ts:472-492`). iOS li mostra (`CurrentWeatherView.swift:563`). Il web dichiara solo
-`sunrise/sunset/moon_phase` (`frontend-web/lib/types.ts:57-61`) e non li mostra: asimmetria
-web/iOS su dati già sul filo.
+Il backend serviva `moonrise`, `moonset`, `moon_illumination` (aggregati in
+`smartEngine.ts:472-492`) e solo iOS li mostrava (`CurrentWeatherView.swift:563`).
+
+**Risolto:** campi aggiunti ad `AstronomyData` in `lib/types.ts` e terza riga in
+`SunWindCard.tsx`. Gli orari passano da un parser con fallback, perché le fonti non
+concordano sul formato (WWO manda ISO con offset, WeatherKit UTC con `Z`, WeatherAPI un
+`"07:42 PM"` convertito a 24h): senza fallback il web avrebbe mostrato `Invalid Date`.
 
 ### 3.3 Meteostat: osservazioni passate mescolate a previsioni future 🔴
 
@@ -118,11 +131,30 @@ temperatura *attuale*. Con `hourly: []` e `daily: []` sempre vuoti, il contribut
 Il fix corretto è il confronto forecast T+24h vs osservato, e Meteostat / Open-Meteo Archive sono
 esattamente la fonte di verità che serve — lo stesso lavoro che risolve §3.3.
 
-### 3.5 `confidence_score` mai calcolato 🟠
+### 3.5 `confidence_score` mai calcolato ✅ RISOLTO (6A)
 
-La colonna esiste dalla migrazione 005, il piano la prevede, il valore scritto è `null`
-(`smartEngine.ts:568`). Aggreghiamo fino a 9 fonti e non diciamo mai **quanto sono d'accordo**:
-è l'informazione più distintiva che possiede un aggregatore, e non la mostriamo.
+La colonna esisteva dalla migrazione 005 e il valore scritto era `null`: aggregavamo fino a 9
+fonti senza mai dire **quanto sono d'accordo**, l'informazione più distintiva che possiede un
+aggregatore.
+
+**Risolto:** `backend/utils/consensus.ts` calcola la deviazione standard **pesata** (di
+popolazione, non campionaria: le fonti attive *sono* l'insieme su cui misuriamo l'accordo) su
+temperatura e probabilità di precipitazione, la converte in accordo 0-1 rispetto a soglie
+esplicite (3 °C, 30 punti percentuali) e la **contrae verso 50 con `n/(n+2)`**: due fonti
+concordi non danno la garanzia di nove, e con pochi campioni la dispersione osservata è essa
+stessa poco affidabile. Esposto come `confidence` nella risposta e scritto in
+`smart_forecasts.confidence_score`. Mostrato in `SourcesIndicator.tsx` con l'intervallo fra la
+fonte più fredda e la più calda quando supera 1 °C. 13 verifiche in `verifyConsensus.ts`.
+
+Restano fuori di proposito le condizioni categoriche: i `condition_code` non sono normalizzati
+fra i provider (Open-Meteo passa il codice WMO numerico, gli altri una stringa già
+normalizzata), quindi un voto sui codici grezzi conterebbe come disaccordo WMO 1 e WMO 2, che
+descrivono lo stesso cielo. Includerle richiede prima una mappa WMO → famiglia lato backend.
+
+**Asimmetria introdotta e dichiarata:** la confidenza è per ora **solo sul web**. iOS non
+mostra nemmeno `sources_used` — non esiste un pannello fonti — e crearlo esce dal perimetro di
+6A. Il modello Swift decodifica già `confidence`, quindi manca solo la vista: voce aperta in
+§6.5.
 
 ### 3.6 AQI monofonte, senza previsione 🟠
 
@@ -154,8 +186,11 @@ daily/hourly.
 
 - WeatherKit hourly: `pressure`, `visibility`, `cloudCover`, `windDirection`, `snowfallIntensity`.
 - WeatherKit daily: `snowfallAmount`, `windSpeedMax`, `windGustSpeedMax`.
-- `precipitation_intensity` corrente: estratto da 5 connettori, mai aggregato né esposto (i mm/h
-  *adesso* mancano, mentre abbiamo i mm previsti per ora e per giorno).
+- ~~`precipitation_intensity` corrente: estratto da 5 connettori, mai aggregato né esposto.~~
+  ✅ **Risolto (6A)**: aggregato con lo stesso gate sulla frazione bagnata dei mm previsti, così
+  una fonte isolata non inventa pioggia in corso. Le due grandezze sono numericamente
+  omogenee (mm/h di intensità e mm accumulati in un'ora), quindi le soglie NWS valgono per
+  entrambe.
 - Open-Meteo: `is_day`, `sunshine_duration`, `cloud_cover_low/mid/high` non richiesti.
 
 ---
@@ -350,15 +385,17 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 
 ### 6.1 Fase 6A — "Raccogliere ciò che è già pagato" (effort basso, impatto immediato)
 
-| # | Intervento | Chiude |
-|---|-----------|--------|
-| 1 | UI nowcast minutale su web e iOS | §3.1 |
-| 2 | Dati lunari sul web (tipi + `SunWindCard`) | §3.2 |
-| 3 | Indice di consenso fra le fonti + `confidence_score` popolato | §3.5, §5.3.1 |
-| 4 | `precipitation_intensity` aggregato in `current` (mm/h adesso) | §3.10 |
-| 5 | Allineamento di `CLAUDE.md`, `AGENTS.md`, `PROJECT_STATUS_SUMMARY.md`, `PHASE_3.md` | §4 |
+**✅ Completata il 2026-09-12** — dettaglio in §7.
 
-### 6.2 Fase 6B — Rete di sicurezza (da fare prima di toccare l'engine)
+| # | Intervento | Chiude | Stato |
+|---|-----------|--------|:-----:|
+| 1 | UI nowcast minutale su web e iOS | §3.1 | ✅ |
+| 2 | Dati lunari sul web (tipi + `SunWindCard`) | §3.2 | ✅ |
+| 3 | Indice di consenso fra le fonti + `confidence_score` popolato | §3.5, §5.3.1 | ✅ (web; iOS in §6.5) |
+| 4 | `precipitation_intensity` aggregato in `current` (mm/h adesso) | §3.10 | ✅ |
+| 5 | Allineamento di `CLAUDE.md`, `AGENTS.md`, `PROJECT_STATUS_SUMMARY.md`, `PHASE_3.md` | §4 | ✅ |
+
+### 6.2 Fase 6B — Rete di sicurezza (**prossimo blocco**, da fare prima di toccare l'engine)
 
 | # | Intervento | Chiude |
 |---|-----------|--------|
@@ -388,9 +425,13 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 
 ### 6.5 Fase 6E — Nicchie e rifiniture
 
-Mare e maree (§5.11), fotovoltaico (§5.9), giardino (§5.10), indici lifestyle (§5.6, con cache
-per il limite AccuWeather), alba/tramonto e cielo notturno (§5.12), residui WeatherKit (§3.10),
-test iOS e audit Lighthouse (`VALUTAZIONI_TECNICHE` §2 e §4).
+- **Pannello fonti su iOS**, con l'indice di consenso e `sources_used` — che iOS non ha mai
+  mostrato. Chiude l'asimmetria dichiarata in §3.5.
+- Mare e maree (§5.11), fotovoltaico (§5.9), giardino (§5.10), indici lifestyle (§5.6, con
+  cache per il limite AccuWeather), alba/tramonto e cielo notturno (§5.12).
+- Residui WeatherKit (§3.10): la neve ha senso insieme alla quota neve di Open-Meteo (§5.2),
+  non da sola.
+- Test iOS e audit Lighthouse (`VALUTAZIONI_TECNICHE` §2 e §4).
 
 ### 6.6 Decisione richiesta: notifiche email
 
@@ -399,6 +440,76 @@ per gli utenti iOS aggiunge poco alle push, ma è **l'unico canale di allerta pe
 oggi non riceve nulla. Alternativa più economica: Web Push (VAPID) sul frontend, che riusa la
 pipeline esistente invece di introdurre Resend, template HTML, rate limiting e disiscrizione GDPR.
 Se si procede con l'email, ricordare che la migrazione va numerata **022**, non 020.
+
+---
+
+## 7. Registro avanzamento
+
+### Fase 6A — completata il 2026-09-12
+
+Commit `feat(6A): nowcast al minuto, indice di consenso, mm/h correnti e luna sul web`
+e `docs(6A): allinea la documentazione al codice`.
+
+**Nuovi file**
+
+| File | Ruolo |
+|------|-------|
+| `backend/utils/consensus.ts` | Deviazione standard pesata fra le fonti → punteggio di confidenza |
+| `backend/scripts/verifyConsensus.ts` | 13 verifiche, in `npm test` |
+| `frontend-web/components/NextHourPrecipitation.tsx` | Nowcast al minuto (web) |
+| `frontend-web/__tests__/next-hour.test.tsx` | 13 test sul titolo, sul gate asciutto e sui minuti passati |
+| `.../UI/Features/Dashboard/NextHourPrecipitationView.swift` | Nowcast al minuto (iOS) |
+
+**File modificati:** `smartEngine.ts` (consenso, `precipitation_intensity`, schema 4,
+`confidence_score`), `backend/package.json`, `frontend-web/lib/types.ts`,
+`SourcesIndicator.tsx`, `SunWindCard.tsx`, `app/page.tsx`, due fixture di test,
+`Models/Forecast.swift`, `DashboardView.swift`, `CurrentWeatherView.swift` (preview),
+più `CLAUDE.md`, `AGENTS.md`, `backend/.env.example`, `PHASE_1.md`, `PHASE_3.md`,
+`AUDIT_API_DATA_SOURCES.md`, `PROJECT_STATUS_SUMMARY.md`, `WEATHERKIT_DATA_ANALYSIS.md`.
+
+**Decisioni prese strada facendo**
+
+1. **Il consenso esclude le condizioni categoriche.** I `condition_code` non sono
+   normalizzati fra i provider: un voto sui codici grezzi conterebbe WMO 1 e WMO 2 come
+   disaccordo pur descrivendo lo stesso cielo. Serve prima una mappa WMO → famiglia lato
+   backend (§3.5).
+2. **Contrazione verso 50 invece di un punteggio grezzo.** Senza shrinkage, una sola fonte
+   avrebbe dato confidenza 100 per definizione — dispersione zero su un campione di uno.
+   Con `n/(n+2)`: 1 fonte → 67, 9 fonti unanimi → 91.
+3. **Il gate della pioggia riusato sui mm/h correnti.** `aggregatePrecipitationMm` era scritto
+   per i mm previsti, ma intensità in mm/h e accumulo in un'ora sono numericamente omogenei,
+   quindi le soglie NWS valgono per entrambi e la regola anti-outlier vale doppio sul dato
+   "adesso".
+4. **Titolo del nowcast dai minuti, non dal `summary` di WeatherKit.** I due campi possono
+   discordare e i minuti sono ciò che il grafico disegna. In più una pausa va difesa per
+   almeno 3 minuti: un buco isolato non è una schiarita.
+5. **La confidenza resta solo sul web.** iOS non mostra nemmeno `sources_used`: costruire quel
+   pannello è una superficie UI nuova, fuori dal perimetro di 6A. Registrata in §6.5 per non
+   lasciare un'asimmetria silenziosa — esattamente il difetto che questo documento contesta
+   altrove.
+
+**Verifiche eseguite**
+
+| Cosa | Risultato |
+|------|-----------|
+| `cd backend && npm run typecheck` | pulito |
+| `cd backend && npm test` | 65 controlli, 5 script, tutti superati |
+| `cd frontend-web && npx tsc --noEmit` | pulito |
+| `cd frontend-web && npm run lint` | nessun nuovo problema (restano 5 error + 4 warning preesistenti in `jest.config.js`, `useLocations.ts`, `weather-utils.ts`, `WeatherEffects.tsx`, `WeatherIcon.tsx`) |
+| `cd frontend-web && npm test` | 137 test, 7 suite, tutti superati |
+| `npm run build` (web) | **non eseguibile in questo ambiente**: `next/font` non raggiunge Google Fonts. Da ripetere in CI |
+| Compilazione iOS | **non verificata**: su Linux non esiste toolchain Swift. Il codice è stato controllato a mano (parentesi bilanciate, nessun carattere non ASCII fuori dalle stringhe) ma va compilato in Xcode |
+
+**Nota sul progetto Xcode:** usa `fileSystemSynchronizedGroups`, quindi
+`NextHourPrecipitationView.swift` viene raccolto automaticamente senza toccare il
+`project.pbxproj`.
+
+### Prossimo blocco
+
+**Fase 6B — rete di sicurezza** (§6.2): Jest sul backend con fixture per i 9 connettori, test
+dell'aggregazione daily/hourly e del bucketing con offset di fuso, `supertest` sulle route,
+Playwright sul web. Va prima della 6C perché la 6C riscrive la logica dei pesi e
+dell'accuratezza, cioè il cuore non testato dell'engine.
 
 ---
 
