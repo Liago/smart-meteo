@@ -21,19 +21,30 @@ const confidenceColors: Record<ConfidenceIndex['level'], string> = {
 };
 
 const sourceColors: Record<string, string> = {
+  'apple_weatherkit': 'bg-slate-700',
   'tomorrow.io': 'bg-blue-500',
   'open-meteo': 'bg-purple-500',
   'openweathermap': 'bg-orange-500',
   'weatherapi': 'bg-green-500',
   'accuweather': 'bg-red-500',
+  'worldweatheronline': 'bg-teal-500',
+  'weatherstack': 'bg-amber-500',
+  'meteostat': 'bg-stone-500',
 };
 
+// Le nove fonti del backend. Senza una voce qui il badge mostrava l'id grezzo
+// (`apple_weatherkit`), e mancavano proprio WeatherKit e WWO, cioè due delle
+// fonti che rispondono più spesso.
 const sourceNames: Record<string, string> = {
+  'apple_weatherkit': 'Apple WeatherKit',
   'tomorrow.io': 'Tomorrow.io',
   'open-meteo': 'Open-Meteo',
   'openweathermap': 'OpenWeather',
   'weatherapi': 'WeatherAPI',
   'accuweather': 'AccuWeather',
+  'worldweatheronline': 'World Weather Online',
+  'weatherstack': 'WeatherStack',
+  'meteostat': 'Meteostat',
 };
 
 export default function SourcesIndicator({ sources, confidence }: SourcesIndicatorProps) {

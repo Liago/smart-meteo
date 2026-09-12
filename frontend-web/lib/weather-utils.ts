@@ -118,7 +118,8 @@ export function isDaytime(sunrise: string, sunset: string): boolean {
 		// Formats expected: "06:00 AM", "06:00", "6:00 AM"
 		const parseTime = (timeStr: string) => {
 			const [time, modifier] = timeStr.split(' ');
-			let [hours, minutes] = time.split(':').map(Number);
+			const [rawHours, minutes] = time.split(':').map(Number);
+			let hours = rawHours;
 
 			if (modifier === 'PM' && hours < 12) hours += 12;
 			if (modifier === 'AM' && hours === 12) hours = 0;

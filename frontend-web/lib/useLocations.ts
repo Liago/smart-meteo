@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { createClient } from './supabase/client';
-import { upsertLocation, getFavorites, addToFavorites, removeFromFavorites as removeSupabaseFavorite } from './supabase/locations';
+import { getFavorites, addToFavorites, removeFromFavorites as removeSupabaseFavorite } from './supabase/locations';
 
 export interface SavedLocation {
 	id: string;
@@ -16,7 +17,7 @@ export function useLocations() {
 	const [homeLocation, setHomeLocation] = useState<SavedLocation | null>(null);
 	const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
-	const [user, setUser] = useState<any>(null);
+	const [user, setUser] = useState<User | null>(null);
 	const supabase = createClient();
 
 	// 1. Check Auth State
