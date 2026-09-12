@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fase 6A ✅, 6B ✅ completate · 6C in corso (3 punti su 6) · 6D-6E da fare.
+> **Stato avanzamento roadmap:** Fase 6A ✅, 6B ✅ completate · 6C in corso (5 punti su 6) · 6D-6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -106,15 +106,18 @@ Il backend serviva `moonrise`, `moonset`, `moon_illumination` (aggregati in
 concordano sul formato (WWO manda ISO con offset, WeatherKit UTC con `Z`, WeatherAPI un
 `"07:42 PM"` convertito a 24h): senza fallback il web avrebbe mostrato `Invalid Date`.
 
-### 3.3 Meteostat: osservazioni passate mescolate a previsioni future 🔴
+### 3.3 Meteostat: osservazioni passate mescolate a previsioni future ✅ RISOLTO (6C)
 
 `VALUTAZIONI_TECNICHE.md` §3 raccomandava l'**opzione B** (spostare Meteostat a ruolo di
-validazione). Non fatto: peso 0.8 e fetcher attivo. Il connettore restituisce l'ultima rilevazione
-oraria disponibile, che può avere ore di ritardo, e quel valore entra nella media pesata della
-temperatura *attuale*. Con `hourly: []` e `daily: []` sempre vuoti, il contributo è solo sul
-`current` — dove fa più danno.
+validazione) da marzo. Il connettore restituisce l'ultima rilevazione oraria disponibile, che può
+avere ore di ritardo, e quel valore entrava nella media pesata della temperatura *attuale*. Con
+`hourly: []` e `daily: []` sempre vuoti, il contributo era solo sul `current` — dove fa più danno.
 
-### 3.4 `source_accuracy` misura la conformità, non l'accuratezza 🔴
+**Risolto:** peso 0, come Weatherstack, quindi lo stesso filtro già esistente la esclude senza
+introdurre un secondo meccanismo. Meteostat è ora la verità osservata alternativa in
+`services/observations.ts`, dove l'archivio ERA5 non ha dati.
+
+### 3.4 `source_accuracy` misura la conformità, non l'accuratezza ✅ RISOLTO (6C)
 
 `accuracy.ts:logAccuracyDeviations` calcola `|temp_fonte − temp_consenso|`: è la deviazione dalla
 **media**, non l'errore rispetto all'**osservato**. Conseguenze:
@@ -128,8 +131,23 @@ temperatura *attuale*. Con `hourly: []` e `daily: []` sempre vuoti, il contribut
   pesi non si muovono più. Nessun decadimento temporale, nessun ricalcolo periodico.
 - Mancano l'endpoint `GET /api/accuracy` e il cron di ricalcolo previsti in `5D.1`.
 
-Il fix corretto è il confronto forecast T+24h vs osservato, e Meteostat / Open-Meteo Archive sono
-esattamente la fonte di verità che serve — lo stesso lavoro che risolve §3.3.
+**Risolto:** `services/observations.ts` porta la verità osservata (Open-Meteo Archive/ERA5,
+gratuito e senza chiave, con Meteostat dove l'archivio non arriva); ogni confronto
+previsione/osservato è una riga in `accuracy_samples`; il MAE viene **ricalcolato** sui soli
+campioni degli ultimi 30 giorni invece di essere aggiornato in modo cumulativo; servono 20
+campioni perché il MAE di una fonte muova il suo peso, e sotto quella soglia il peso resta
+statico. La vecchia funzione incrementale è stata rimossa e i valori accumulati con la semantica
+precedente azzerati: non sono confrontabili. `GET /api/accuracy` rende il tutto verificabile.
+
+**Limite che resta, dichiarato:** `raw_forecasts` archivia i valori *correnti* di ogni fonte, non
+le sue previsioni per orizzonte. Quello che si misura è quindi l'accuratezza del **nowcast** —
+quanto la fonte azzecca la temperatura dell'ora in cui l'abbiamo interrogata. È un segnale reale
+e un miglioramento netto sulla deviazione dal consenso, ma non copre il +24h: per quello serve
+archiviare le previsioni per orizzonte, cioè una modifica di schema. Voce aperta in §6.5.
+
+**Il ritardo dell'archivio** ERA5 (circa cinque giorni) fa sì che la verifica guardi a sei giorni
+indietro e non a ieri: l'anello di retroazione è lento, ma misura l'errore vero invece di una
+somiglianza fra previsioni.
 
 ### 3.5 `confidence_score` mai calcolato ✅ RISOLTO (6A)
 
@@ -492,9 +510,9 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 | 10 | **Pesare il daily e l'hourly**: `avgSimple` ignorava `SOURCE_WEIGHTS` | §3.11 | ✅ |
 | 11 | Open-Meteo multi-modello (`&models=`) come fonti distinte | §5.13 | ✅ |
 | 12 | `CRON_SECRET`: rifiutare quando manca invece di lasciar passare | §3.12 | ✅ |
-| 13 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 | ⏳ |
-| 14 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 | ⏳ |
-| 15 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 | ⏳ |
+| 13 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 | ✅ |
+| 14 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 | ✅ |
+| 15 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 | ⏳ ultimo punto |
 
 Il punto 10 è andato per primo: una modifica minima, ma cambia i numeri mostrati, e senza di
 essa i punti 13 e 14 affinerebbero pesi che poi non venivano applicati a daily e hourly.
@@ -684,13 +702,43 @@ Commit `feat(6C): pesa daily e hourly, e chiude il polling senza segreto`,
 
 **Verifiche:** 267 test backend (13 suite), 137 web, 25 E2E × 2 viewport, typecheck pulito.
 
+**Fatto anche** (2026-09-12, commit `feat(6C): accuratezza misurata sull'osservato, non sul
+consenso`):
+
+4. **Verità osservata e MAE reale** (§3.3, §3.4). Archivio ERA5 come fonte primaria, Meteostat
+   dove non arriva; `accuracy_samples` con un campione per confronto; MAE ricalcolato sulla
+   finestra di 30 giorni; soglia di 20 campioni prima che un MAE muova un peso;
+   `GET /api/accuracy` pubblica e `POST /api/accuracy/recompute` protetta; scheduled function
+   giornaliera alle 04:10 UTC.
+5. **Meteostat a peso 0**, fuori dalle previsioni e dentro la verifica: chiude una voce aperta in
+   `VALUTAZIONI_TECNICHE` §3 da marzo.
+
+**Decisioni di questo secondo blocco**
+
+- **ERA5 come verità primaria, non Meteostat**, al contrario di quanto ipotizzava il piano di
+  marzo: è gratuito, senza chiave e copre ogni località, mentre Meteostat ha copertura
+  disomogenea e una quota mensile. Meteostat resta come secondo tentativo.
+- **Soglia di 20 campioni.** Un MAE calcolato su tre confronti è rumore: correggere un peso con
+  quello è peggio che lasciarlo statico. L'endpoint distingue esplicitamente le fonti che pesano
+  da quelle che stanno ancora accumulando.
+- **Ricalcolo, non aggiornamento incrementale.** La vecchia media cumulativa non poteva
+  dimenticare: rifare la media da zero sulla finestra è ciò che rende i pesi capaci di seguire
+  una fonte che peggiora o migliora.
+- **Peso 0 invece di una colonna `source_type`.** Il piano suggeriva di aggiungere un campo alla
+  tabella `sources`; il peso a 0 ottiene lo stesso risultato con il filtro che già esisteva per
+  Weatherstack, senza un secondo meccanismo da tenere allineato fra DB e registro in memoria.
+- **I campioni vecchi sono stati azzerati** dalla migrazione: valori calcolati sulla conformità
+  al consenso, se sopravvissuti, avrebbero continuato a spostare i pesi con la semantica
+  sbagliata.
+
+**Verifiche:** 304 test backend (15 suite), 137 web, 25 E2E × 2 viewport, typecheck pulito.
+
 ### Prossimo blocco
 
-**Fase 6C, punti 13-15**: Meteostat e Open-Meteo Archive come verità osservata (§3.3),
-da cui il MAE reale con finestra scorrevole, `GET /api/accuracy` e il cron di ricalcolo (§3.4),
-più l'ensemble per i percentili (§5.3.2). È il pezzo più grosso rimasto e va progettato come un
-blocco unico: senza dati osservati, i pesi dinamici continuano a premiare la conformità al
-consenso invece dell'accuratezza.
+**Fase 6C, ultimo punto**: l'ensemble di Open-Meteo
+(`ensemble-api.open-meteo.com`) per i percentili 10/50/90 (§5.3.2) — i singoli membri al posto
+di una stima di dispersione ricavata da modelli deterministici. Poi la **Fase 6D**: pollini e AQI
+previsionale, quota neve, indici temporaleschi, radar, allerte su soglie personali.
 
 ---
 
