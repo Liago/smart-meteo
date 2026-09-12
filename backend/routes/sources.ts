@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { OPENMETEO_MODELS } from '../connectors/openmeteo';
 
 export interface WeatherSource {
 	id: string;
@@ -93,7 +94,19 @@ const sources: WeatherSource[] = [
 		description: 'Historical and statistical weather data',
 		lastError: null,
 		lastResponseMs: null
-	}
+	},
+	// I modelli Open-Meteo, ciascuno una fonte a sé: sostituiscono la voce
+	// `open-meteo` (miscela `best_match`) quando sono attivi, vedi lo Smart
+	// Engine. Il registro vive nel connettore, accanto ai pesi.
+	...OPENMETEO_MODELS.map(model => ({
+		id: model.sourceId,
+		name: model.name,
+		weight: model.weight,
+		active: true,
+		description: model.description,
+		lastError: null as string | null,
+		lastResponseMs: null as number | null,
+	})),
 ];
 
 const router = Router();

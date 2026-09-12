@@ -22,6 +22,12 @@ const confidenceColors: Record<ConfidenceIndex['level'], string> = {
 
 const sourceColors: Record<string, string> = {
   'apple_weatherkit': 'bg-slate-700',
+  // I modelli Open-Meteo condividono il viola della fonte da cui arrivano.
+  'open-meteo:icon_d2': 'bg-purple-700',
+  'open-meteo:icon_eu': 'bg-purple-600',
+  'open-meteo:ecmwf': 'bg-violet-500',
+  'open-meteo:meteofrance': 'bg-indigo-500',
+  'open-meteo:gfs': 'bg-fuchsia-500',
   'tomorrow.io': 'bg-blue-500',
   'open-meteo': 'bg-purple-500',
   'openweathermap': 'bg-orange-500',
@@ -37,6 +43,14 @@ const sourceColors: Record<string, string> = {
 // fonti che rispondono più spesso.
 const sourceNames: Record<string, string> = {
   'apple_weatherkit': 'Apple WeatherKit',
+  // Modelli meteorologici richiesti a Open-Meteo uno per uno: sono fonti
+  // indipendenti, non una sola. Le etichette restano corte perché in dashboard
+  // ce ne possono essere cinque accanto agli altri provider.
+  'open-meteo:icon_d2': 'ICON-D2',
+  'open-meteo:icon_eu': 'ICON-EU',
+  'open-meteo:ecmwf': 'ECMWF',
+  'open-meteo:meteofrance': 'Météo-France',
+  'open-meteo:gfs': 'GFS',
   'tomorrow.io': 'Tomorrow.io',
   'open-meteo': 'Open-Meteo',
   'openweathermap': 'OpenWeather',

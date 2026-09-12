@@ -103,11 +103,13 @@ describe('GET /api/health', () => {
 });
 
 describe('GET /api/sources', () => {
-	it('elenca le nove fonti con peso e stato', async () => {
+	it('elenca i nove provider più i modelli Open-Meteo, con peso e stato', async () => {
 		const res = await request(app).get('/api/sources');
 
 		expect(res.status).toBe(200);
-		expect(res.body.sources).toHaveLength(9);
+		// 9 provider storici + 5 modelli Open-Meteo registrati come fonti a sé.
+		expect(res.body.sources.length).toBeGreaterThanOrEqual(9);
+		expect(res.body.sources.map((s: any) => s.id)).toContain('open-meteo:icon_d2');
 		for (const source of res.body.sources) {
 			expect(source).toHaveProperty('id');
 			expect(source).toHaveProperty('name');

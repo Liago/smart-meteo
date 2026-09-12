@@ -1,5 +1,5 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
-import { fetchFromOpenMeteo } from '../connectors/openmeteo';
+import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS } from '../connectors/openmeteo';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -36,8 +36,10 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   4 → aggiunge precipitation_intensity e confidence su current
  *   5 → daily e hourly passano dalla media semplice a quella pesata: i valori
  *       cambiano, quindi le righe in cache vanno rigenerate
+ *   6 → i modelli Open-Meteo entrano come fonti distinte: sources_used cambia
+ *       forma e i valori aggregati con essa
  */
-const FORECAST_SCHEMA_VERSION = 5;
+const FORECAST_SCHEMA_VERSION = 6;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -48,7 +50,10 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'worldweatheronline': 1.0,
 	'weatherstack': 0, // Disabilitato: il piano free usa HTTP non cifrato (no HTTPS)
 	'meteostat': 0.8,
-	'apple_weatherkit': 1.2
+	'apple_weatherkit': 1.2,
+	// I modelli Open-Meteo: i pesi vivono nel connettore, accanto alla
+	// descrizione di ciascun modello.
+	...Object.fromEntries(OPENMETEO_MODELS.map(m => [m.sourceId, m.weight])),
 };
 
 const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
@@ -60,7 +65,13 @@ const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<Unif
 	'worldweatheronline': fetchFromWWO,
 	'weatherstack': fetchFromWeatherstack,
 	'meteostat': fetchFromMeteostat,
-	'apple_weatherkit': fetchFromWeatherKit
+	'apple_weatherkit': fetchFromWeatherKit,
+	...Object.fromEntries(
+		OPENMETEO_MODELS.map(m => [
+			m.sourceId,
+			(lat: number, lon: number) => fetchFromOpenMeteoModel(lat, lon, m),
+		])
+	),
 };
 
 interface AggregationData {
@@ -176,7 +187,21 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	}
 
 	// 3. Fetch from External & Load Accuracies
-	const activeSources = sources.filter(s => s.active && (SOURCE_WEIGHTS[s.id] ?? 1) > 0);
+	//
+	// I modelli Open-Meteo *sostituiscono* la fonte `open-meteo`, non la
+	// affiancano: `best_match` è una miscela degli stessi modelli, quindi
+	// usarle insieme conterebbe due volte gli stessi dati e sovrapeserebbe
+	// qualunque modello Open-Meteo scelga per quella località.
+	const models = activeOpenMeteoModels();
+	const modelSourceIds = new Set(models.map(m => m.sourceId));
+	const enabledModelIds = new Set(OPENMETEO_MODELS.map(m => m.sourceId));
+
+	const activeSources = sources.filter(s => {
+		if ((SOURCE_WEIGHTS[s.id] ?? 1) <= 0 || !s.active) return false;
+		if (s.id === 'open-meteo') return models.length === 0;
+		if (enabledModelIds.has(s.id)) return modelSourceIds.has(s.id);
+		return true;
+	});
 	const accuracyMapPromise = getAccuracyMap();
 
 	// Raccoglie le allerte da tutte le fonti durante il fetch

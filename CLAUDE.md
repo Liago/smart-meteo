@@ -12,7 +12,7 @@ smart-meteo/
 │   ├── connectors/             # 9 forecast providers + 1 alerts-only source
 │   │   ├── weatherkit.ts       # Apple WeatherKit (weight: 1.2) - JWT auth, alerts, forecastNextHour
 │   │   ├── tomorrow.ts         # Tomorrow.io (weight: 1.2)
-│   │   ├── openmeteo.ts        # Open-Meteo (weight: 1.1)
+│   │   ├── openmeteo.ts        # Open-Meteo: best_match (1.1) + 5 models as separate sources
 │   │   ├── accuweather.ts      # AccuWeather (weight: 1.1)
 │   │   ├── openweathermap.ts   # OpenWeatherMap (weight: 1.0) + One Call alerts
 │   │   ├── weatherapi.ts       # WeatherAPI (weight: 1.0) - only AQI source, + alerts
@@ -185,7 +185,8 @@ cd frontend-web && npm run build
 - Weather API keys: `TOMORROW_API_KEY`, `OPENWEATHER_API_KEY`, `WEATHERAPI_KEY`, `ACCUWEATHER_API_KEY`, `METEOSTAT_KEY`, `WORLDWEATHER_KEY`, `WEATHERSTACK_KEY` (unused: source disabled)
 - Apple WeatherKit (JWT): `APPLE_TEAM_ID`, `APPLE_SERVICE_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`
 - Push notifications (APNs): `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, `APNS_BUNDLE_ID`, `APNS_PRODUCTION`
-- Scheduled alert polling: `CRON_SECRET` (guards `POST /api/alerts/poll`)
+- Scheduled alert polling: `CRON_SECRET` (guards `POST /api/alerts/poll`; without it the endpoint answers 503 rather than staying open)
+- `OPENMETEO_MODELS` (optional): comma-separated model ids to narrow the Open-Meteo models, or `off` to fall back to the single `best_match` source
 - Open-Meteo needs no key. There is **no** Meteomatics connector: it was in the
   original plan (`docs/IMPLEMENTATION_PLAN.md`) but was replaced by Open-Meteo,
   so `METEOMATICS_*` in `.env.example` is dead configuration.
@@ -229,9 +230,11 @@ cd frontend-web && npm run build
 - **Weather connectors** implement a common interface in `backend/connectors/` - each normalizes provider-specific data into a unified `UnifiedForecast` format defined in `backend/types.ts` and `backend/utils/formatter.ts`
 - **Smart engine** (`backend/engine/smartEngine.ts`) fetches from up to 9 sources in parallel, aggregates using weighted averaging, and caches results for 30 minutes
 - **Cache invalidation by shape**: `FORECAST_SCHEMA_VERSION` is stored inside `full_data`; a cached row with a different version is ignored and regenerated. Bump it whenever response fields are added or renamed
-- **Source weights** range from 0 (Weatherstack, disabled) through 0.8 (Meteostat) to 1.2 (Tomorrow.io and WeatherKit), stored in the `SOURCE_WEIGHTS` constant, then scaled at runtime by `1 / (1 + MAE)` from the `source_accuracy` table
+- **Open-Meteo multi-model**: Open-Meteo is a free frontend over national weather services' models, not a model of its own. It is queried **one model at a time** (`&models=`), so ICON-D2, ICON-EU, ECMWF IFS, Météo-France and GFS enter the aggregation as five independent sources (`open-meteo:icon_d2` …), giving more statistical diversity than several commercial providers that rebrand the same GFS/ECMWF. The models **replace** the `open-meteo` (`best_match`) source rather than joining it: `best_match` is a blend of the same models, so using both would double-count. Switch off with `OPENMETEO_MODELS=off`, or narrow it with a comma-separated list of model ids
+- **Source weights** range from 0 (Weatherstack, disabled) through 0.8 (Meteostat) to 1.2 (Tomorrow.io, WeatherKit, ICON-D2), stored in the `SOURCE_WEIGHTS` constant (model weights live next to each model in `connectors/openmeteo.ts`), then scaled at runtime by `1 / (1 + MAE)` from the `source_accuracy` table
 - **Careful**: that MAE is the deviation from the aggregated consensus, not the error against observed weather, so it currently rewards conformity. See `docs/GAP_ANALYSIS_2026-09.md` §3.4
-- **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. They are pure functions with `verify*.ts` checks
+- **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
+- **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals
 - **Location management** uses localStorage for guests with automatic Supabase sync on login
@@ -250,8 +253,8 @@ cd frontend-web && npm run build
 ## Database
 
 - Supabase (PostgreSQL) with schema in `backend/supabase_schema.sql`
-- 21 migrations in `supabase/migrations/` (001-021): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup
-- The next free migration number is **022**
+- 22 migrations in `supabase/migrations/` (001-022): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources
+- The next free migration number is **023**
 - Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`
 - `upsert_location` utility function for location management
 - Automatic `updated_at` triggers on all tables

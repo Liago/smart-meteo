@@ -57,7 +57,29 @@ jest.mock('../../services/accuracy', () => ({
 let sourceResponses: Record<string, UnifiedForecast | null> = {};
 
 jest.mock('../../connectors/tomorrow', () => ({ fetchFromTomorrow: jest.fn(async () => sourceResponses['tomorrow.io'] ?? null) }));
-jest.mock('../../connectors/openmeteo', () => ({ fetchFromOpenMeteo: jest.fn(async () => sourceResponses['open-meteo'] ?? null) }));
+/**
+ * Modelli Open-Meteo attivi in questo test: vuoto per default, così gli
+ * scenari sull'aggregazione continuano a usare la fonte `open-meteo`
+ * (`best_match`). I test dedicati alla selezione dei modelli lo riempiono.
+ */
+let activeModels: { id: string; sourceId: string; name: string; description: string; weight: number }[] = [];
+
+const MODELLI = [
+	{ id: 'icon_d2', sourceId: 'open-meteo:icon_d2', name: 'ICON-D2', description: '', weight: 1.2 },
+	{ id: 'icon_eu', sourceId: 'open-meteo:icon_eu', name: 'ICON-EU', description: '', weight: 1.1 },
+	{ id: 'ecmwf_ifs025', sourceId: 'open-meteo:ecmwf', name: 'IFS', description: '', weight: 1.1 },
+	{ id: 'meteofrance_seamless', sourceId: 'open-meteo:meteofrance', name: 'AROME', description: '', weight: 1.0 },
+	{ id: 'gfs_seamless', sourceId: 'open-meteo:gfs', name: 'GFS', description: '', weight: 0.9 },
+];
+
+jest.mock('../../connectors/openmeteo', () => ({
+	fetchFromOpenMeteo: jest.fn(async () => sourceResponses['open-meteo'] ?? null),
+	fetchFromOpenMeteoModel: jest.fn(async (_lat: number, _lon: number, model: any) =>
+		sourceResponses[model.sourceId] ?? null
+	),
+	activeOpenMeteoModels: jest.fn(() => activeModels),
+	OPENMETEO_MODELS: MODELLI,
+}));
 jest.mock('../../connectors/accuweather', () => ({ fetchFromAccuWeather: jest.fn(async () => sourceResponses['accuweather'] ?? null) }));
 jest.mock('../../connectors/worldweatheronline', () => ({ fetchFromWWO: jest.fn(async () => sourceResponses['worldweatheronline'] ?? null) }));
 jest.mock('../../connectors/weatherstack', () => ({ fetchFromWeatherstack: jest.fn(async () => sourceResponses['weatherstack'] ?? null) }));
@@ -105,6 +127,7 @@ beforeEach(() => {
 	cachedRow = null;
 	insertedSmart.length = 0;
 	sourceResponses = {};
+	activeModels = [];
 });
 
 // --------------------------------------------------------------------- tests
@@ -473,7 +496,7 @@ describe('cache', () => {
 	it('restituisce il full_data in cache quando lo schema coincide', async () => {
 		cachedRow = {
 			full_data: {
-				schema_version: 5,
+				schema_version: 6,
 				current: { temperature: 11.1 },
 				sources_used: ['cached-source'],
 				alerts: [],
@@ -488,7 +511,7 @@ describe('cache', () => {
 
 	it('non fa uscire schema_version dall API', async () => {
 		cachedRow = {
-			full_data: { schema_version: 5, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+			full_data: { schema_version: 6, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
 		};
 
 		const r = await getSmartForecast(LAT, LON);
@@ -515,6 +538,71 @@ describe('cache', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r.current.temperature).toBeCloseTo(20, 1);
+	});
+});
+
+describe('modelli Open-Meteo come fonti distinte', () => {
+	it('quando sono attivi sostituiscono la fonte best_match', async () => {
+		// `best_match` è una miscela degli stessi modelli: usarla insieme a loro
+		// conterebbe due volte gli stessi dati.
+		activeModels = MODELLI;
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 99 });
+		sourceResponses['open-meteo:icon_d2'] = forecast('open-meteo:icon_d2', { temp: 20 });
+		sourceResponses['open-meteo:ecmwf'] = forecast('open-meteo:ecmwf', { temp: 22 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used).not.toContain('open-meteo');
+		expect(r.sources_used).toContain('open-meteo:icon_d2');
+		expect(r.sources_used).toContain('open-meteo:ecmwf');
+	});
+
+	it('ogni modello pesa secondo il proprio id', async () => {
+		activeModels = MODELLI;
+		// ICON-D2 pesa 1.2, GFS 0.9: (30*1.2 + 20*0.9)/2.1 = 25.7
+		sourceResponses['open-meteo:icon_d2'] = forecast('open-meteo:icon_d2', { temp: 30 });
+		sourceResponses['open-meteo:gfs'] = forecast('open-meteo:gfs', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(25.7, 1);
+	});
+
+	it('con un sottoinsieme di modelli fetcha solo quelli', async () => {
+		activeModels = [MODELLI[0]!, MODELLI[2]!];
+		sourceResponses['open-meteo:icon_d2'] = forecast('open-meteo:icon_d2', { temp: 20 });
+		sourceResponses['open-meteo:icon_eu'] = forecast('open-meteo:icon_eu', { temp: 40 });
+		sourceResponses['open-meteo:ecmwf'] = forecast('open-meteo:ecmwf', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used).toContain('open-meteo:icon_d2');
+		expect(r.sources_used).toContain('open-meteo:ecmwf');
+		expect(r.sources_used).not.toContain('open-meteo:icon_eu');
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+	});
+
+	it('senza modelli attivi torna a best_match', async () => {
+		activeModels = [];
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 21 });
+		sourceResponses['open-meteo:icon_d2'] = forecast('open-meteo:icon_d2', { temp: 99 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used).toEqual(['open-meteo']);
+		expect(r.current.temperature).toBeCloseTo(21, 1);
+	});
+
+	it('più modelli indipendenti alzano il numero di fonti del consenso', async () => {
+		activeModels = MODELLI;
+		for (const m of MODELLI) {
+			sourceResponses[m.sourceId] = forecast(m.sourceId, { temp: 20, precipitation_prob: 10 });
+		}
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.confidence.sources_count).toBe(5);
+		expect(r.confidence.level).toBe('high');
 	});
 });
 
