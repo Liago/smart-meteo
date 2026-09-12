@@ -1,0 +1,570 @@
+/**
+ * Aggregazione dello Smart Engine.
+ *
+ * È il cuore non testato del progetto: 587 righe che fondono fino a nove fonti
+ * con regole diverse per grandezza (media pesata, voto sulle condizioni, media
+ * circolare per la direzione del vento, gate sulla frazione bagnata per i mm) e
+ * un bucketing orario che deve riconciliare fonti in UTC con fonti in ora
+ * locale.
+ *
+ * Tutti i connettori e Supabase sono sostituiti: qui si verifica la matematica
+ * del merge, non la rete.
+ */
+
+import { UnifiedForecast } from '../../utils/formatter';
+
+// ---------------------------------------------------------------- mock setup
+
+/** Righe restituite dalla query di cache; sovrascritto test per test. */
+let cachedRow: any = null;
+/** Insert osservate, per verificare cosa viene scritto in smart_forecasts. */
+const insertedSmart: any[] = [];
+
+jest.mock('../../services/supabase', () => {
+	/**
+	 * Supabase client ridotto alle tre forme usate dall'engine:
+	 * `rpc`, una select a catena che termina in `.single()`, e `insert`.
+	 */
+	const chain = (table: string) => ({
+		select: () => chain(table),
+		eq: () => chain(table),
+		gt: () => chain(table),
+		order: () => chain(table),
+		limit: () => chain(table),
+		single: async () => ({ data: cachedRow, error: cachedRow ? null : { message: 'no rows' } }),
+		insert: async (row: any) => {
+			if (table === 'smart_forecasts') insertedSmart.push(row);
+			return { error: null };
+		},
+	});
+
+	return {
+		supabase: {
+			rpc: async () => ({ data: 'location-uuid', error: null }),
+			from: (table: string) => chain(table),
+		},
+	};
+});
+
+jest.mock('../../services/accuracy', () => ({
+	// Nessuna storia di accuratezza: i pesi restano quelli statici, così i
+	// numeri attesi nei test sono calcolabili a mano.
+	getAccuracyMap: jest.fn(async () => ({})),
+	logAccuracyDeviations: jest.fn(),
+}));
+
+/** Risposte per fonte: la chiave è l'id in SOURCE_WEIGHTS. */
+let sourceResponses: Record<string, UnifiedForecast | null> = {};
+
+jest.mock('../../connectors/tomorrow', () => ({ fetchFromTomorrow: jest.fn(async () => sourceResponses['tomorrow.io'] ?? null) }));
+jest.mock('../../connectors/openmeteo', () => ({ fetchFromOpenMeteo: jest.fn(async () => sourceResponses['open-meteo'] ?? null) }));
+jest.mock('../../connectors/accuweather', () => ({ fetchFromAccuWeather: jest.fn(async () => sourceResponses['accuweather'] ?? null) }));
+jest.mock('../../connectors/worldweatheronline', () => ({ fetchFromWWO: jest.fn(async () => sourceResponses['worldweatheronline'] ?? null) }));
+jest.mock('../../connectors/weatherstack', () => ({ fetchFromWeatherstack: jest.fn(async () => sourceResponses['weatherstack'] ?? null) }));
+jest.mock('../../connectors/meteostat', () => ({ fetchFromMeteostat: jest.fn(async () => sourceResponses['meteostat'] ?? null) }));
+
+jest.mock('../../connectors/openweathermap', () => ({
+	fetchFromOpenWeather: jest.fn(async () => sourceResponses['openweathermap'] ?? null),
+	fetchOWMAlerts: jest.fn(async () => []),
+}));
+
+jest.mock('../../connectors/weatherapi', () => ({
+	fetchFromWeatherAPI: jest.fn(async () => sourceResponses['weatherapi'] ?? null),
+	fetchFromWeatherAPIWithAlerts: jest.fn(async () => {
+		const forecast = sourceResponses['weatherapi'];
+		return forecast ? { forecast, alerts: [] } : null;
+	}),
+}));
+
+jest.mock('../../connectors/weatherkit', () => ({
+	fetchFromWeatherKit: jest.fn(async () => sourceResponses['apple_weatherkit'] ?? null),
+	fetchFromWeatherKitWithAlerts: jest.fn(async () => {
+		const forecast = sourceResponses['apple_weatherkit'];
+		return forecast ? { forecast, alerts: [] } : null;
+	}),
+}));
+
+import { getSmartForecast } from '../../engine/smartEngine';
+
+// ------------------------------------------------------------------- helpers
+
+const LAT = 45.46;
+const LON = 9.19;
+
+function forecast(source: string, data: Partial<Record<string, any>> = {}): UnifiedForecast {
+	return new UnifiedForecast({
+		source,
+		lat: LAT,
+		lon: LON,
+		time: '2026-09-12T14:00:00Z',
+		...data,
+	});
+}
+
+beforeEach(() => {
+	cachedRow = null;
+	insertedSmart.length = 0;
+	sourceResponses = {};
+});
+
+// --------------------------------------------------------------------- tests
+
+describe('media pesata dei valori correnti', () => {
+	it('pesa la temperatura secondo SOURCE_WEIGHTS', async () => {
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', { temp: 30 });
+		sourceResponses['meteostat'] = forecast('meteostat', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// (30*1.2 + 20*0.8) / 2.0 = 26
+		expect(r.current.temperature).toBeCloseTo(26, 1);
+	});
+
+	it('una fonte che tace non abbassa la media', async () => {
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', { temp: 25, humidity: null });
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 25, humidity: 60 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(25, 1);
+		// L'unica fonte con umidità la determina da sola.
+		expect(r.current.humidity).toBeCloseTo(60, 1);
+	});
+
+	it('se tutte le fonti falliscono solleva un errore invece di restituire zeri', async () => {
+		await expect(getSmartForecast(LAT, LON)).rejects.toThrow(/All weather sources failed/);
+	});
+
+	it('sources_used elenca solo le fonti che hanno risposto', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { temp: 21 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used.sort()).toEqual(['open-meteo', 'weatherapi']);
+	});
+
+	it('weatherstack è escluso dal fetch perché ha peso 0', async () => {
+		sourceResponses['weatherstack'] = forecast('weatherstack', { temp: 99 });
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used).not.toContain('weatherstack');
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+	});
+});
+
+describe('voto sulle condizioni', () => {
+	it('vince la condizione con più peso, non con più fonti', async () => {
+		// Due fonti leggere contro una pesante: 1.2 > 1.0, ma qui le leggere
+		// sommano 2.0 e devono vincere.
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', { condition_code: 'clear' });
+		sourceResponses['openweathermap'] = forecast('openweathermap', { condition_code: 'rain' });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { condition_code: 'rain' });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.condition).toBe('rain');
+	});
+
+	it('i codici WMO numerici hanno la precedenza sulle etichette testuali', async () => {
+		// Open-Meteo passa il codice numerico, che è più informativo: l'engine lo
+		// preferisce per non perdere il dettaglio nella normalizzazione.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { condition_code: '61' });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { condition_code: 'rain' });
+		sourceResponses['openweathermap'] = forecast('openweathermap', { condition_code: 'rain' });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.condition_code).toBe('61');
+	});
+
+	it('la copertura nuvolosa bassa promuove una condizione generica a clear', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', { condition_code: 'cloudy', cloud_cover: 5 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.condition).toBe('clear');
+		// Il codice grezzo resta quello votato: la correzione vive su `condition`.
+		expect(r.current.condition_code).toBe('cloudy');
+	});
+});
+
+describe('direzione del vento', () => {
+	it('usa la media circolare: 350° e 10° danno nord, non sud', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { wind_direction: 350 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { wind_direction: 10 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		const dir = r.current.wind_direction;
+		expect(dir === 0 || dir === 360 || dir > 355 || dir < 5).toBe(true);
+		expect(r.current.wind_direction_label).toBe('N');
+	});
+
+	it('traduce i gradi in punto cardinale', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { wind_direction: 90 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.wind_direction_label).toBe('E');
+	});
+});
+
+describe('dew point', () => {
+	it('preferisce i valori forniti dalle API al calcolo di Magnus', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20, humidity: 50, dew_point: 3 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// Magnus su 20 °C e 50% darebbe ~9.3: il valore diretto vince.
+		expect(r.current.dew_point).toBeCloseTo(3, 1);
+	});
+
+	it('ricade su Magnus quando nessuna fonte lo fornisce', async () => {
+		sourceResponses['openweathermap'] = forecast('openweathermap', { temp: 20, humidity: 50 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.dew_point).toBeCloseTo(9.3, 1);
+	});
+});
+
+describe('intensità di precipitazione corrente', () => {
+	it('aggrega i mm/h delle fonti concordi', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { precipitation_intensity: 2 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { precipitation_intensity: 2 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.precipitation_intensity).toBeCloseTo(2, 1);
+	});
+
+	it('sopprime la pioggia dichiarata da una sola fonte su quattro', async () => {
+		// Gate sulla frazione bagnata: 1 peso su 4.3 è sotto 1/3.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { precipitation_intensity: 0 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { precipitation_intensity: 0 });
+		sourceResponses['accuweather'] = forecast('accuweather', { precipitation_intensity: 0 });
+		sourceResponses['openweathermap'] = forecast('openweathermap', { precipitation_intensity: 5 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.precipitation_intensity).toBe(0);
+	});
+});
+
+describe('indice di consenso', () => {
+	it('fonti concordi e numerose danno confidenza alta', async () => {
+		for (const id of ['tomorrow.io', 'open-meteo', 'accuweather', 'weatherapi', 'openweathermap']) {
+			sourceResponses[id] = forecast(id, { temp: 20, precipitation_prob: 10 });
+		}
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.confidence.level).toBe('high');
+		expect(r.confidence.sources_count).toBe(5);
+		expect(r.confidence.temperature.spread).toBe(0);
+	});
+
+	it('fonti in disaccordo danno confidenza bassa e un intervallo visibile', async () => {
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', { temp: 14, precipitation_prob: 0 });
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20, precipitation_prob: 50 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', { temp: 26, precipitation_prob: 100 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.confidence.level).toBe('low');
+		expect(r.confidence.temperature.min).toBe(14);
+		expect(r.confidence.temperature.max).toBe(26);
+	});
+
+	it('il punteggio viene scritto in smart_forecasts.confidence_score', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20, precipitation_prob: 10 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(insertedSmart).toHaveLength(1);
+		expect(insertedSmart[0].confidence_score).toBe(r.confidence.score);
+		expect(insertedSmart[0].confidence_score).not.toBeNull();
+	});
+});
+
+describe('aggregazione giornaliera', () => {
+	const day = (date: string, over: Record<string, any> = {}) => ({
+		date,
+		temp_max: 28,
+		temp_min: 18,
+		precipitation_prob: 20,
+		condition_code: 'clear',
+		condition_text: 'Sunny',
+		...over,
+	});
+
+	it('unisce per data le previsioni di fonti diverse', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			daily: [day('2026-09-12', { temp_max: 30 }), day('2026-09-13')],
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			daily: [day('2026-09-12', { temp_max: 26 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.daily).toHaveLength(2);
+		const oggi = r.daily.find((d: any) => d.date === '2026-09-12');
+		expect(oggi.temp_max).toBeCloseTo(28, 1);
+	});
+
+	it('le temperature giornaliere usano la media SEMPLICE, non quella pesata', async () => {
+		// Comportamento attuale, fotografato e non approvato: `avgSimple` ignora
+		// SOURCE_WEIGHTS. Con pesi 1.1 e 1.0 l'attesa pesata sarebbe 28.1, quella
+		// semplice è 28 — la differenza è piccola qui ma diventa sensibile fra la
+		// fonte a 1.2 e quella a 0.8, e contraddice sia il piano originale
+		// ("media pesata per valori numerici") sia i mm dello stesso oggetto
+		// daily, che invece sono pesati. Vedi GAP_ANALYSIS_2026-09 §3.11.
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', {
+			temp: 20,
+			daily: [day('2026-09-12', { temp_max: 30 })],
+		});
+		sourceResponses['meteostat'] = forecast('meteostat', {
+			temp: 20,
+			daily: [day('2026-09-12', { temp_max: 20 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// Pesata: (30*1.2 + 20*0.8)/2 = 26. Semplice: 25.
+		expect(r.daily[0].temp_max).toBeCloseTo(25, 1);
+	});
+
+	it('prende il massimo dell UV giornaliero, non la media', async () => {
+		// L'indice UV è un estremo: mediarlo fra fonti smorza il picco di cui
+		// l'utente deve essere avvisato.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			daily: [day('2026-09-12', { uv_index_max: 4 })],
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			daily: [day('2026-09-12', { uv_index_max: 9 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.daily[0].uv_index_max).toBe(9);
+	});
+
+	it('i giorni sono ordinati per data', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			daily: [day('2026-09-14'), day('2026-09-12'), day('2026-09-13')],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.daily.map((d: any) => d.date)).toEqual(['2026-09-12', '2026-09-13', '2026-09-14']);
+	});
+});
+
+describe('bucketing orario e fusi', () => {
+	const hour = (time: string, over: Record<string, any> = {}) => ({
+		time,
+		temp: 20,
+		precipitation_prob: 10,
+		condition_code: 'clear',
+		condition_text: 'Sunny',
+		...over,
+	});
+
+	it('allinea un timestamp UTC con uno già in ora locale', async () => {
+		// Open-Meteo dichiara +2h e manda l'ora locale; WeatherKit manda UTC.
+		// 14:00Z e 16:00 locali sono lo stesso istante: devono cadere nello
+		// stesso slot, non in due fasce distanti due ore.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 7200,
+			hourly: [hour('2026-09-12T16:00', { temp: 24 })],
+		});
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00:00Z', { temp: 26 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly).toHaveLength(1);
+		expect(r.hourly[0].time).toBe('2026-09-12T16:00');
+		expect(r.hourly[0].temp).toBeCloseTo(25, 1);
+	});
+
+	it('senza offset noto i timestamp locali restano dove sono', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12 16:00', { temp: 24 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].time).toBe('2026-09-12T16:00');
+	});
+
+	it('aggrega umidità, vento e UV orari quando ci sono', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: [hour('2026-09-12T14:00', { humidity: 50, wind_speed: 4, uv_index: 6, wind_direction: 90, wind_gust: 8 })],
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00', { humidity: 60, wind_speed: 6, uv_index: 4, wind_direction: 90, wind_gust: 12 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		const slot = r.hourly[0];
+		expect(slot.humidity).toBeCloseTo(55, 1);
+		expect(slot.wind_speed).toBeCloseTo(5, 1);
+		expect(slot.uv_index).toBeCloseTo(5, 1);
+		expect(slot.wind_direction).toBe(90);
+		// La raffica è un estremo: si prende il massimo, non la media.
+		expect(slot.wind_gust).toBeCloseTo(12, 1);
+	});
+
+	it('gli slot orari sono ordinati nel tempo', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12T18:00'), hour('2026-09-12T14:00'), hour('2026-09-12T16:00')],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		const times = r.hourly.map((h: any) => h.time);
+		expect(times).toEqual([...times].sort());
+	});
+});
+
+describe('cache', () => {
+	it('restituisce il full_data in cache quando lo schema coincide', async () => {
+		cachedRow = {
+			full_data: {
+				schema_version: 4,
+				current: { temperature: 11.1 },
+				sources_used: ['cached-source'],
+				alerts: [],
+			},
+		};
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBe(11.1);
+		expect(r.sources_used).toEqual(['cached-source']);
+	});
+
+	it('non fa uscire schema_version dall API', async () => {
+		cachedRow = {
+			full_data: { schema_version: 4, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+		};
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('schema_version');
+	});
+
+	it('ignora una riga scritta con uno schema precedente e rigenera', async () => {
+		cachedRow = {
+			full_data: { schema_version: 2, current: { temperature: 11.1 }, sources_used: ['stale'], alerts: [] },
+		};
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+		expect(r.sources_used).toEqual(['open-meteo']);
+	});
+
+	it('ignora una riga senza full_data', async () => {
+		cachedRow = { temperature: 11.1 };
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+	});
+});
+
+describe('forma della risposta', () => {
+	it('espone forecastNextHour solo quando una fonte lo fornisce', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const senza = await getSmartForecast(LAT, LON);
+		expect(senza).not.toHaveProperty('forecastNextHour');
+
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 20,
+			forecastNextHour: { summary: [], minutes: [{ startTime: '2026-09-12T14:00:00Z', precipitationChance: 80, precipitationIntensity: 2 }] },
+		});
+
+		const con = await getSmartForecast(LAT, LON);
+		expect(con.forecastNextHour.minutes).toHaveLength(1);
+	});
+
+	it('prende air_quality dalla sola fonte che lo fornisce', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			air_quality: { aqi_us_epa: 2, pm2_5: 12, pm10: 20, no2: 15, o3: 40, co: 200, so2: 5 },
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.air_quality.pm2_5).toBe(12);
+	});
+
+	it('air_quality è null quando WeatherAPI non risponde', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.air_quality).toBeNull();
+	});
+
+	it('preferisce la fonte astronomica che porta anche i dati lunari', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			astronomy: { sunrise: '06:00', sunset: '20:00', moon_phase: 'Luna Nuova' },
+		});
+		sourceResponses['worldweatheronline'] = forecast('worldweatheronline', {
+			temp: 20,
+			astronomy: {
+				sunrise: '06:05',
+				sunset: '20:05',
+				moon_phase: 'Waxing Gibbous',
+				moonrise: '2026-09-12T21:12:00',
+				moonset: '2026-09-13T11:03:00',
+			},
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.astronomy.moonrise).toBe('2026-09-12T21:12:00');
+		expect(r.astronomy.moonset).toBe('2026-09-13T11:03:00');
+	});
+
+	it('completa i dati lunari mancanti pescandoli da un altra fonte', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			astronomy: { sunrise: '06:00', sunset: '20:00', moon_phase: 'Luna Nuova', moonrise: '21:00' },
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			astronomy: { sunrise: '06:05', sunset: '20:05', moon_phase: 'Waxing Gibbous', moon_illumination: 72 },
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.astronomy.moon_illumination).toBe(72);
+	});
+});

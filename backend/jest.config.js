@@ -15,6 +15,7 @@ module.exports = {
 	roots: ['<rootDir>/__tests__'],
 	testMatch: ['**/*.test.ts'],
 	clearMocks: true,
+	setupFiles: ['<rootDir>/jest.setup.ts'],
 	transform: {
 		'^.+\\.ts$': [
 			'ts-jest',
