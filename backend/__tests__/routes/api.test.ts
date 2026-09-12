@@ -282,15 +282,16 @@ describe('POST /api/alerts/poll', () => {
 		expect(res.status).toBe(403);
 	});
 
-	it('senza CRON_SECRET configurato l endpoint resta aperto', async () => {
-		// Comportamento attuale, fotografato: in assenza della variabile il
-		// controllo viene saltato. In produzione la variabile va impostata,
-		// altrimenti chiunque può innescare il polling e le push.
+	it('senza CRON_SECRET configurato l endpoint rifiuta, non resta aperto', async () => {
+		// Fino alla Fase 6C, in assenza della variabile il controllo veniva
+		// saltato: un deploy con la variabile dimenticata lasciava a chiunque la
+		// possibilità di innescare polling e push.
 		delete process.env.CRON_SECRET;
 
 		const res = await request(app).post('/api/alerts/poll');
 
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(503);
+		expect(res.body.error).toMatch(/CRON_SECRET/);
 	});
 });
 

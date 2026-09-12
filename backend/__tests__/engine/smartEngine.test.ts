@@ -315,16 +315,15 @@ describe('aggregazione giornaliera', () => {
 
 		expect(r.daily).toHaveLength(2);
 		const oggi = r.daily.find((d: any) => d.date === '2026-09-12');
-		expect(oggi.temp_max).toBeCloseTo(28, 1);
+		// (30*1.1 + 26*1.0) / 2.1 = 28.09
+		expect(oggi.temp_max).toBeCloseTo(28.1, 1);
 	});
 
-	it('le temperature giornaliere usano la media SEMPLICE, non quella pesata', async () => {
-		// Comportamento attuale, fotografato e non approvato: `avgSimple` ignora
-		// SOURCE_WEIGHTS. Con pesi 1.1 e 1.0 l'attesa pesata sarebbe 28.1, quella
-		// semplice è 28 — la differenza è piccola qui ma diventa sensibile fra la
-		// fonte a 1.2 e quella a 0.8, e contraddice sia il piano originale
-		// ("media pesata per valori numerici") sia i mm dello stesso oggetto
-		// daily, che invece sono pesati. Vedi GAP_ANALYSIS_2026-09 §3.11.
+	it('le temperature giornaliere sono pesate come quelle correnti', async () => {
+		// Fino alla Fase 6C il daily usava `avgSimple` e ignorava SOURCE_WEIGHTS:
+		// Meteostat (0.8, osservazioni passate) pesava come Tomorrow.io (1.2)
+		// proprio sui sette giorni, cioè su quasi tutto quello che l'utente
+		// guarda. Ora la media è pesata come su `current`.
 		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', {
 			temp: 20,
 			daily: [day('2026-09-12', { temp_max: 30 })],
@@ -336,8 +335,28 @@ describe('aggregazione giornaliera', () => {
 
 		const r = await getSmartForecast(LAT, LON);
 
-		// Pesata: (30*1.2 + 20*0.8)/2 = 26. Semplice: 25.
-		expect(r.daily[0].temp_max).toBeCloseTo(25, 1);
+		// Pesata: (30*1.2 + 20*0.8)/2 = 26. La media semplice darebbe 25.
+		expect(r.daily[0].temp_max).toBeCloseTo(26, 1);
+	});
+
+	it('la condizione giornaliera è votata a peso, non a conteggio', async () => {
+		// Due fonti leggere concordi (1.0 + 1.0) battono una pesante (1.2).
+		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', {
+			temp: 20,
+			daily: [day('2026-09-12', { condition_code: 'clear' })],
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			daily: [day('2026-09-12', { condition_code: 'rain' })],
+		});
+		sourceResponses['openweathermap'] = forecast('openweathermap', {
+			temp: 20,
+			daily: [day('2026-09-12', { condition_code: 'rain' })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.daily[0].condition_code).toBe('rain');
 	});
 
 	it('prende il massimo dell UV giornaliero, non la media', async () => {
@@ -425,8 +444,12 @@ describe('bucketing orario e fusi', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		const slot = r.hourly[0];
-		expect(slot.humidity).toBeCloseTo(55, 1);
+		// Anche l'hourly è pesato: open-meteo 1.1 contro weatherapi 1.0.
+		// (50*1.1 + 60*1.0)/2.1 = 54.8
+		expect(slot.humidity).toBeCloseTo(54.8, 1);
+		// (4*1.1 + 6*1.0)/2.1 = 4.95
 		expect(slot.wind_speed).toBeCloseTo(5, 1);
+		// (6*1.1 + 4*1.0)/2.1 = 5.05
 		expect(slot.uv_index).toBeCloseTo(5, 1);
 		expect(slot.wind_direction).toBe(90);
 		// La raffica è un estremo: si prende il massimo, non la media.
@@ -450,7 +473,7 @@ describe('cache', () => {
 	it('restituisce il full_data in cache quando lo schema coincide', async () => {
 		cachedRow = {
 			full_data: {
-				schema_version: 4,
+				schema_version: 5,
 				current: { temperature: 11.1 },
 				sources_used: ['cached-source'],
 				alerts: [],
@@ -465,7 +488,7 @@ describe('cache', () => {
 
 	it('non fa uscire schema_version dall API', async () => {
 		cachedRow = {
-			full_data: { schema_version: 4, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+			full_data: { schema_version: 5, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
 		};
 
 		const r = await getSmartForecast(LAT, LON);
@@ -475,7 +498,7 @@ describe('cache', () => {
 
 	it('ignora una riga scritta con uno schema precedente e rigenera', async () => {
 		cachedRow = {
-			full_data: { schema_version: 2, current: { temperature: 11.1 }, sources_used: ['stale'], alerts: [] },
+			full_data: { schema_version: 4, current: { temperature: 11.1 }, sources_used: ['stale'], alerts: [] },
 		};
 		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
 

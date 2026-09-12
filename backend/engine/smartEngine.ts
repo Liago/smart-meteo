@@ -13,6 +13,7 @@ import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/form
 import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
+import { weightedMean, weightedVote } from '../utils/aggregate';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
@@ -33,8 +34,10 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   2 → aggiunge precipitation_mm su hourly e daily
  *   3 → aggiunge feels_like, wind_direction e wind_gust su hourly
  *   4 → aggiunge precipitation_intensity e confidence su current
+ *   5 → daily e hourly passano dalla media semplice a quella pesata: i valori
+ *       cambiano, quindi le righe in cache vanno rigenerate
  */
-const FORECAST_SCHEMA_VERSION = 4;
+const FORECAST_SCHEMA_VERSION = 5;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -312,35 +315,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		aggregation.conditions[code] += weight;
 	});
 
-	const avg = (items: { val: number; weight: number }[]) => {
-		if (items.length === 0) return null;
-		const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-		const weightedSum = items.reduce((sum, item) => sum + (item.val * item.weight), 0);
-		return Number((weightedSum / totalWeight).toFixed(1));
-	};
+	const avg = weightedMean;
 
-	const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-
-	let bestCondition = 'unknown';
-	let maxScore = -1;
-	
-	const numericScores: Record<string, number> = {};
-	const stringScores: Record<string, number> = {};
-
-	Object.entries(aggregation.conditions).forEach(([code, score]) => {
-		if (isNumericCondition(code)) numericScores[code] = score;
-		else stringScores[code] = score;
-	});
-
-	if (Object.keys(numericScores).length > 0) {
-		Object.entries(numericScores).forEach(([code, score]) => {
-			if (score > maxScore) { maxScore = score; bestCondition = code; }
-		});
-	} else {
-		Object.entries(stringScores).forEach(([code, score]) => {
-			if (score > maxScore) { maxScore = score; bestCondition = code; }
-		});
-	}
+	// `aggregation.conditions` è già una mappa codice → peso accumulato.
+	let bestCondition = weightedVote(
+		Object.entries(aggregation.conditions).map(([code, weight]) => ({ code, weight }))
+	);
 
 	const aggCloudCover = avg(aggregation.cloud_cover);
 	const rawBestCondition = bestCondition; // Preserve WMO code before normalization
@@ -350,38 +330,37 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const dailyMap = new Map<string, any>();
 	validForecasts.forEach(f => {
 		if (f.daily && Array.isArray(f.daily)) {
+			// Ogni valore porta il peso della sua fonte: prima solo i millimetri
+			// lo facevano, e le temperature giornaliere finivano in una media
+			// aritmetica che ignorava SOURCE_WEIGHTS.
+			const sourceWeight = weightOf(f.source);
 			f.daily.forEach(d => {
 				if (!dailyMap.has(d.date)) {
 					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [] });
 				}
 				const entry = dailyMap.get(d.date)!;
-				if (d.temp_max !== null) entry.temp_max.push(d.temp_max);
-				if (d.temp_min !== null) entry.temp_min.push(d.temp_min);
-				if (d.precipitation_prob !== null) entry.precip_prob.push(d.precipitation_prob);
+				if (d.temp_max !== null) entry.temp_max.push({ val: d.temp_max, weight: sourceWeight });
+				if (d.temp_min !== null) entry.temp_min.push({ val: d.temp_min, weight: sourceWeight });
+				if (d.precipitation_prob !== null) entry.precip_prob.push({ val: d.precipitation_prob, weight: sourceWeight });
 				if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
-				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: weightOf(f.source) });
-				entry.codes.push(d.condition_code);
+				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: sourceWeight });
+				entry.codes.push({ code: d.condition_code, weight: sourceWeight });
 			});
 		}
 	});
 
 	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 7).map(date => {
 		const data = dailyMap.get(date)!;
-		const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
-		const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-		const numericCodes = data.codes.filter(isNumericCondition);
-		const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
+		const bestCode = weightedVote(data.codes);
 
-		const codeCounts: Record<string, number> = {};
-		targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
-		const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
-
+		// L'UV è un estremo: mediarlo fra fonti smorzerebbe il picco di cui
+		// l'utente va avvisato.
 		const uvMax = data.uv_index_max.length > 0 ? Math.max(...data.uv_index_max) : undefined;
 		return {
 			date,
-			temp_max: avgSimple(data.temp_max),
-			temp_min: avgSimple(data.temp_min),
-			precipitation_prob: avgSimple(data.precip_prob) || 0,
+			temp_max: weightedMean(data.temp_max),
+			temp_min: weightedMean(data.temp_min),
+			precipitation_prob: weightedMean(data.precip_prob) || 0,
 			condition_code: bestCode,
 			condition_text: bestCode.toUpperCase(),
 			...(uvMax !== undefined && { uv_index_max: uvMax }),
@@ -418,7 +397,19 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		return normalizedTime.slice(0, 13) + ':00';
 	};
 
-	const hourlyMap = new Map<string, { temps: number[]; feels_like: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[]; precip_mm: { val: number; weight: number }[]; wind_directions: { val: number; weight: number }[]; wind_gusts: { val: number; weight: number }[] }>();
+	type Weighted = { val: number; weight: number };
+	const hourlyMap = new Map<string, {
+		temps: Weighted[];
+		feels_like: Weighted[];
+		probs: Weighted[];
+		codes: { code: string; weight: number }[];
+		humidities: Weighted[];
+		wind_speeds: Weighted[];
+		uv_indices: Weighted[];
+		precip_mm: Weighted[];
+		wind_directions: Weighted[];
+		wind_gusts: Weighted[];
+	}>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
 			const sourceWeight = weightOf(f.source);
@@ -428,21 +419,21 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
-				if (h.temp != null) entry.temps.push(h.temp);
-				if (h.feels_like != null) entry.feels_like.push(h.feels_like);
-				if (h.precipitation_prob != null) entry.probs.push(h.precipitation_prob);
-				if (h.humidity != null) entry.humidities.push(h.humidity);
-				if (h.wind_speed != null) entry.wind_speeds.push(h.wind_speed);
-				if (h.uv_index != null) entry.uv_indices.push(h.uv_index);
-				// Direzione e raffica non sono medie aritmetiche: la prima è circolare,
-				// la seconda va presa al massimo. Entrambe portano quindi il peso della fonte.
+				if (h.temp != null) entry.temps.push({ val: h.temp, weight: sourceWeight });
+				if (h.feels_like != null) entry.feels_like.push({ val: h.feels_like, weight: sourceWeight });
+				if (h.precipitation_prob != null) entry.probs.push({ val: h.precipitation_prob, weight: sourceWeight });
+				if (h.humidity != null) entry.humidities.push({ val: h.humidity, weight: sourceWeight });
+				if (h.wind_speed != null) entry.wind_speeds.push({ val: h.wind_speed, weight: sourceWeight });
+				if (h.uv_index != null) entry.uv_indices.push({ val: h.uv_index, weight: sourceWeight });
+				// Direzione e raffica non sono medie: la prima è circolare, la
+				// seconda va presa al massimo.
 				if (h.wind_direction != null) entry.wind_directions.push({ val: h.wind_direction, weight: sourceWeight });
 				if (h.wind_gust != null) entry.wind_gusts.push({ val: h.wind_gust, weight: sourceWeight });
 				// NB: openweathermap non popola precipitation_mm sull'hourly perché i suoi
 				// slot sono totali su 3 ore e non sono confrontabili con gli accumuli orari
 				// delle altre fonti. Contribuisce solo alla somma giornaliera.
 				if (h.precipitation_mm != null) entry.precip_mm.push({ val: h.precipitation_mm, weight: sourceWeight });
-				entry.codes.push(h.condition_code);
+				entry.codes.push({ code: h.condition_code, weight: sourceWeight });
 			});
 		}
 	});
@@ -450,26 +441,19 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const aggregatedHourly = Array.from(hourlyMap.entries())
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([time, data]) => {
-			const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
-			const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-			const numericCodes = data.codes.filter(isNumericCondition);
-			const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
-
-			const codeCounts: Record<string, number> = {};
-			targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
-			const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+			const bestCode = weightedVote(data.codes);
 			return {
 				time,
-				temp: avgSimple(data.temps) ?? 0,
-				precipitation_prob: avgSimple(data.probs) ?? 0,
+				temp: weightedMean(data.temps) ?? 0,
+				precipitation_prob: weightedMean(data.probs) ?? 0,
 				condition_code: bestCode,
 				condition_text: bestCode.toUpperCase(),
-				...(data.feels_like.length > 0 && { feels_like: avgSimple(data.feels_like) }),
-				...(data.humidities.length > 0 && { humidity: avgSimple(data.humidities) }),
-				...(data.wind_speeds.length > 0 && { wind_speed: avgSimple(data.wind_speeds) }),
+				...(data.feels_like.length > 0 && { feels_like: weightedMean(data.feels_like) }),
+				...(data.humidities.length > 0 && { humidity: weightedMean(data.humidities) }),
+				...(data.wind_speeds.length > 0 && { wind_speed: weightedMean(data.wind_speeds) }),
 				...(data.wind_directions.length > 0 && { wind_direction: aggregateWindDirection(data.wind_directions) }),
 				...(data.wind_gusts.length > 0 && { wind_gust: aggregateWindGust(data.wind_gusts) }),
-				...(data.uv_indices.length > 0 && { uv_index: avgSimple(data.uv_indices) }),
+				...(data.uv_indices.length > 0 && { uv_index: weightedMean(data.uv_indices) }),
 				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
 			};
 		});

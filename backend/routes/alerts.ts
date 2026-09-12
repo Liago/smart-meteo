@@ -339,7 +339,18 @@ alertsRouter.post('/poll', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
     const requestSecret = req.headers['x-cron-secret'] as string;
 
-    if (cronSecret && requestSecret !== cronSecret) {
+    // Senza segreto configurato la richiesta va rifiutata, non lasciata
+    // passare: questo endpoint interroga i provider e fa partire le push, e
+    // prima un deploy con la variabile dimenticata lo lasciava aperto a
+    // chiunque.
+    if (!cronSecret) {
+        console.error('[AlertPoller] CRON_SECRET non configurato: polling rifiutato');
+        return res.status(503).json({
+            error: 'Polling non disponibile: CRON_SECRET non configurato sul server',
+        });
+    }
+
+    if (requestSecret !== cronSecret) {
         return res.status(403).json({ error: 'Unauthorized: invalid cron secret' });
     }
 
