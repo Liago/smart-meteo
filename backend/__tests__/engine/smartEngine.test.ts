@@ -50,7 +50,6 @@ jest.mock('../../services/accuracy', () => ({
 	// Nessuna storia di accuratezza: i pesi restano quelli statici, così i
 	// numeri attesi nei test sono calcolabili a mano.
 	getAccuracyMap: jest.fn(async () => ({})),
-	logAccuracyDeviations: jest.fn(),
 }));
 
 /** Risposte per fonte: la chiave è l'id in SOURCE_WEIGHTS. */
@@ -135,12 +134,12 @@ beforeEach(() => {
 describe('media pesata dei valori correnti', () => {
 	it('pesa la temperatura secondo SOURCE_WEIGHTS', async () => {
 		sourceResponses['tomorrow.io'] = forecast('tomorrow.io', { temp: 30 });
-		sourceResponses['meteostat'] = forecast('meteostat', { temp: 20 });
+		sourceResponses['openweathermap'] = forecast('openweathermap', { temp: 20 });
 
 		const r = await getSmartForecast(LAT, LON);
 
-		// (30*1.2 + 20*0.8) / 2.0 = 26
-		expect(r.current.temperature).toBeCloseTo(26, 1);
+		// (30*1.2 + 20*1.0) / 2.2 = 25.45
+		expect(r.current.temperature).toBeCloseTo(25.5, 1);
 	});
 
 	it('una fonte che tace non abbassa la media', async () => {
@@ -174,6 +173,19 @@ describe('media pesata dei valori correnti', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r.sources_used).not.toContain('weatherstack');
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+	});
+
+	it('meteostat è escluso: fornisce osservazioni, non previsioni', async () => {
+		// Le sue rilevazioni possono avere ore di ritardo e finivano nella media
+		// della temperatura *attuale*. Dalla Fase 6C serve come verità osservata
+		// per la verifica dell'accuratezza, non come fonte previsionale.
+		sourceResponses['meteostat'] = forecast('meteostat', { temp: 99 });
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sources_used).not.toContain('meteostat');
 		expect(r.current.temperature).toBeCloseTo(20, 1);
 	});
 });
@@ -351,15 +363,15 @@ describe('aggregazione giornaliera', () => {
 			temp: 20,
 			daily: [day('2026-09-12', { temp_max: 30 })],
 		});
-		sourceResponses['meteostat'] = forecast('meteostat', {
+		sourceResponses['openweathermap'] = forecast('openweathermap', {
 			temp: 20,
 			daily: [day('2026-09-12', { temp_max: 20 })],
 		});
 
 		const r = await getSmartForecast(LAT, LON);
 
-		// Pesata: (30*1.2 + 20*0.8)/2 = 26. La media semplice darebbe 25.
-		expect(r.daily[0].temp_max).toBeCloseTo(26, 1);
+		// Pesata: (30*1.2 + 20*1.0)/2.2 = 25.45. La media semplice darebbe 25.
+		expect(r.daily[0].temp_max).toBeCloseTo(25.5, 1);
 	});
 
 	it('la condizione giornaliera è votata a peso, non a conteggio', async () => {

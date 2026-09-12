@@ -17,7 +17,7 @@ smart-meteo/
 │   │   ├── openweathermap.ts   # OpenWeatherMap (weight: 1.0) + One Call alerts
 │   │   ├── weatherapi.ts       # WeatherAPI (weight: 1.0) - only AQI source, + alerts
 │   │   ├── worldweatheronline.ts # WWO (weight: 1.0)
-│   │   ├── meteostat.ts        # Meteostat (weight: 0.8) - OBSERVED data, not forecast
+│   │   ├── meteostat.ts        # Meteostat (weight: 0) - observations only, used as ground truth
 │   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
@@ -26,13 +26,15 @@ smart-meteo/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
 │   │   ├── sources.ts          # /api/sources
+│   │   ├── accuracy.ts         # /api/accuracy, /api/accuracy/recompute
 │   │   └── alerts.ts           # /api/alerts/* (subscribe, active, poll, health)
 │   ├── services/
 │   │   ├── supabase.ts         # Supabase client
 │   │   ├── apns.ts             # Apple push notifications
 │   │   ├── alertProcessor.ts   # Alert -> subscription matching, push, delivery log
 │   │   ├── alertPoller.ts      # Background alert polling by subscription cluster
-│   │   └── accuracy.ts         # Source MAE (vs consensus) -> dynamic weights
+│   │   ├── observations.ts     # Ground truth: observed temperatures (ERA5 archive, Meteostat)
+│   │   └── accuracy.ts         # Source MAE vs OBSERVED data -> dynamic weights
 │   ├── utils/
 │   │   ├── formatter.ts        # Data normalization (UnifiedForecast)
 │   │   ├── moon.ts             # Moon phase calculations
@@ -203,6 +205,8 @@ cd frontend-web && npm run build
 - `POST /api/alerts/subscribe` / `POST /api/alerts/unsubscribe` - Device push registration
 - `GET /api/alerts/active?lat=&lon=` - Active alerts for an area
 - `POST /api/alerts/poll` - Alert polling, guarded by the `X-Cron-Secret` header
+- `GET /api/accuracy` - Per-source MAE against observed temperatures, sample count, window and resulting weight multiplier (public read)
+- `POST /api/accuracy/recompute` - Daily verification job, guarded by `X-Cron-Secret`
 - `GET /api/alerts/health` - APNs status, subscription count, 24h delivery stats
 - `POST /api/alerts/test-push` - Manual push test
 
@@ -232,7 +236,9 @@ cd frontend-web && npm run build
 - **Cache invalidation by shape**: `FORECAST_SCHEMA_VERSION` is stored inside `full_data`; a cached row with a different version is ignored and regenerated. Bump it whenever response fields are added or renamed
 - **Open-Meteo multi-model**: Open-Meteo is a free frontend over national weather services' models, not a model of its own. It is queried **one model at a time** (`&models=`), so ICON-D2, ICON-EU, ECMWF IFS, Météo-France and GFS enter the aggregation as five independent sources (`open-meteo:icon_d2` …), giving more statistical diversity than several commercial providers that rebrand the same GFS/ECMWF. The models **replace** the `open-meteo` (`best_match`) source rather than joining it: `best_match` is a blend of the same models, so using both would double-count. Switch off with `OPENMETEO_MODELS=off`, or narrow it with a comma-separated list of model ids
 - **Source weights** range from 0 (Weatherstack, disabled) through 0.8 (Meteostat) to 1.2 (Tomorrow.io, WeatherKit, ICON-D2), stored in the `SOURCE_WEIGHTS` constant (model weights live next to each model in `connectors/openmeteo.ts`), then scaled at runtime by `1 / (1 + MAE)` from the `source_accuracy` table
-- **Careful**: that MAE is the deviation from the aggregated consensus, not the error against observed weather, so it currently rewards conformity. See `docs/GAP_ANALYSIS_2026-09.md` §3.4
+- **The MAE is measured against observations**, not against the consensus of the other sources. Until Phase 6C it was the deviation from the aggregate, which rewarded conformity and penalised a source that was right while the others were wrong. `services/observations.ts` gets the observed temperatures from Open-Meteo Archive (ERA5, free, no key) with Meteostat as a fallback; each comparison is a row in `accuracy_samples`, and the MAE is **recomputed** over a 30-day sliding window instead of being updated as a never-decaying cumulative average. A source needs 20 samples before its MAE moves its weight
+- **What is verified is the nowcast**, not the +24h horizon: `raw_forecasts` stores each source's *current* values, not its forecast per horizon. Extending it needs a schema change - see `docs/GAP_ANALYSIS_2026-09.md` §3.4
+- **Meteostat is not a forecast source**: it reports observations, sometimes hours old, and they used to land in the average of the *current* temperature. It now has weight 0 and serves as ground truth for the accuracy job
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
@@ -253,9 +259,9 @@ cd frontend-web && npm run build
 ## Database
 
 - Supabase (PostgreSQL) with schema in `backend/supabase_schema.sql`
-- 22 migrations in `supabase/migrations/` (001-022): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources
-- The next free migration number is **023**
-- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`
+- 23 migrations in `supabase/migrations/` (001-023): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources, accuracy samples
+- The next free migration number is **024**
+- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `accuracy_samples`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`
 - `upsert_location` utility function for location management
 - Automatic `updated_at` triggers on all tables
 

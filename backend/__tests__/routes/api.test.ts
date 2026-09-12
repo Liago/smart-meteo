@@ -69,6 +69,44 @@ jest.mock('../../services/alertPoller', () => ({
 	pollAlerts: jest.fn(async () => ({ clusters: 2, alertsFound: 1, alertsProcessed: 1 })),
 }));
 
+jest.mock('../../services/accuracy', () => {
+	const actual = jest.requireActual('../../services/accuracy');
+	return {
+		...actual,
+		getAccuracyReport: jest.fn(async () => [
+			{
+				source_id: 'open-meteo:ecmwf',
+				metric: 'temperature',
+				mae: 0.9,
+				sample_count: 120,
+				window_days: 30,
+				observation_source: 'archive',
+				last_computed_at: '2026-09-12T04:10:00Z',
+				weight_multiplier: 0.5263,
+				affects_weight: true,
+			},
+			{
+				source_id: 'accuweather',
+				metric: 'temperature',
+				mae: 3.4,
+				sample_count: 4,
+				window_days: 30,
+				observation_source: 'archive',
+				last_computed_at: null,
+				weight_multiplier: 1,
+				affects_weight: false,
+			},
+		]),
+		recomputeAccuracy: jest.fn(async () => ({
+			date: '2026-09-06',
+			locations: 3,
+			samples: 42,
+			sourcesUpdated: 8,
+			skipped: 1,
+		})),
+	};
+});
+
 import { app } from '../../app';
 
 beforeEach(() => {
@@ -90,6 +128,7 @@ describe('GET /', () => {
 		expect(res.status).toBe(200);
 		expect(res.body.service).toBe('Smart Meteo API');
 		expect(res.body.endpoints).toContain('GET /api/forecast?lat=&lon=');
+		expect(res.body.endpoints).toContain('GET /api/accuracy');
 	});
 });
 
@@ -294,6 +333,74 @@ describe('POST /api/alerts/poll', () => {
 
 		expect(res.status).toBe(503);
 		expect(res.body.error).toMatch(/CRON_SECRET/);
+	});
+});
+
+describe('GET /api/accuracy', () => {
+	it('è una lettura pubblica: rende verificabile il perché dei pesi', async () => {
+		const res = await request(app).get('/api/accuracy');
+
+		expect(res.status).toBe(200);
+		expect(res.body.window_days).toBe(30);
+		expect(res.body.sources).toHaveLength(2);
+	});
+
+	it('dichiara cosa misura, per non far passare il MAE per un altro numero', async () => {
+		const res = await request(app).get('/api/accuracy');
+
+		expect(res.body.metric_note).toMatch(/osservata/i);
+		expect(res.body.observation_lag_days).toBeGreaterThan(0);
+		expect(res.body.min_samples_for_weight).toBeGreaterThan(0);
+	});
+
+	it('distingue le fonti che pesano da quelle con troppi pochi campioni', async () => {
+		const res = await request(app).get('/api/accuracy');
+
+		const misurata = res.body.sources.find((s: any) => s.source_id === 'open-meteo:ecmwf');
+		const provvisoria = res.body.sources.find((s: any) => s.source_id === 'accuweather');
+
+		expect(misurata.affects_weight).toBe(true);
+		expect(provvisoria.affects_weight).toBe(false);
+		expect(provvisoria.weight_multiplier).toBe(1);
+	});
+});
+
+describe('POST /api/accuracy/recompute', () => {
+	const CRON_ORIGINALE = process.env.CRON_SECRET;
+
+	afterEach(() => {
+		if (CRON_ORIGINALE === undefined) delete process.env.CRON_SECRET;
+		else process.env.CRON_SECRET = CRON_ORIGINALE;
+	});
+
+	it('con il segreto corretto esegue la verifica', async () => {
+		process.env.CRON_SECRET = 'segreto';
+
+		const res = await request(app)
+			.post('/api/accuracy/recompute')
+			.set('X-Cron-Secret', 'segreto');
+
+		expect(res.status).toBe(200);
+		expect(res.body.success).toBe(true);
+		expect(res.body.samples).toBe(42);
+	});
+
+	it('con il segreto sbagliato risponde 403', async () => {
+		process.env.CRON_SECRET = 'segreto';
+
+		const res = await request(app)
+			.post('/api/accuracy/recompute')
+			.set('X-Cron-Secret', 'sbagliato');
+
+		expect(res.status).toBe(403);
+	});
+
+	it('senza CRON_SECRET configurato rifiuta, come il poller allerte', async () => {
+		delete process.env.CRON_SECRET;
+
+		const res = await request(app).post('/api/accuracy/recompute');
+
+		expect(res.status).toBe(503);
 	});
 });
 

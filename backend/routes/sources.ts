@@ -89,9 +89,12 @@ const sources: WeatherSource[] = [
 	{
 		id: 'meteostat',
 		name: 'Meteostat',
-		weight: 0.8,
+		// Peso 0: fornisce osservazioni, non previsioni. Dalla Fase 6C è fuori
+		// dall'aggregazione e serve come verita di riferimento per la verifica
+		// dell'accuratezza.
+		weight: 0,
 		active: true,
-		description: 'Historical and statistical weather data',
+		description: 'Osservazioni di stazione: riferimento per la verifica dell\'accuratezza, non una previsione',
 		lastError: null,
 		lastResponseMs: null
 	},

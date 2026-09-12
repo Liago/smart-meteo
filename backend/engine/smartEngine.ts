@@ -17,7 +17,7 @@ import { weightedMean, weightedVote } from '../utils/aggregate';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
-import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
+import { getAccuracyMap } from '../services/accuracy';
 import { aggregateAlerts } from '../utils/alertGeo';
 
 /**
@@ -49,7 +49,12 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'accuweather': 1.1,
 	'worldweatheronline': 1.0,
 	'weatherstack': 0, // Disabilitato: il piano free usa HTTP non cifrato (no HTTPS)
-	'meteostat': 0.8,
+	// Meteostat fornisce OSSERVAZIONI, non previsioni: dalla Fase 6C non entra
+	// più nell'aggregazione (le sue rilevazioni passate finivano nella media
+	// della temperatura *attuale*, con ore di ritardo). Resta in uso come
+	// verità osservata per la verifica dell'accuratezza, in
+	// `services/observations.ts`.
+	'meteostat': 0,
 	'apple_weatherkit': 1.2,
 	// I modelli Open-Meteo: i pesi vivono nel connettore, accanto alla
 	// descrizione di ciascun modello.
@@ -303,7 +308,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	const accuracyMap = await accuracyMapPromise;
 
-	// Peso dinamico della fonte: base_weight * (1 / (1 + MAE)).
+	// Peso dinamico della fonte: base_weight * (1 / (1 + MAE)), dove il MAE è
+	// l'errore medio rispetto alle temperature OSSERVATE sulla finestra
+	// scorrevole (`services/accuracy.ts`). Le fonti con troppi pochi campioni
+	// non compaiono nella mappa e restano al peso statico.
 	// Estratto qui perché serve anche alle aggregazioni daily/hourly più sotto.
 	const weightOf = (source: string) => {
 		const baseWeight = SOURCE_WEIGHTS[source] || 1.0;
@@ -597,9 +605,6 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		});
 		if (smartError) console.error('Error saving smart forecast:', smartError);
 	}
-
-	// 7. Log Deviations for AI Accuracy
-	logAccuracyDeviations(result, validForecasts);
 
 	// 8. Le allerte vengono solo restituite, non notificate.
 	//    L'invio delle push è compito esclusivo del poller schedulato
