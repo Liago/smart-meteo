@@ -210,12 +210,19 @@ cd frontend-web && npm run build
 - Web tests are in `frontend-web/__tests__/` (7 suites: api, components, weather-utils,
   air-quality, narrative, hourly-detail, next-hour), `npm test` from the repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend has **no Jest suite**. `cd backend && npm test` runs the `scripts/verify*.ts`
-  checks (alert geo, alert dedup, precipitation, wind, consensus) with plain `assert`
-  via ts-node: they cover the pure aggregation functions, not the connectors or routes
-- `cd backend && npm run typecheck` for `tsc --noEmit`
-- iOS has no automated tests
-- No E2E suite and no Lighthouse audit yet - both are planned in `docs/TODO_TESTING.md`
+- Backend tests: `cd backend && npm test` - **229 tests in 11 suites** (Jest + ts-jest,
+  node environment). `__tests__/utils/` for the pure aggregation functions,
+  `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
+  in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
+  Supabase and connectors mocked, `__tests__/routes/` for the HTTP contract via supertest
+- `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
+  per-connector test would not catch a unit mismatch, since each one is self-consistent
+- `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
+- E2E: `cd frontend-web && npm run test:e2e` - 25 scenarios × 2 viewports (Playwright).
+  The backend API is never contacted: every scenario starts from a known response built
+  in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
+  downloaded. `e2e/` is excluded from Jest
+- iOS has no automated tests; no Lighthouse audit yet - both in `docs/TODO_TESTING.md`
 
 ## Key Patterns
 

@@ -115,6 +115,13 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
+### Fase 6B — Rete di test (2026-09-12)
+- **Backend da 0 a 229 test** in 11 suite: Jest + ts-jest, fixture dei nove provider come costruttori, axios-mock-adapter sui connettori, Supabase e connettori mockati sull'engine, supertest sulle route. I cinque script `verify*.ts` portati nella suite e `scripts/` rimossa
+- **25 scenari E2E** Playwright su due viewport, con l'API backend sempre intercettata
+- **Tre bug di unità sul vento corretti**: Open-Meteo, WWO e Meteostat consegnavano `wind_speed` in km/h invece di m/s, gonfiando di 3.6× il numero più in vista e contraddicendo il proprio dato orario. Trovati da un test cross-connettore, non leggendo il codice
+- `SourcesIndicator` mostrava l'id grezzo di quattro fonti su nove: corretto
+- Lint web da 5 errori a 2 (i rimasti sono `setState` in `useEffect`, preesistenti)
+
 ### Fase 6A — Dati già pagati, portati all'utente (2026-09-12)
 - **Nowcast al minuto** (web + iOS): `forecastNextHour` era propagato dall'engine dalla Fase 5E e **nessun client lo leggeva**. Nuovi `NextHourPrecipitation.tsx` e `NextHourPrecipitationView.swift`, con titolo dedotto dai minuti e non dal `summary` di WeatherKit
 - **Indice di consenso** (`backend/utils/consensus.ts`): deviazione standard pesata fra le fonti su temperatura e probabilità di pioggia, contratta verso 50 con `n/(n+2)`; esposta come `confidence` e scritta in `smart_forecasts.confidence_score`, che era `null` dalla migrazione 005. Mostrata in `SourcesIndicator` (solo web: iOS non ha un pannello fonti)
@@ -156,15 +163,17 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 137 test (7 suite) | Espansione in TODO_TESTING §4 |
-| Frontend web E2E (Playwright) | ❌ Non implementato | → TODO_TESTING §3 |
-| Backend unit/integration test | ⚠️ 5 script `verify*.ts` (65 controlli) sulle sole funzioni pure; **nessun Jest, nessun test dei connettori o delle route** | → TODO_TESTING §2 |
+| Frontend web unit test | ✅ 137 test (7 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 25 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **229 test in 11 suite** (utils, 9 connettori, engine, route con supertest) | Fase 6B |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
-| Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5 |
+| Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
 
-> **→ Pianificato in `TODO_TESTING.md` e `VALUTAZIONI_TECNICHE.md`. Il prossimo blocco
-> di lavoro è la Fase 6B della `GAP_ANALYSIS_2026-09.md`: rete di test sul backend
-> prima di rimettere mano all'engine.**
+> **La Fase 6B ha prodotto anche cinque ritrovamenti**: tre bug di unità sul vento
+> (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
+> che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
+> (entrambi documentati da test, in carico alla 6C).
+> **Prossimo blocco: Fase 6C** della `GAP_ANALYSIS_2026-09.md`.
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -198,7 +207,10 @@ Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`
 | 6 | `source_accuracy` misura la conformità al consenso, non l'errore vs osservato | 🔴 | ⏳ Fase 6C |
 | 7 | AQI da una sola fonte, senza previsione né fallback | 🟠 | ⏳ Fase 6D |
 | 8 | `EMAIL_NOTIFICATIONS_PLAN.md` interamente non implementato | 🔴 | ⏳ Decisione pendente (Web Push come alternativa) |
-| 9 | Nessun Jest sul backend, nessun E2E, nessun test iOS, nessun Lighthouse | 🔴 | ⏳ Fase 6B |
+| 9 | Nessun Jest sul backend, nessun E2E, nessun test iOS, nessun Lighthouse | 🔴 | ✅ 6B (restano iOS e Lighthouse) |
+| 13 | Vento in km/h da tre connettori su otto | 🔴 | ✅ Risolto in 6B |
+| 14 | Daily e hourly ignorano `SOURCE_WEIGHTS` | 🔴 | ⏳ Fase 6C |
+| 15 | `/api/alerts/poll` aperto senza `CRON_SECRET` | 🟠 | ⏳ Fase 6C |
 | 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Fase 6D |
 | 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E |
 | 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |

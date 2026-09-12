@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fase 6A ✅ completata (2026-09-12) · 6B → 6E da fare.
+> **Stato avanzamento roadmap:** Fase 6A ✅ e Fase 6B ✅ completate (2026-09-12) · 6C → 6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -168,14 +168,25 @@ chiamata. Risolvibile gratis (§5.1).
 Vedi §2. Da valutare se resti in roadmap: il valore incrementale rispetto alle push è modesto per
 utenti iOS, ma è **l'unico canale di allerta per gli utenti web**, che oggi non ricevono nulla.
 
-### 3.8 Testing 🔴
+### 3.8 Testing ✅ RISOLTO (6B), tranne iOS e Lighthouse
 
-Il rischio concreto: `smartEngine.ts` è 587 righe di aggregazione con media circolare del vento,
-gating della frazione umida delle precipitazioni, bucketing orario con offset di fuso e
-invalidazione della cache per versione di schema — tutta logica numerica, tutta senza test di
-regressione. I 4 script `verify*.ts` coprono geo-allerte, dedup, precipitazioni e vento: sono il
-20% giusto. Manca il resto, in particolare i connettori (8 suite con fixture) e l'aggregazione
-daily/hourly.
+Il rischio era concreto: `smartEngine.ts` è 587 righe di logica numerica — media circolare del
+vento, gate sulla frazione umida, bucketing orario con offset di fuso, invalidazione della cache
+per versione di schema — senza alcun test di regressione, e i connettori non ne avevano nessuno.
+
+**Risolto:** 229 test backend in 11 suite (utils, 9 connettori, engine, route con supertest),
+137 test web in 7 suite, 25 scenari E2E Playwright su due viewport. I cinque script
+`verify*.ts` sono stati portati nella suite Jest e la cartella `scripts/` rimossa: due sistemi
+di test in parallelo erano un doppio posto da ricordare.
+
+**Il ritorno immediato:** scrivere i test ha fatto emergere **tre bug di unità sul vento**
+(§3.13) e **due comportamenti** che nessun documento descriveva (§3.11 e §3.12). Nessuno dei tre
+bug era visibile leggendo il codice — su WeatherKit la lettura del sorgente portava alla
+conclusione *sbagliata*, e solo l'esecuzione ha mostrato il comportamento reale.
+
+**Resta aperto:** nessun test iOS (`VALUTAZIONI_TECNICHE` §4), nessun audit Lighthouse, gli
+scenari E2E che richiedono una sessione Supabase reale (pagina fonti autenticata, login,
+logout), e i tre hook web non coperti.
 
 ### 3.9 Radar / mappa assenti 🟡
 
@@ -192,6 +203,69 @@ daily/hourly.
   omogenee (mm/h di intensità e mm accumulati in un'ora), quindi le soglie NWS valgono per
   entrambe.
 - Open-Meteo: `is_day`, `sunshine_duration`, `cloud_cover_low/mid/high` non richiesti.
+
+### 3.11 Il daily e l'hourly ignorano i pesi delle fonti 🔴 NUOVO (trovato in 6B)
+
+`aggregatedDaily` e `aggregatedHourly` usano `avgSimple`, una media **aritmetica**:
+`SOURCE_WEIGHTS` non entra nel calcolo di `temp_max`, `temp_min`, `precipitation_prob`,
+`humidity`, `wind_speed` e `uv_index`. I pesi vengono invece applicati, nello stesso oggetto, ai
+millimetri (`aggregatePrecipitationMm` riceve `weightOf(f.source)`), alla direzione del vento e
+alle raffiche.
+
+Perché conta: i pesi sono il concetto centrale del progetto — vanno da 0.8 a 1.2, e sopra ci
+sono una tabella `source_accuracy`, un calcolo di MAE e un meccanismo di pesi dinamici. Su
+`current` funzionano. Sui **sette giorni e sulla curva oraria**, cioè su quasi tutto quello che
+l'utente guarda, sono inerti: Meteostat (0.8, che fornisce osservazioni passate) pesa esattamente
+come WeatherKit (1.2).
+
+Non è documentato come una scelta da nessuna parte, e `IMPLEMENTATION_PLAN.md` dice l'opposto:
+«Algoritmo V1 (Media Pesata): calcola la media pesata per valori numerici (Temp, Vento, Pioggia)».
+Il fatto che i mm accanto siano pesati suggerisce una dimenticanza cresciuta man mano che si
+aggiungevano campi.
+
+Il comportamento attuale è fotografato in `__tests__/engine/smartEngine.test.ts` con un test che
+dichiara di non approvarlo. Cambiare la matematica delle previsioni è lavoro della **Fase 6C**,
+non di una fase di test.
+
+### 3.12 `POST /api/alerts/poll` è aperto senza `CRON_SECRET` 🟠 NUOVO (trovato in 6B)
+
+```ts
+if (cronSecret && requestSecret !== cronSecret) {
+    return res.status(403).json({ error: 'Unauthorized: invalid cron secret' });
+}
+```
+
+Se `CRON_SECRET` non è configurato il controllo viene saltato del tutto e chiunque può innescare
+il polling — quindi le chiamate ai provider e **l'invio delle push**. La logica corretta è
+l'opposto: senza segreto configurato, rifiutare. Coperto da un test che documenta il
+comportamento attuale.
+
+### 3.13 Unità del vento incoerenti fra connettori ✅ RISOLTO (6B)
+
+Tre connettori consegnavano `wind_speed` in km/h invece dei m/s dichiarati da
+`UnifiedForecastData`, quindi 3 fonti su 8 attive entravano nella media pesata con valori **3.6
+volte troppo alti**, e nello stesso connettore il dato orario contraddiceva quello corrente:
+
+| Fonte | Campo | Problema |
+|-------|-------|----------|
+| Open-Meteo | `current.wind_speed_10m` | km/h di default (non passiamo `wind_speed_unit`), non convertito mentre l'hourly sì |
+| World Weather Online | `windspeedKmph` | il nome dice l'unità, passato grezzo |
+| Meteostat | `wspd`, `wpgt` | km/h per documentazione, passati grezzi |
+
+Su **WeatherKit** avevo diagnosticato un quarto bug leggendo il sorgente (`current.windSpeed * 3.6`)
+e mi sbagliavo: poche righe dopo un `forecastPayload.wind_speed = current.windSpeed / 3.6`
+sovrascriveva il valore. Il comportamento era corretto e solo il test lo ha dimostrato. Il codice
+morto e i quattro commenti in cui l'autore discuteva con se stesso l'unità sono stati rimossi.
+
+`__tests__/connectors/windUnits.test.ts` verifica la convenzione su **tutti** i connettori
+insieme, con 36 km/h = 10 m/s esatti: un test per singolo connettore non avrebbe fatto emergere
+il problema, perché ciascuno era coerente con se stesso.
+
+### 3.14 `SourcesIndicator` mostrava l'id grezzo di 4 fonti su 9 ✅ RISOLTO (6B)
+
+La mappa dei nomi copriva cinque fonti: le altre comparivano come `apple_weatherkit`,
+`worldweatheronline`, `weatherstack`, `meteostat` — fra cui due delle fonti che rispondono più
+spesso. Trovato scrivendo lo scenario E2E che verificava la lista.
 
 ---
 
@@ -395,23 +469,31 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 | 4 | `precipitation_intensity` aggregato in `current` (mm/h adesso) | §3.10 | ✅ |
 | 5 | Allineamento di `CLAUDE.md`, `AGENTS.md`, `PROJECT_STATUS_SUMMARY.md`, `PHASE_3.md` | §4 | ✅ |
 
-### 6.2 Fase 6B — Rete di sicurezza (**prossimo blocco**, da fare prima di toccare l'engine)
+### 6.2 Fase 6B — Rete di sicurezza
+
+**✅ Completata il 2026-09-12** — dettaglio in §7.
+
+| # | Intervento | Chiude | Stato |
+|---|-----------|--------|:-----:|
+| 6 | Jest + ts-jest sul backend; fixture per i 9 connettori | `TODO_TESTING` §2.1-2.3 | ✅ |
+| 7 | Test dell'aggregazione: media pesata, voting, daily/hourly, bucketing con offset, cache per versione | `TODO_TESTING` §2.4-2.5 | ✅ |
+| 8 | `supertest` sulle route (`/forecast`, `/sources`, `/alerts/*`) | `TODO_TESTING` §2.6 | ✅ |
+| 9 | Playwright: dashboard, ricerca, auth | `TODO_TESTING` §3 | ✅ (fonti autenticate fuori portata) |
+
+### 6.3 Fase 6C — Qualità della previsione (**prossimo blocco**, il cuore del prodotto)
 
 | # | Intervento | Chiude |
 |---|-----------|--------|
-| 6 | Jest + ts-jest sul backend; fixture per i 9 connettori | `TODO_TESTING` §2.1-2.3 |
-| 7 | Test dell'aggregazione: media pesata, voting, daily/hourly, bucketing con offset, cache per versione | `TODO_TESTING` §2.4-2.5 |
-| 8 | `supertest` sulle route (`/forecast`, `/sources`, `/alerts/*`) | `TODO_TESTING` §2.6 |
-| 9 | Playwright: dashboard, ricerca, fonti, auth | `TODO_TESTING` §3 |
+| 10 | **Pesare il daily e l'hourly**: oggi `avgSimple` ignora `SOURCE_WEIGHTS` | §3.11 |
+| 11 | Open-Meteo multi-modello (`&models=`) come fonti distinte | §5.13 |
+| 12 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 |
+| 13 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 |
+| 14 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 |
+| 15 | `CRON_SECRET`: rifiutare quando manca invece di lasciar passare | §3.12 |
 
-### 6.3 Fase 6C — Qualità della previsione (il cuore del prodotto)
-
-| # | Intervento | Chiude |
-|---|-----------|--------|
-| 10 | Open-Meteo multi-modello (`&models=`) come fonti distinte | §5.13 |
-| 11 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 |
-| 12 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 |
-| 13 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 |
+Il punto 10 va per primo: è una riga di codice, ma cambia i numeri mostrati e adesso c'è la
+suite che ne misura l'effetto. Senza quello, i punti 12 e 13 affinerebbero pesi che poi non
+vengono applicati.
 
 ### 6.4 Fase 6D — Nuove feature utente
 
@@ -504,12 +586,70 @@ più `CLAUDE.md`, `AGENTS.md`, `backend/.env.example`, `PHASE_1.md`, `PHASE_3.md
 `NextHourPrecipitationView.swift` viene raccolto automaticamente senza toccare il
 `project.pbxproj`.
 
+### Fase 6B — completata il 2026-09-12
+
+Commit `test(6B): suite Jest sul backend e tre bug di unità del vento`,
+`test(6B): aggregazione dell engine e contratto HTTP delle route`,
+`test(6B): suite E2E Playwright con API intercettata`.
+
+**Copertura prima e dopo**
+
+| | Prima | Dopo |
+|---|------:|-----:|
+| Backend | 0 test Jest (5 script `assert`) | **229** test, 11 suite |
+| Web unit | 137 test, 7 suite | 137 test, 7 suite |
+| E2E | 0 | **25** scenari × 2 viewport |
+| Lint web | 5 errori | 2 errori (preesistenti) |
+
+**Nuovi file**
+
+`backend/jest.config.js`, `backend/jest.setup.ts`,
+`backend/__tests__/fixtures/providers.ts`, `__tests__/utils/` (7 suite),
+`__tests__/connectors/{windUnits,mapping}.test.ts`,
+`__tests__/engine/smartEngine.test.ts`, `__tests__/routes/api.test.ts`,
+`frontend-web/playwright.config.ts`, `frontend-web/e2e/` (3 spec + fixture).
+
+**Cosa ha prodotto, oltre alla copertura**
+
+| Trovato | Tipo | Esito |
+|---------|------|-------|
+| Vento in km/h da Open-Meteo, WWO, Meteostat (§3.13) | bug | ✅ corretto |
+| `SourcesIndicator` con l'id grezzo di 4 fonti (§3.14) | bug UI | ✅ corretto |
+| Daily e hourly non pesati (§3.11) | scelta implicita, probabile dimenticanza | ⏳ 6C |
+| `/api/alerts/poll` aperto senza segreto (§3.12) | sicurezza | ⏳ 6C |
+| `middleware/auth.ts` che esplode all'import senza env | fragilità | ⏳ 6E |
+
+**Decisioni prese strada facendo**
+
+1. **Un solo sistema di test.** I cinque `verify*.ts` sono stati portati in Jest e la cartella
+   `scripts/` rimossa, invece di mantenere due posti dove cercare i test.
+2. **Fixture come costruttori, non file JSON.** Ogni test parte dalla forma completa della
+   risposta e sovrascrive un campo: con file statici servirebbe un JSON per variante.
+3. **Un test cross-connettore sulle unità.** Nove test isolati non avrebbero trovato il bug del
+   vento, perché ogni connettore era coerente con se stesso: serviva un test che confrontasse la
+   convenzione fra tutti.
+4. **Località seminata in localStorage per gli E2E.** Senza, la dashboard mostra il benvenuto e
+   non chiama l'API. La geolocalizzazione resta neutralizzata: se concessa, i test dipenderebbero
+   dall'IP del runner.
+5. **Comportamenti fotografati e non corretti.** §3.11 e §3.12 sono documentati da test che
+   dichiarano di non approvarli. Cambiare la matematica delle previsioni o la sicurezza di un
+   endpoint non è lavoro di una fase di test: è 6C, con l'utente informato.
+6. **Progetto mobile su Pixel 7.** Il descrittore `iPhone 14` di Playwright implica WebKit, non
+   installato in tutti gli ambienti; il viewport mobile con touch si ottiene comunque.
+
+**Limiti dichiarati**
+
+- Il contenuto autenticato di `/sources` non è raggiungibile dagli E2E: il middleware di Next
+  verifica la sessione server-side e `page.route` non la intercetta. Serve un progetto Supabase
+  di test.
+- Lighthouse non è eseguibile in sandbox (`next build` si ferma su `next/font`): va in CI.
+- Nessun test iOS: manca la toolchain Swift su Linux.
+
 ### Prossimo blocco
 
-**Fase 6B — rete di sicurezza** (§6.2): Jest sul backend con fixture per i 9 connettori, test
-dell'aggregazione daily/hourly e del bucketing con offset di fuso, `supertest` sulle route,
-Playwright sul web. Va prima della 6C perché la 6C riscrive la logica dei pesi e
-dell'accuratezza, cioè il cuore non testato dell'engine.
+**Fase 6C — qualità della previsione** (§6.3), a partire dal punto 10: pesare il daily e
+l'hourly. È una modifica minima ma cambia i numeri mostrati, e ora esiste la suite che ne misura
+l'effetto — che era esattamente il motivo per cui la 6B veniva prima.
 
 ---
 
