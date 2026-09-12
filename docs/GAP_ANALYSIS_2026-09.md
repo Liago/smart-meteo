@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fase 6A ✅ e Fase 6B ✅ completate (2026-09-12) · 6C → 6E da fare.
+> **Stato avanzamento roadmap:** Fase 6A ✅, 6B ✅ completate · 6C in corso (3 punti su 6) · 6D-6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -204,7 +204,7 @@ logout), e i tre hook web non coperti.
   entrambe.
 - Open-Meteo: `is_day`, `sunshine_duration`, `cloud_cover_low/mid/high` non richiesti.
 
-### 3.11 Il daily e l'hourly ignorano i pesi delle fonti 🔴 NUOVO (trovato in 6B)
+### 3.11 Il daily e l'hourly ignorano i pesi delle fonti ✅ RISOLTO (6C)
 
 `aggregatedDaily` e `aggregatedHourly` usano `avgSimple`, una media **aritmetica**:
 `SOURCE_WEIGHTS` non entra nel calcolo di `temp_max`, `temp_min`, `precipitation_prob`,
@@ -223,11 +223,14 @@ Non è documentato come una scelta da nessuna parte, e `IMPLEMENTATION_PLAN.md` 
 Il fatto che i mm accanto siano pesati suggerisce una dimenticanza cresciuta man mano che si
 aggiungevano campi.
 
-Il comportamento attuale è fotografato in `__tests__/engine/smartEngine.test.ts` con un test che
-dichiara di non approvarlo. Cambiare la matematica delle previsioni è lavoro della **Fase 6C**,
-non di una fase di test.
+**Risolto:** nuovo `backend/utils/aggregate.ts` con `weightedMean` e `weightedVote`, condivisi
+dai tre livelli — sostituiscono tre implementazioni quasi identiche, una pesata e due no. Il
+voto conserva la precedenza dei codici WMO numerici su quelli testuali: sommare pesi fra
+vocabolari diversi non avrebbe senso, "61" e "rain" descrivono la stessa cosa ma non si
+riconoscono fra loro. Schema di cache a 5, perché i valori cambiano. I tre test che
+fotografavano il comportamento non pesato sono stati invertiti.
 
-### 3.12 `POST /api/alerts/poll` è aperto senza `CRON_SECRET` 🟠 NUOVO (trovato in 6B)
+### 3.12 `POST /api/alerts/poll` è aperto senza `CRON_SECRET` ✅ RISOLTO (6C)
 
 ```ts
 if (cronSecret && requestSecret !== cronSecret) {
@@ -235,10 +238,12 @@ if (cronSecret && requestSecret !== cronSecret) {
 }
 ```
 
-Se `CRON_SECRET` non è configurato il controllo viene saltato del tutto e chiunque può innescare
-il polling — quindi le chiamate ai provider e **l'invio delle push**. La logica corretta è
-l'opposto: senza segreto configurato, rifiutare. Coperto da un test che documenta il
-comportamento attuale.
+Se `CRON_SECRET` non era configurato il controllo veniva saltato del tutto e chiunque poteva
+innescare il polling — quindi le chiamate ai provider e **l'invio delle push**.
+
+**Risolto:** l'endpoint risponde 503 quando la variabile manca. La scheduled function di Netlify
+chiama `pollAlerts()` direttamente e non passa dall'endpoint HTTP, quindi il polling automatico
+non è toccato.
 
 ### 3.13 Unità del vento incoerenti fra connettori ✅ RISOLTO (6B)
 
@@ -480,20 +485,22 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 | 8 | `supertest` sulle route (`/forecast`, `/sources`, `/alerts/*`) | `TODO_TESTING` §2.6 | ✅ |
 | 9 | Playwright: dashboard, ricerca, auth | `TODO_TESTING` §3 | ✅ (fonti autenticate fuori portata) |
 
-### 6.3 Fase 6C — Qualità della previsione (**prossimo blocco**, il cuore del prodotto)
+### 6.3 Fase 6C — Qualità della previsione (**in corso**, il cuore del prodotto)
 
-| # | Intervento | Chiude |
-|---|-----------|--------|
-| 10 | **Pesare il daily e l'hourly**: oggi `avgSimple` ignora `SOURCE_WEIGHTS` | §3.11 |
-| 11 | Open-Meteo multi-modello (`&models=`) come fonti distinte | §5.13 |
-| 12 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 |
-| 13 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 |
-| 14 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 |
-| 15 | `CRON_SECRET`: rifiutare quando manca invece di lasciar passare | §3.12 |
+| # | Intervento | Chiude | Stato |
+|---|-----------|--------|:-----:|
+| 10 | **Pesare il daily e l'hourly**: `avgSimple` ignorava `SOURCE_WEIGHTS` | §3.11 | ✅ |
+| 11 | Open-Meteo multi-modello (`&models=`) come fonti distinte | §5.13 | ✅ |
+| 12 | `CRON_SECRET`: rifiutare quando manca invece di lasciar passare | §3.12 | ✅ |
+| 13 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 | ⏳ |
+| 14 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 | ⏳ |
+| 15 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 | ⏳ |
 
-Il punto 10 va per primo: è una riga di codice, ma cambia i numeri mostrati e adesso c'è la
-suite che ne misura l'effetto. Senza quello, i punti 12 e 13 affinerebbero pesi che poi non
-vengono applicati.
+Il punto 10 è andato per primo: una modifica minima, ma cambia i numeri mostrati, e senza di
+essa i punti 13 e 14 affinerebbero pesi che poi non venivano applicati a daily e hourly.
+
+I punti 13 e 14 vanno insieme: sono lo stesso intervento visto da due lati — togliere Meteostat
+dalle previsioni e usarlo come verità osservata per misurare l'errore reale delle fonti.
 
 ### 6.4 Fase 6D — Nuove feature utente
 
@@ -645,11 +652,45 @@ Commit `test(6B): suite Jest sul backend e tre bug di unità del vento`,
 - Lighthouse non è eseguibile in sandbox (`next build` si ferma su `next/font`): va in CI.
 - Nessun test iOS: manca la toolchain Swift su Linux.
 
+### Fase 6C — in corso (3 punti su 6 al 2026-09-12)
+
+Commit `feat(6C): pesa daily e hourly, e chiude il polling senza segreto`,
+`feat(6C): i modelli Open-Meteo entrano come fonti indipendenti`.
+
+**Fatto**
+
+1. **Daily e hourly pesati** (§3.11). `utils/aggregate.ts` con `weightedMean` e `weightedVote`
+   sostituisce tre implementazioni quasi identiche. I pesi, e con essi il meccanismo di
+   accuratezza dinamica, smettono di essere inerti su quasi tutto ciò che l'utente guarda.
+2. **Modelli Open-Meteo come fonti indipendenti** (§5.13). Cinque modelli — ICON-D2, ICON-EU,
+   ECMWF IFS, Météo-France, GFS — al posto della miscela `best_match`, che è una loro
+   combinazione: affiancarli l'avrebbe contata due volte. Migrazione 022 per il vincolo di
+   chiave esterna di `raw_forecasts`, registro dei modelli nel connettore da cui engine e route
+   derivano pesi, fetcher e voci. `OPENMETEO_MODELS=off` torna al comportamento precedente.
+3. **`/api/alerts/poll` chiuso** senza segreto configurato (§3.12): 503 invece di lasciar
+   passare.
+
+**Decisioni**
+
+- **I modelli sostituiscono `best_match` invece di affiancarlo.** È la differenza fra aggiungere
+  diversità statistica e contare due volte gli stessi dati.
+- **Pesi dei modelli accanto ai modelli**, nel connettore, non in una seconda tabella
+  nell'engine: `SOURCE_WEIGHTS`, `SOURCE_FETCHERS` e `/api/sources` li derivano da lì.
+- **Modelli attivi per default**, reversibili con una variabile. Il costo è di cinque richieste
+  HTTP in più per ogni cache miss su un piano da 10.000 al giorno; il beneficio è il punto §5.13
+  di questa analisi.
+- **Il daily e l'hourly sono stati pesati prima di toccare l'accuratezza**: misurare meglio i
+  pesi non serve se poi i pesi non vengono applicati.
+
+**Verifiche:** 267 test backend (13 suite), 137 web, 25 E2E × 2 viewport, typecheck pulito.
+
 ### Prossimo blocco
 
-**Fase 6C — qualità della previsione** (§6.3), a partire dal punto 10: pesare il daily e
-l'hourly. È una modifica minima ma cambia i numeri mostrati, e ora esiste la suite che ne misura
-l'effetto — che era esattamente il motivo per cui la 6B veniva prima.
+**Fase 6C, punti 13-15**: Meteostat e Open-Meteo Archive come verità osservata (§3.3),
+da cui il MAE reale con finestra scorrevole, `GET /api/accuracy` e il cron di ricalcolo (§3.4),
+più l'ensemble per i percentili (§5.3.2). È il pezzo più grosso rimasto e va progettato come un
+blocco unico: senza dati osservati, i pesi dinamici continuano a premiare la conformità al
+consenso invece dell'accuratezza.
 
 ---
 
