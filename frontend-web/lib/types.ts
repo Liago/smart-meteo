@@ -53,6 +53,13 @@ export interface HourlyForecast {
 	wind_gust?: number | null;        // m/s
 	uv_index?: number | null;
 	precipitation_mm?: number | null; // mm accumulati nell'ora
+	/**
+	 * Banda di incertezza della temperatura: percentili 10 e 90 fra i membri
+	 * dell'ensemble. Presenti solo dove il modello copre l'orizzonte, quindi
+	 * vanno sempre trattati come opzionali.
+	 */
+	temp_p10?: number | null;
+	temp_p90?: number | null;
 }
 
 export interface AstronomyData {

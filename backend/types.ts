@@ -22,6 +22,13 @@ export interface HourlyForecast {
 	wind_gust?: number | null;       // m/s
 	uv_index?: number | null;
 	precipitation_mm?: number | null; // mm accumulati nell'ora
+	/**
+	 * Banda di incertezza della temperatura dai membri dell'ensemble
+	 * (percentili 10 e 90). Presente solo dove il modello di ensemble copre
+	 * l'orizzonte: si assottiglia verso le ore vicine e si allarga in avanti.
+	 */
+	temp_p10?: number | null;
+	temp_p90?: number | null;
 }
 
 /**

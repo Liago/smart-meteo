@@ -129,6 +129,26 @@ test.describe('nowcast al minuto', () => {
 	});
 });
 
+test.describe('banda di incertezza', () => {
+	test('il grafico orario disegna la banda quando i percentili ci sono', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		// La banda è l'unico path decorativo del grafico orario.
+		const banda = page.locator('svg path[aria-hidden="true"]');
+		await expect(banda.first()).toBeAttached();
+	});
+
+	test('senza percentili il grafico resta quello di prima', async ({ page }) => {
+		await mockApi(page, { withoutBand: true });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.locator('svg path[aria-hidden="true"]')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

@@ -105,6 +105,17 @@ jest.mock('../../connectors/weatherkit', () => ({
 	}),
 }));
 
+/** Banda restituita dall'ensemble: vuota per default. */
+let ensembleBands: { time: string; p10: number; p50: number; p90: number; members: number }[] = [];
+
+jest.mock('../../connectors/openmeteoEnsemble', () => ({
+	fetchTemperatureBand: jest.fn(async () =>
+		ensembleBands.length > 0
+			? { model: 'icon_eu', bands: ensembleBands, utcOffsetSeconds: 7200 }
+			: null
+	),
+}));
+
 import { getSmartForecast } from '../../engine/smartEngine';
 
 // ------------------------------------------------------------------- helpers
@@ -127,6 +138,7 @@ beforeEach(() => {
 	insertedSmart.length = 0;
 	sourceResponses = {};
 	activeModels = [];
+	ensembleBands = [];
 });
 
 // --------------------------------------------------------------------- tests
@@ -508,7 +520,7 @@ describe('cache', () => {
 	it('restituisce il full_data in cache quando lo schema coincide', async () => {
 		cachedRow = {
 			full_data: {
-				schema_version: 6,
+				schema_version: 7,
 				current: { temperature: 11.1 },
 				sources_used: ['cached-source'],
 				alerts: [],
@@ -523,7 +535,7 @@ describe('cache', () => {
 
 	it('non fa uscire schema_version dall API', async () => {
 		cachedRow = {
-			full_data: { schema_version: 6, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+			full_data: { schema_version: 7, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
 		};
 
 		const r = await getSmartForecast(LAT, LON);
@@ -615,6 +627,80 @@ describe('modelli Open-Meteo come fonti distinte', () => {
 
 		expect(r.confidence.sources_count).toBe(5);
 		expect(r.confidence.level).toBe('high');
+	});
+});
+
+describe('banda di incertezza dall ensemble', () => {
+	const hour = (time: string) => ({
+		time,
+		temp: 20,
+		precipitation_prob: 10,
+		condition_code: 'clear',
+		condition_text: 'Sunny',
+	});
+
+	it('applica i percentili agli slot orari corrispondenti', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00'), hour('2026-09-12T15:00')],
+		});
+		ensembleBands = [
+			{ time: '2026-09-12T14:00', p10: 18, p50: 20, p90: 22, members: 40 },
+			{ time: '2026-09-12T15:00', p10: 17, p50: 21, p90: 25, members: 40 },
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].temp_p10).toBe(18);
+		expect(r.hourly[0].temp_p90).toBe(22);
+		expect(r.hourly[1].temp_p90).toBe(25);
+	});
+
+	it('gli slot senza banda restano senza le chiavi, non a zero', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00'), hour('2026-09-12T15:00')],
+		});
+		// L'ensemble copre solo la prima ora: l'orizzonte è più corto.
+		ensembleBands = [{ time: '2026-09-12T14:00', p10: 18, p50: 20, p90: 22, members: 40 }];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].temp_p10).toBe(18);
+		expect(r.hourly[1]).not.toHaveProperty('temp_p10');
+	});
+
+	it('senza ensemble la risposta resta identica', async () => {
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00')],
+		});
+		ensembleBands = [];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0]).not.toHaveProperty('temp_p10');
+		expect(r.hourly[0].temp).toBeCloseTo(20, 1);
+	});
+
+	it('la banda passa dallo stesso bucketing orario delle fonti', async () => {
+		// L'ensemble risponde in ora locale, WeatherKit in UTC: senza passare
+		// dalla stessa chiave finirebbero in fasce diverse.
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 20,
+			hourly: [hour('2026-09-12T14:00:00Z')],
+		});
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 7200,
+			hourly: [hour('2026-09-12T16:00')],
+		});
+		ensembleBands = [{ time: '2026-09-12T16:00', p10: 18, p50: 20, p90: 22, members: 40 }];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly).toHaveLength(1);
+		expect(r.hourly[0].temp_p10).toBe(18);
 	});
 });
 

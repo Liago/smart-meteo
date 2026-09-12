@@ -95,9 +95,14 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 			return { ...item, temp };
 		});
 
+		// La scala verticale deve contenere anche la banda, altrimenti il 90°
+		// percentile finirebbe fuori dal riquadro nelle ore più incerte.
 		const temps = itemsWithTemp.map(i => i.temp);
-		const minTemp = Math.min(...temps) - 2;
-		const maxTemp = Math.max(...temps) + 2;
+		const bandValues = weatherItems.flatMap(w =>
+			[w.data.temp_p10, w.data.temp_p90].filter((v): v is number => v != null)
+		);
+		const minTemp = Math.min(...temps, ...bandValues) - 2;
+		const maxTemp = Math.max(...temps, ...bandValues) + 2;
 		const tempRange = maxTemp - minTemp || 1;
 
 		const minSpacing = 76;
@@ -124,7 +129,53 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 		}
 		const areaD = `${pathD} L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
 
-		return { width, height, points, pathD, areaD, gridY1: Math.round(height * 0.32), gridY2: Math.round(height * 0.68) };
+		// Banda di incertezza: percorso chiuso che segue il 90° percentile
+		// all'andata e il 10° al ritorno. Si disegna solo se TUTTI i punti hanno
+		// la banda — un tratto interrotto suggerirebbe una certezza che non c'è
+		// nelle ore scoperte dall'ensemble.
+		const yFor = (temp: number) => {
+			const usableHeight = height - paddingTop - paddingBottom;
+			return height - paddingBottom - ((temp - minTemp) / tempRange) * usableHeight;
+		};
+
+		// Sui marcatori di alba e tramonto la banda va interpolata dai vicini,
+		// come già si fa per la temperatura: quei punti non hanno dati orari, e
+		// senza interpolazione la banda risulterebbe incompleta — quindi mai
+		// disegnata — in tutte le finestre che contengono un evento solare.
+		const bandAtTime = (t: number, key: 'temp_p10' | 'temp_p90'): number | null => {
+			const before = weatherItems.filter(w => w.time <= t && w.data[key] != null).pop();
+			const after = weatherItems.find(w => w.time > t && w.data[key] != null);
+			if (!before && !after) return null;
+			if (!before) return after!.data[key]!;
+			if (!after) return before.data[key]!;
+
+			const ratio = (t - before.time) / (after.time - before.time);
+			return before.data[key]! + (after.data[key]! - before.data[key]!) * ratio;
+		};
+
+		const bandPoints = points.map((p) => {
+			const low = p.type === 'weather' ? p.data.temp_p10 ?? null : bandAtTime(p.time, 'temp_p10');
+			const high = p.type === 'weather' ? p.data.temp_p90 ?? null : bandAtTime(p.time, 'temp_p90');
+			return low != null && high != null ? { x: p.x, low, high } : null;
+		});
+
+		let bandD: string | null = null;
+		const covered = bandPoints.filter((b): b is { x: number; low: number; high: number } => b !== null);
+		if (covered.length >= 2 && covered.length === bandPoints.length) {
+			const upper = covered.map((b) => ({ x: b.x, y: yFor(b.high) }));
+			const lower = [...covered].reverse().map((b) => ({ x: b.x, y: yFor(b.low) }));
+			const trace = (pts: { x: number; y: number }[], start: boolean) => {
+				let d = start ? `M ${pts[0].x} ${pts[0].y}` : ` L ${pts[0].x} ${pts[0].y}`;
+				for (let i = 0; i < pts.length - 1; i++) {
+					const midX = (pts[i].x + pts[i + 1].x) / 2;
+					d += ` C ${midX} ${pts[i].y}, ${midX} ${pts[i + 1].y}, ${pts[i + 1].x} ${pts[i + 1].y}`;
+				}
+				return d;
+			};
+			bandD = `${trace(upper, true)}${trace(lower, false)} Z`;
+		}
+
+		return { width, height, points, pathD, areaD, bandD, gridY1: Math.round(height * 0.32), gridY2: Math.round(height * 0.68) };
 	}, [hourly, astronomy, mode]);
 
 	if (!chartData) return null;
@@ -151,6 +202,16 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 					<line x1="0" y1={chartData.gridY1} x2={chartData.width} y2={chartData.gridY1} stroke="#eef2f6" strokeWidth="1" />
 					<line x1="0" y1={chartData.gridY2} x2={chartData.width} y2={chartData.gridY2} stroke="#eef2f6" strokeWidth="1" />
 					<path d={chartData.areaD} fill="var(--color-duet-accent-soft)" />
+					{/* Banda 10°-90° percentile fra i membri dell'ensemble: quanto la
+					    previsione è incerta, non solo quale valore è più probabile. */}
+					{chartData.bandD && (
+						<path
+							d={chartData.bandD}
+							fill="var(--color-duet-accent)"
+							opacity={0.16}
+							aria-hidden="true"
+						/>
+					)}
 					<motion.path
 						d={chartData.pathD}
 						fill="none"

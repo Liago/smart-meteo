@@ -1,5 +1,6 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
 import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS } from '../connectors/openmeteo';
+import { fetchTemperatureBand } from '../connectors/openmeteoEnsemble';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -38,8 +39,9 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *       cambiano, quindi le righe in cache vanno rigenerate
  *   6 → i modelli Open-Meteo entrano come fonti distinte: sources_used cambia
  *       forma e i valori aggregati con essa
+ *   7 → banda di incertezza (temp_p10/temp_p90) sugli slot orari
  */
-const FORECAST_SCHEMA_VERSION = 6;
+const FORECAST_SCHEMA_VERSION = 7;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -190,6 +192,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			);
 		}
 	}
+
+	// La banda di incertezza parte subito, in parallelo alle fonti: è un
+	// arricchimento e non deve allungare il percorso critico.
+	const ensemblePromise = fetchTemperatureBand(lat, lon);
 
 	// 3. Fetch from External & Load Accuracies
 	//
@@ -490,6 +496,23 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
 			};
 		});
+
+	// Banda di incertezza sugli slot orari: le chiavi passano dallo stesso
+	// `hourKeyOf` delle fonti, altrimenti un ensemble in ora locale e una fonte
+	// in UTC finirebbero in fasce diverse.
+	const ensemble = await ensemblePromise;
+	if (ensemble) {
+		const bandByHour = new Map(ensemble.bands.map(b => [hourKeyOf(b.time), b]));
+		let applicate = 0;
+		for (const slot of aggregatedHourly) {
+			const band = bandByHour.get(slot.time);
+			if (!band) continue;
+			(slot as any).temp_p10 = band.p10;
+			(slot as any).temp_p90 = band.p90;
+			applicate++;
+		}
+		console.log(`[Ensemble] ${ensemble.model}: banda applicata a ${applicate}/${aggregatedHourly.length} slot`);
+	}
 
 	// Prefer astronomy source with moonrise/moonset, then real moon_phase, then any
 	const sourceWithAstronomy =

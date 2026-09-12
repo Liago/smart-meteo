@@ -31,6 +31,10 @@ function buildHourly(date: string, over: Record<number, Record<string, unknown>>
 		wind_gust: 6,
 		uv_index: h > 8 && h < 18 ? 5 : 0,
 		precipitation_mm: 0,
+		// Banda di incertezza: si allarga con l'ora, come fa un ensemble reale
+		// man mano che l'orizzonte si allontana.
+		temp_p10: 20 + (h % 6) - 1 - h * 0.08,
+		temp_p90: 20 + (h % 6) + 1 + h * 0.08,
 		...over[h],
 	}));
 }
@@ -49,6 +53,8 @@ function buildMinutes(rainFrom: number | null, rainTo = 60) {
 }
 
 export interface ForecastOptions {
+	/** Rimuove la banda di incertezza, come quando l'ensemble non risponde. */
+	withoutBand?: boolean;
 	/** Minuto da cui inizia a piovere nel nowcast; null = ora asciutta. */
 	rainStartsInMinutes?: number | null;
 	/** Omette del tutto il nowcast, come quando WeatherKit non risponde. */
@@ -118,7 +124,9 @@ export function buildForecast(options: ForecastOptions = {}) {
 			uv_index_max: 6,
 			precipitation_mm: offset === 2 ? 8.4 : 0,
 		})),
-		hourly: [...buildHourly(today), ...buildHourly(isoDate(1))],
+		hourly: [...buildHourly(today), ...buildHourly(isoDate(1))].map((h) =>
+			options.withoutBand ? { ...h, temp_p10: undefined, temp_p90: undefined } : h
+		),
 		astronomy: {
 			sunrise: `${today}T06:52:00`,
 			sunset: `${today}T19:44:00`,

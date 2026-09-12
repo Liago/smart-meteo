@@ -19,6 +19,7 @@ smart-meteo/
 │   │   ├── worldweatheronline.ts # WWO (weight: 1.0)
 │   │   ├── meteostat.ts        # Meteostat (weight: 0) - observations only, used as ground truth
 │   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
+│   │   ├── openmeteoEnsemble.ts # Ensemble members -> temperature p10/p50/p90 band
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
 │   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 4)
@@ -189,6 +190,7 @@ cd frontend-web && npm run build
 - Push notifications (APNs): `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, `APNS_BUNDLE_ID`, `APNS_PRODUCTION`
 - Scheduled alert polling: `CRON_SECRET` (guards `POST /api/alerts/poll`; without it the endpoint answers 503 rather than staying open)
 - `OPENMETEO_MODELS` (optional): comma-separated model ids to narrow the Open-Meteo models, or `off` to fall back to the single `best_match` source
+- `OPENMETEO_ENSEMBLE` (optional): ensemble model for the uncertainty band (default `icon_eu`), or `off` to drop the band
 - Open-Meteo needs no key. There is **no** Meteomatics connector: it was in the
   original plan (`docs/IMPLEMENTATION_PLAN.md`) but was replaced by Open-Meteo,
   so `METEOMATICS_*` in `.env.example` is dead configuration.
@@ -271,7 +273,7 @@ cd frontend-web && npm run build
 // Frontend types (frontend-web/lib/types.ts)
 ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/gust/label), precipitation_prob, dew_point, aqi, pressure, condition
 DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text
-HourlyForecast     // time, temp, precipitation_prob, condition_code/text
+HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band)
 AstronomyData      // sunrise, sunset, moon_phase
 ForecastResponse   // location, generated_at, sources_used, current, daily[], hourly[], astronomy
 WeatherSource      // id, name, weight, active, description, lastError, lastResponseMs
