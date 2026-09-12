@@ -50,9 +50,12 @@ export async function fetchFromMeteostat(lat: number, lon: number): Promise<Unif
 			temp: latest.temp,
 			feels_like: null, // Not provided
 			humidity: latest.rhum,
-			wind_speed: latest.wspd,
+			// wspd e wpgt sono in km/h nella documentazione Meteostat, mentre
+			// UnifiedForecastData è in m/s: senza conversione questa fonte
+			// entrava nella media pesata con valori 3.6 volte troppo alti.
+			wind_speed: latest.wspd != null ? Number((latest.wspd / 3.6).toFixed(2)) : null,
 			wind_direction: latest.wdir,
-			wind_gust: latest.wpgt ?? null,
+			wind_gust: latest.wpgt != null ? Number((latest.wpgt / 3.6).toFixed(2)) : null,
 			condition_text: `Code ${latest.coco}`, // Meteostat condition codes
 			condition_code: String(latest.coco),
 			precipitation_prob: null,

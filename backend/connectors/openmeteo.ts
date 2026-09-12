@@ -76,7 +76,10 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 			temp: current.temperature_2m,
 			feels_like: current.apparent_temperature,
 			humidity: current.relative_humidity_2m,
-			wind_speed: current.wind_speed_10m,
+			// Open-Meteo risponde in km/h (unità di default, non passiamo
+			// wind_speed_unit): il contratto di UnifiedForecastData è m/s, come
+			// già fa la mappatura hourly qui sopra.
+			wind_speed: current.wind_speed_10m != null ? Number((current.wind_speed_10m / 3.6).toFixed(2)) : null,
 			wind_direction: current.wind_direction_10m,
 			wind_gust: current.wind_gusts_10m != null ? current.wind_gusts_10m / 3.6 : null,
 			condition_text: `Code ${current.weather_code}`,

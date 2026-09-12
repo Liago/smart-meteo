@@ -223,11 +223,8 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             temp: current.temperature,
             feels_like: current.temperatureApparent,
             humidity: current.humidity != null ? current.humidity * 100 : null,
-            wind_speed: current.windSpeed != null ? current.windSpeed * 3.6 : null, // (from m/s or km/h? API docs say km/h per metric, assumiamo km/h se lang=it, o kph standard)
-            // Se Apple ritorna kph nativamente, rimuovere * 3.6. Documentation assumes kph per lang=it locale. Let's pass as is if Apple handles metric.
-            // Let's assume m/s to be safe and standard with the rest of the app, actually Apple docs say: "The wind speed, in kilometers per hour." Se it's km/h we must convert back or keep.
-            // All our backend assumes `wind_speed` in M/S before format. So if Apple is km/h, we do: / 3.6
-            // actually Let's assume km/h -> m/s:
+            // Apple documenta windSpeed in km/h, il contratto interno è m/s.
+            wind_speed: current.windSpeed != null ? Number((current.windSpeed / 3.6).toFixed(2)) : null,
             wind_direction: current.windDirection,
             wind_gust: current.windGust != null ? current.windGust / 3.6 : null,
             condition_text: current.conditionCode,
@@ -250,11 +247,6 @@ export async function fetchFromWeatherKit(lat: number, lon: number): Promise<Uni
             } as any : undefined,
             raw_data: data
         };
-
-        // Fix wind speed since Apple gives km/h natively
-        if (current.windSpeed != null) {
-            forecastPayload.wind_speed = current.windSpeed / 3.6;
-        }
 
         const nextHour = parseForecastNextHour(data);
         if (nextHour) {
