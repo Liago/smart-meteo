@@ -1,10 +1,24 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import type { ConfidenceIndex } from '@/lib/types';
 
 interface SourcesIndicatorProps {
   sources: string[];
+  confidence?: ConfidenceIndex | null;
 }
+
+const confidenceLabels: Record<ConfidenceIndex['level'], string> = {
+  high: 'Fonti concordi',
+  medium: 'Accordo parziale',
+  low: 'Fonti in disaccordo',
+};
+
+const confidenceColors: Record<ConfidenceIndex['level'], string> = {
+  high: 'var(--color-duet-green)',
+  medium: '#f7b228',
+  low: '#EC685A',
+};
 
 const sourceColors: Record<string, string> = {
   'tomorrow.io': 'bg-blue-500',
@@ -22,8 +36,13 @@ const sourceNames: Record<string, string> = {
   'accuweather': 'AccuWeather',
 };
 
-export default function SourcesIndicator({ sources }: SourcesIndicatorProps) {
+export default function SourcesIndicator({ sources, confidence }: SourcesIndicatorProps) {
   if (sources.length === 0) return null;
+
+  // Intervallo fra la fonte più fredda e la più calda: è il modo più concreto
+  // di mostrare il disaccordo, più del punteggio da solo.
+  const tempRange = confidence?.temperature;
+  const showRange = tempRange != null && tempRange.max - tempRange.min >= 1;
 
   return (
     <motion.div
@@ -39,6 +58,27 @@ export default function SourcesIndicator({ sources }: SourcesIndicatorProps) {
           {sources.length} attive
         </span>
       </div>
+      {confidence && (
+        <div
+          className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-xl px-3 py-2"
+          style={{ background: 'var(--color-duet-accent-soft)' }}
+        >
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ background: confidenceColors[confidence.level] }}
+            />
+            {confidenceLabels[confidence.level]}
+            <span style={{ color: 'var(--color-duet-muted)' }}>{confidence.score}/100</span>
+          </span>
+          {showRange && (
+            <span className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>
+              Temperatura prevista fra {Math.round(tempRange.min)}° e {Math.round(tempRange.max)}°
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {sources.map((source, i) => (
           <motion.span

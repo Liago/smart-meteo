@@ -179,6 +179,13 @@ struct DashboardView: View {
                                 .padding(.horizontal)
                             }
 
+                            // Nowcast al minuto: l'informazione più urgente
+                            // della schermata, sopra al meteo corrente.
+                            if let nextHour = forecast.forecastNextHour {
+                                NextHourPrecipitationView(data: nextHour)
+                                    .padding(.horizontal)
+                            }
+
                             // Current Weather
                             CurrentWeatherView(current: forecast.current, today: forecast.daily?.first, astronomy: forecast.astronomy)
                             

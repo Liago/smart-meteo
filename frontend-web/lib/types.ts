@@ -7,6 +7,7 @@ export interface ForecastCurrent {
 	wind_direction_label: string | null;
 	wind_gust: number | null;
 	precipitation_prob: number;
+	precipitation_intensity: number | null; // mm/h che stanno cadendo adesso
 	dew_point: number | null;
 	aqi: number | null;
 	pressure: number | null;
@@ -58,6 +59,44 @@ export interface AstronomyData {
 	sunrise: string;
 	sunset: string;
 	moon_phase: string;
+	moonrise?: string;
+	moonset?: string;
+	moon_illumination?: number; // percentuale di disco illuminato
+}
+
+/**
+ * Previsione precipitazione minuto per minuto per la prossima ora.
+ * Fonte: Apple WeatherKit (`forecastNextHour`), quindi presente solo dove Apple
+ * copre il nowcast — Italia inclusa. I timestamp sono istanti UTC.
+ */
+export interface MinutelyPrecipitation {
+	startTime: string;
+	precipitationChance: number;    // 0-100
+	precipitationIntensity: number; // mm/h
+}
+
+export interface ForecastNextHour {
+	summary: { condition: string; startTime: string; endTime: string }[];
+	minutes: MinutelyPrecipitation[];
+}
+
+/** Dispersione di una grandezza fra le fonti che hanno risposto. */
+export interface ConsensusSpread {
+	spread: number; // deviazione standard pesata
+	min: number;
+	max: number;
+}
+
+/**
+ * Quanto le fonti sono d'accordo: 100 = unanimi e numerose, 50 = nessuna
+ * informazione utile (poche fonti o dispersione massima).
+ */
+export interface ConfidenceIndex {
+	score: number;
+	level: 'high' | 'medium' | 'low';
+	sources_count: number;
+	temperature: ConsensusSpread | null;
+	precipitation_prob: ConsensusSpread | null;
 }
 
 export interface WeatherAlert {
@@ -88,9 +127,11 @@ export interface ForecastResponse {
 	generated_at: string;
 	sources_used: string[];
 	current: ForecastCurrent;
+	confidence?: ConfidenceIndex | null;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;
+	forecastNextHour?: ForecastNextHour;
 	alerts?: WeatherAlert[];
 }
 

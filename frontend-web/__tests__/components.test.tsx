@@ -19,6 +19,7 @@ const mockForecastData: ForecastCurrent = {
   wind_direction_label: 'S',
   wind_gust: 7.5,
   precipitation_prob: 15,
+  precipitation_intensity: 0,
   dew_point: 12.8,
   aqi: 2,
   pressure: 1013,

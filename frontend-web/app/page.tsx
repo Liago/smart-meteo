@@ -8,6 +8,7 @@ import DayNarrative from '@/components/DayNarrative';
 import ForecastDetails from '@/components/ForecastDetails';
 import HourlyForecast from '@/components/HourlyForecast';
 import SunWindCard from '@/components/SunWindCard';
+import NextHourPrecipitation from '@/components/NextHourPrecipitation';
 import AirQualitySummary from '@/components/AirQualitySummary';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import SkeletonLoader from '@/components/SkeletonLoader';
@@ -207,6 +208,8 @@ export default function Home() {
 					<>
 						{allAlerts.length > 0 && <WeatherAlerts alerts={allAlerts} />}
 
+						<NextHourPrecipitation data={data.forecastNextHour} />
+
 						<div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5 items-start">
 							<CurrentWeather
 								data={data.current}
@@ -225,7 +228,7 @@ export default function Home() {
 							/>
 							<div className="flex flex-col gap-5">
 								<AirQualitySummary data={data.current} sourcesCount={data.sources_used.length} />
-								<SourcesIndicator sources={data.sources_used} />
+								<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
 							</div>
 						</div>
 

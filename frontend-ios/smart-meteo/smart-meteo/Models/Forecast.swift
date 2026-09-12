@@ -73,6 +73,12 @@ struct ForecastResponse: Codable {
     let hourly: [HourlyForecast]?
     let astronomy: AstronomyData?
     let alerts: [WeatherAlert]?
+    /// Quanto le fonti sono d'accordo. Opzionale: manca sulle risposte in cache
+    /// scritte prima della sua introduzione.
+    let confidence: ConfidenceIndex?
+    /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
+    /// copre il dataset `forecastNextHour` (Italia inclusa).
+    let forecastNextHour: ForecastNextHour?
 
     enum CodingKeys: String, CodingKey {
         case location
@@ -83,6 +89,8 @@ struct ForecastResponse: Codable {
         case hourly
         case astronomy
         case alerts
+        case confidence
+        case forecastNextHour
     }
 }
 
@@ -98,6 +106,9 @@ struct ForecastCurrent: Codable {
     let humidity: Double?
     let windSpeed: Double?
     let precipitationProb: Double
+    /// mm/h che stanno cadendo adesso. Opzionale: manca sulle risposte in cache
+    /// scritte prima della sua introduzione.
+    let precipitationIntensity: Double?
     let condition: String
     let conditionCode: String?
     let conditionText: String
@@ -119,6 +130,7 @@ struct ForecastCurrent: Codable {
         case humidity
         case windSpeed = "wind_speed"
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case condition
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
@@ -155,6 +167,7 @@ struct DailyForecast: Codable, Identifiable {
         case tempMax = "temp_max"
         case tempMin = "temp_min"
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case uvIndexMax = "uv_index_max"
@@ -188,6 +201,7 @@ struct HourlyForecast: Codable, Identifiable {
         case time
         case temp
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case precipitationMm = "precipitation_mm"
@@ -233,5 +247,58 @@ struct AirQualityDetail: Codable {
         case aqiUsEpa = "aqi_us_epa"
         case pm25 = "pm2_5"
         case pm10, no2, o3, co, so2
+    }
+}
+
+// MARK: - Next Hour Precipitation
+
+/// Un minuto della previsione di precipitazione per la prossima ora.
+/// `startTime` è un istante UTC, così come lo restituisce WeatherKit.
+struct MinutelyPrecipitation: Codable, Identifiable {
+    var id: String { startTime }
+    let startTime: String
+    /// 0-100.
+    let precipitationChance: Double
+    /// mm/h.
+    let precipitationIntensity: Double
+}
+
+struct ForecastNextHourSummary: Codable {
+    let condition: String
+    let startTime: String
+    let endTime: String
+}
+
+struct ForecastNextHour: Codable {
+    let summary: [ForecastNextHourSummary]
+    let minutes: [MinutelyPrecipitation]
+}
+
+// MARK: - Confidence
+
+/// Dispersione di una grandezza fra le fonti che hanno risposto.
+struct ConsensusSpread: Codable {
+    /// Deviazione standard pesata.
+    let spread: Double
+    let min: Double
+    let max: Double
+}
+
+/// Quanto le fonti sono d'accordo: 100 = unanimi e numerose, 50 = nessuna
+/// informazione utile (poche fonti, oppure dispersione massima).
+struct ConfidenceIndex: Codable {
+    let score: Int
+    /// "high" | "medium" | "low".
+    let level: String
+    let sourcesCount: Int
+    let temperature: ConsensusSpread?
+    let precipitationProb: ConsensusSpread?
+
+    enum CodingKeys: String, CodingKey {
+        case score
+        case level
+        case sourcesCount = "sources_count"
+        case temperature
+        case precipitationProb = "precipitation_prob"
     }
 }

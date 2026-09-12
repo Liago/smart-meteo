@@ -43,6 +43,7 @@ const current = (partial: Partial<ForecastCurrent> = {}): ForecastCurrent => ({
 	wind_direction: null,
 	wind_direction_label: null,
 	wind_gust: null,
+	precipitation_intensity: null,
 	precipitation_prob: 0,
 	dew_point: null,
 	aqi: null,

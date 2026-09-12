@@ -12,6 +12,7 @@ import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
+import { computeConsensus } from '../utils/consensus';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
@@ -31,8 +32,9 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   1 → forma originale
  *   2 → aggiunge precipitation_mm su hourly e daily
  *   3 → aggiunge feels_like, wind_direction e wind_gust su hourly
+ *   4 → aggiunge precipitation_intensity e confidence su current
  */
-const FORECAST_SCHEMA_VERSION = 3;
+const FORECAST_SCHEMA_VERSION = 4;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -66,6 +68,7 @@ interface AggregationData {
 	wind_direction: { val: number; weight: number }[];
 	wind_gust: { val: number; weight: number }[];
 	precipitation_prob: { val: number; weight: number }[];
+	precipitation_intensity: { val: number; weight: number }[];
 	aqi: { val: number; weight: number }[];
 	pressure: { val: number; weight: number }[];
 	uv_index: { val: number; weight: number }[];
@@ -260,6 +263,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		wind_direction: [],
 		wind_gust: [],
 		precipitation_prob: [],
+		precipitation_intensity: [],
 		aqi: [],
 		pressure: [],
 		uv_index: [],
@@ -295,6 +299,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('wind_direction', f.wind_direction);
 		pushValue('wind_gust', f.wind_gust);
 		pushValue('precipitation_prob', f.precipitation_prob);
+		pushValue('precipitation_intensity', f.precipitation_intensity);
 		pushValue('aqi', f.aqi);
 		pushValue('pressure', f.pressure);
 		pushValue('uv_index', f.uv_index);
@@ -499,6 +504,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const aggHumidity = avg(aggregation.humidity);
 	// Media circolare: la media aritmetica di 350° e 10° darebbe sud invece di nord.
 	const aggWindDir = aggregateWindDirection(aggregation.wind_direction);
+	// Quanto le fonti sono d'accordo: è l'informazione che solo un aggregatore ha.
+	const consensus = computeConsensus(
+		aggregation.temp,
+		aggregation.precipitation_prob,
+		validForecasts.length
+	);
 
 	const result = {
 		location: { lat, lon },
@@ -513,6 +524,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			wind_direction_label: aggWindDir !== null ? degreesToCompass(aggWindDir) : null,
 			wind_gust: avg(aggregation.wind_gust),
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
+			// mm/h che stanno cadendo adesso: stessa regola dei mm previsti
+			// (gate sulla frazione bagnata), così una fonte isolata non inventa
+			// pioggia in corso.
+			precipitation_intensity: aggregatePrecipitationMm(aggregation.precipitation_intensity),
 			dew_point: avg(aggregation.dew_point) ?? ((aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null),
 			aqi: avg(aggregation.aqi),
 			pressure: avg(aggregation.pressure),
@@ -524,6 +539,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			cloud_cover: aggCloudCover,
 			air_quality: sourceWithAirQuality?.air_quality ?? null,
 		},
+		confidence: consensus,
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,
@@ -565,7 +581,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_text: result.current.condition_text,
 			sources_used: result.sources_used,
 			sources_count: result.sources_used.length,
-			confidence_score: null,
+			confidence_score: consensus?.score ?? null,
 			// Lo schema_version viaggia solo nella cache: viene rimosso prima di
 			// restituire la risposta, così l'API non cambia forma.
 			full_data: { ...result, schema_version: FORECAST_SCHEMA_VERSION }

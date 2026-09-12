@@ -704,6 +704,7 @@ struct AirQualityBalloon: View {
             humidity: 60,
             windSpeed: 12,
             precipitationProb: 0.1,
+            precipitationIntensity: 0,
             condition: "clear",
             conditionCode: "0",
             conditionText: "Sunny",
