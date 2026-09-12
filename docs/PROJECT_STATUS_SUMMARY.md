@@ -115,15 +115,15 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6C — Qualità della previsione (2026-09-12, 5 punti su 6)
+### Fase 6C — Qualità della previsione (2026-09-12, completata)
 - **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
 - **Modelli Open-Meteo come fonti indipendenti**: ICON-D2, ICON-EU, ECMWF IFS, Météo-France e GFS al posto della miscela `best_match`, che è una loro combinazione — affiancarli l'avrebbe contata due volte. Migrazione 022, `OPENMETEO_MODELS=off` per tornare indietro
 - **Accuratezza misurata sull'osservato**: `source_accuracy` conteneva la deviazione dal consenso, quindi penalizzava la fonte che aveva ragione da sola, e la media cumulativa senza finestra congelava i pesi. Ora `services/observations.ts` porta la verità osservata (ERA5, Meteostat dove non arriva), ogni confronto è un campione in `accuracy_samples` (migrazione 023) e il MAE si ricalcola sui 30 giorni
 - **`GET /api/accuracy`** pubblica, **`POST /api/accuracy/recompute`** protetta, scheduled function giornaliera
 - **Meteostat fuori dalle previsioni** (peso 0) e dentro la verifica: chiude `VALUTAZIONI_TECNICHE` §3, aperta da marzo
 - **`/api/alerts/poll` chiuso** senza `CRON_SECRET`: 503 invece di lasciar passare
-- Test backend da 229 a **304**
-- ⏳ Resta l'ensemble Open-Meteo per i percentili 10/50/90
+- **Banda di incertezza** dai membri di ICON-EU-EPS: percentili 10/90 sugli slot orari e banda disegnata sul grafico web. L'indice di consenso della 6A misura l'accordo fra modelli deterministici, che sovrastima la certezza; un ensemble misura l'incertezza come la intendono i meteorologi
+- Test backend da 229 a **326**
 
 ### Fase 6B — Rete di test (2026-09-12)
 - **Backend da 0 a 229 test** in 11 suite: Jest + ts-jest, fixture dei nove provider come costruttori, axios-mock-adapter sui connettori, Supabase e connettori mockati sull'engine, supertest sulle route. I cinque script `verify*.ts` portati nella suite e `scripts/` rimossa

@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fase 6A ✅, 6B ✅ completate · 6C in corso (5 punti su 6) · 6D-6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D-6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -503,7 +503,7 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 | 8 | `supertest` sulle route (`/forecast`, `/sources`, `/alerts/*`) | `TODO_TESTING` §2.6 | ✅ |
 | 9 | Playwright: dashboard, ricerca, auth | `TODO_TESTING` §3 | ✅ (fonti autenticate fuori portata) |
 
-### 6.3 Fase 6C — Qualità della previsione (**in corso**, il cuore del prodotto)
+### 6.3 Fase 6C — Qualità della previsione ✅ **completata il 2026-09-12**
 
 | # | Intervento | Chiude | Stato |
 |---|-----------|--------|:-----:|
@@ -512,7 +512,7 @@ gap documentati e feature nuove quando ricadono sullo stesso codice.
 | 12 | `CRON_SECRET`: rifiutare quando manca invece di lasciar passare | §3.12 | ✅ |
 | 13 | Meteostat / Open-Meteo Archive come ground truth, fuori dall'aggregazione | §3.3, §5.7 | ✅ |
 | 14 | MAE reale con finestra 30 giorni, `GET /api/accuracy`, cron di ricalcolo | §3.4, §5.14 | ✅ |
-| 15 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 | ⏳ ultimo punto |
+| 15 | Ensemble Open-Meteo per i percentili 10/50/90 | §5.3.2 | ✅ |
 
 Il punto 10 è andato per primo: una modifica minima, ma cambia i numeri mostrati, e senza di
 essa i punti 13 e 14 affinerebbero pesi che poi non venivano applicati a daily e hourly.
@@ -520,7 +520,7 @@ essa i punti 13 e 14 affinerebbero pesi che poi non venivano applicati a daily e
 I punti 13 e 14 vanno insieme: sono lo stesso intervento visto da due lati — togliere Meteostat
 dalle previsioni e usarlo come verità osservata per misurare l'errore reale delle fonti.
 
-### 6.4 Fase 6D — Nuove feature utente
+### 6.4 Fase 6D — Nuove feature utente (**prossimo blocco**)
 
 | # | Intervento | Chiude |
 |---|-----------|--------|
@@ -733,12 +733,46 @@ consenso`):
 
 **Verifiche:** 304 test backend (15 suite), 137 web, 25 E2E × 2 viewport, typecheck pulito.
 
+**Fatto infine** (commit `feat(6C): banda di incertezza dai membri dell'ensemble`):
+
+6. **Banda di incertezza** (§5.3.2). ICON-EU-EPS, 40 membri, percentili 10/50/90 orari propagati
+   sugli slot e disegnati sul grafico web. È la differenza fra dire «21 °C» e dire «fra 18 e
+   24 °C, più probabilmente 21».
+
+**Decisioni dell'ultimo blocco**
+
+- **L'ensemble non è una fonte dell'aggregazione.** Non fornisce condizioni correnti né
+  astronomia: viaggia a parte come `forecastNextHour`, e la sua assenza non cambia la previsione.
+- **Percentili interpolati, non per indice arrotondato.** Su 40 membri il decimo percentile cade
+  fra il quarto e il quinto valore.
+- **Niente banda parziale.** O copre tutti i punti del grafico o non si disegna: un tratto
+  interrotto suggerirebbe certezza nelle ore che l'ensemble non copre.
+- **Membri riconosciuti per pattern**, non costruendo i nomi delle chiavi da un numero atteso:
+  cambia da modello a modello.
+
+### Riepilogo della Fase 6C
+
+| Intervento | Effetto |
+|-----------|---------|
+| Daily e hourly pesati | I pesi smettono di essere inerti su quasi tutto ciò che l'utente guarda |
+| 5 modelli Open-Meteo al posto di `best_match` | Da una fonte a cinque previsioni indipendenti, a costo zero |
+| MAE sull'osservato con finestra di 30 giorni | I pesi dinamici misurano l'accuratezza, non la conformità al gruppo |
+| Meteostat a verità osservata | Le osservazioni passate escono dalla media del presente |
+| Banda di incertezza | L'incertezza diventa visibile invece che implicita |
+| `/api/alerts/poll` e `/api/accuracy/recompute` chiusi | Nessun endpoint che innesca push o scritture resta aperto |
+
+**Verifiche finali:** 326 test backend (16 suite), 137 web (7 suite), 27 scenari E2E × 2
+viewport, typecheck pulito su entrambi i lati, lint web a 2 errori preesistenti.
+
 ### Prossimo blocco
 
-**Fase 6C, ultimo punto**: l'ensemble di Open-Meteo
-(`ensemble-api.open-meteo.com`) per i percentili 10/50/90 (§5.3.2) — i singoli membri al posto
-di una stima di dispersione ricavata da modelli deterministici. Poi la **Fase 6D**: pollini e AQI
-previsionale, quota neve, indici temporaleschi, radar, allerte su soglie personali.
+**Fase 6D — nuove feature utente** (§6.4): pollini e AQI previsionale da Open-Meteo Air Quality
+(§5.1), quota neve e rischio gelate (§5.2), indice temporali da CAPE (§5.8), radar (§5.5),
+allerte su soglie personali (§5.15).
+
+Da valutare prima della 6D: **la resa grafica della banda su iOS** e **il pannello fonti su
+iOS**, dove mostrare anche l'indice di consenso. Entrambi sono asimmetrie dichiarate fra i due
+client, non dimenticanze — ma sono le uniche due rimaste.
 
 ---
 
