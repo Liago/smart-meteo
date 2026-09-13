@@ -326,6 +326,37 @@ export interface SeaOutlook {
 	max_wave_at: string | null;
 }
 
+/** Attività valutate dagli indici «buona giornata per…». */
+export type ActivityId = 'running' | 'cycling' | 'laundry';
+
+export interface ActivityScore {
+	id: ActivityId;
+	label: string;
+	/** 0-100. */
+	score: number;
+	/**
+	 * Il fattore che tiene basso il punteggio, quando ce n'è uno. È
+	 * l'informazione che rende il numero utile: «65» non dice niente, «65,
+	 * limita il vento» dice se rimandare o cambiare percorso.
+	 */
+	limiting: string | null;
+}
+
+/**
+ * «Oggi è una buona giornata per…», calcolato dai dati che già aggreghiamo.
+ *
+ * Non viene da un'API di indici a consumo: il piano gratuito di AccuWeather dà
+ * 50 chiamate al giorno e ne usiamo già 3 per cache miss, quindi tre indici
+ * dimezzerebbero le previsioni servibili.
+ */
+export interface ActivitiesOutlook {
+	/** Giorno locale della finestra valutata. */
+	date: string;
+	from: string;
+	to: string;
+	activities: ActivityScore[];
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -373,6 +404,8 @@ export interface ForecastResponse {
 	sky?: SkyOutlook;
 	/** Mare: presente solo sulle località costiere. */
 	sea?: SeaOutlook;
+	/** «Buona giornata per…» sulla prossima finestra diurna. */
+	activities?: ActivitiesOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

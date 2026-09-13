@@ -85,6 +85,11 @@ export interface ForecastOptions {
 	/** Blocco cielo: tramonti e osservazione astronomica. */
 	sky?: Record<string, unknown> | null;
 	/**
+	 * Indici lifestyle. Presenti per default: si calcolano dalle ore che il
+	 * backend manda comunque, quindi ci sono ovunque ci sia una previsione.
+	 */
+	activities?: Record<string, unknown> | null;
+	/**
 	 * Blocco mare. **Assente per default**: la località di prova è Milano, e
 	 * nell'entroterra il modello d'onda non copre.
 	 */
@@ -220,6 +225,20 @@ export function buildForecast(options: ForecastOptions = {}) {
 
 	if (options.sea) {
 		forecast.sea = options.sea;
+	}
+
+	if (options.activities !== null) {
+		forecast.activities = options.activities ?? {
+			date: today,
+			from: `${today}T08:00`,
+			to: `${today}T19:00`,
+			// Già ordinati per punteggio decrescente, come li manda il backend.
+			activities: [
+				{ id: 'cycling', label: 'Andare in bici', score: 100, limiting: null },
+				{ id: 'laundry', label: 'Stendere il bucato', score: 88, limiting: null },
+				{ id: 'running', label: 'Correre', score: 62, limiting: 'temperatura' },
+			],
+		};
 	}
 
 	if (!options.withoutNextHour) {

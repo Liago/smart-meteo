@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 7 punti su 9.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 8 punti su 9 (resta solo l'audit, bloccato dall'ambiente).
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -404,15 +404,22 @@ Web con MapLibre/Leaflet, iOS con `MapKit` + overlay: colma §3.9 e un punto del
 
 ### Tier 2 — differenzianti, effort contenuto
 
-#### 5.6 Indici "lifestyle" (AccuWeather + Tomorrow.io)
+#### 5.6 Indici "lifestyle" ⭐ ✅ IMPLEMENTATA (6E) — **ma non come proposta qui**
 
-`GET /indices/v1/daily/1day/{locationKey}/{indexId}` — già nel piano free che usiamo. Decine di
-indici: corsa, escursionismo, ciclismo, zanzare, artrite, ritardi aerei, lavaggio auto, asma,
-raffreddore. Tomorrow.io aggiunge `fireIndex`, `roadRisk`, `grassGrowthPotential`.
-Prodotto: "Oggi è una buona giornata per…" — molto condivisibile, poco costoso.
+La proposta era di comprarli: `GET /indices/v1/daily/1day/{locationKey}/{indexId}` di AccuWeather,
+già nel piano free che usiamo, con decine di indici pronti (corsa, ciclismo, zanzare, lavaggio
+auto, asma), più `fireIndex` e `roadRisk` di Tomorrow.io.
 
-⚠️ Vincolo: AccuWeather free è 50 chiamate/giorno e ne consumiamo già 3 per forecast. Da valutare
-solo con cache giornaliera aggressiva.
+**Il conto non torna.** Su AccuWeather ogni indice è **una chiamata a sé**, il piano free dà 50
+chiamate al giorno e `connectors/accuweather.ts` ne consuma già 3 per ogni cache miss (geoposition
++ current + daily + hourly, con la locationKey in cache un'ora): circa 16 previsioni servibili al
+giorno. Tre indici le porterebbero a otto. Non è un limite che una cache più aggressiva aggira:
+è un budget che non c'è.
+
+Gli indici sono quindi **calcolati in casa**, da dati che aggreghiamo già — `backend/utils/activities.ts`,
+`components/ActivitiesPanel.tsx`. Costo zero, nessuna dipendenza nuova, e in più si può dire
+*perché* il punteggio è quello, cosa che un indice a scatola chiusa non permette. Le decisioni
+sono nel registro, §7 → Fase 6E punto 8.
 
 #### 5.7 Confronto con le normali climatiche (Meteostat + Open-Meteo Archive)
 
@@ -580,7 +587,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 22 | Mare: onde e temperatura dell'acqua | §5.11 | ✅ |
 | 23 | Radiazione solare e resa fotovoltaica | §5.9 | ✅ |
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
-| 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
+| 25 | Indici lifestyle (calcolati in casa: il budget AccuWeather non regge) | §5.6 | ✅ |
 | 26 | Alba/tramonto e cielo notturno | §5.12 | ✅ |
 | 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
 
@@ -986,7 +993,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (7 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (8 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1238,6 +1245,59 @@ già dimostrata da tre connettori in questo repo, e ciò che si sta ricordando s
 parametri**, non la struttura. Il connettore è scritto per degradare: qualunque serie assente
 diventa `null` e il riquadro sparisce, invece di mostrare un mare inventato.
 
+#### 8. Indici lifestyle: «buona giornata per…»
+
+Chiude §5.6. Commit `feat(6E): indici lifestyle, buona giornata per…`.
+
+Corsa, bici e bucato: un punteggio 0-100 sulla prossima finestra diurna, con il fattore che lo
+tiene basso. Schema di cache alla versione 16.
+
+**Decisioni**
+
+- **Calcolati, non comprati.** È la decisione che riscrive la proposta §5.6, e nasce da
+  un'aritmetica: AccuWeather free dà 50 chiamate al giorno, `connectors/accuweather.ts` ne spende
+  già 3 per cache miss (~16 previsioni servibili al giorno) e ogni indice è una chiamata in più.
+  Tre indici avrebbero dimezzato le previsioni servibili per aggiungere tre numeri. I dati che
+  servono — temperatura percepita, pioggia, vento, UV, umidità, AQI europeo — li aggreghiamo già
+  tutti.
+- **Il punteggio è il MINIMO dei fattori, non la media.** Una giornata perfetta sotto il diluvio
+  non è mezza buona: la media darebbe 60 e nasconderebbe proprio il fattore per cui si rinuncia.
+- **Accanto al numero c'è il perché.** «65» non dice niente, «65, limita il vento» dice se
+  rimandare o cambiare percorso. È l'unica cosa che un indice a scatola chiusa non può dare, ed è
+  il motivo per cui calcolarli in casa non è solo un ripiego sul budget.
+- **Il fattore limitante si nomina solo sotto 80.** Sopra, niente limita davvero, e scriverlo
+  suggerirebbe un problema che non c'è.
+- **Probabilità e vento si prendono al massimo, i millimetri si sommano.** Un'ora al 90% in mezzo
+  a undici serene è comunque un'uscita da rimandare; i millimetri invece bagnano per quantità
+  totale.
+- **La finestra è quella di un solo giorno.** Di sera scivola a domani — «buona giornata per
+  correre» alle 23 significa domani — ma non mescola mai oggi pomeriggio con domani mattina: un
+  punteggio così non varrebbe per nessuno dei due. Il giorno valutato viaggia nella risposta e il
+  pannello lo dichiara.
+- **Le soglie del vento in bici sono metà di quelle a piedi** (12/30 km/h contro 20/45): a 25 km/h
+  si corre, in bici si soffre.
+- **Il vento del bucato è l'unico fattore invertito**, e vive in una funzione a sé invece che in un
+  parametro di `windScore`: un segno meno nascosto dentro una soglia si legge male a mesi di
+  distanza.
+
+**Due errori miei, trovati dai miei stessi test**
+
+- `dryAirScore` era `100 - umidità`: al 50% di umidità — aria perfettamente normale, in cui il
+  bucato asciuga benissimo — dava 50, e qualunque giornata ordinaria sarebbe sembrata mediocre.
+  Sostituita con una curva a soglie (piena fino al 65%, zero al 95%).
+- Il pavimento di `dryingWindScore` era 40: con aria ferma il vento risultava **il fattore
+  limitante** di una giornata di sole asciutta e tiepida, cioè un avviso su un problema che non
+  c'è. Il vento è un bonus, non un requisito: pavimento alzato a 80, e aggiunta
+  `dryingTempScore`, senza la quale il registro avrebbe detto «stendi pure» a 3 °C.
+
+**Verifiche:** 588 test backend (28 suite), 255 web (15 suite), 50 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+**Limite dichiarato:** solo backend e web, come le quattro voci precedenti. E i pesi delle soglie
+sono scelte ragionevoli, non tarate su dati: nessuno ha misurato a che temperatura la gente
+smette davvero di correre. Sono però tutte costanti esportate e testate, quindi tarabili quando
+un dato ci sarà.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1247,13 +1307,22 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 
 ### Prossimo blocco
 
-**Fase 6E, punti 25 e 27**: indici lifestyle, test iOS e audit Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
-schermate non compilate: un passaggio su simulatore viene prima.
-**Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
+**Le feature della 6E sono finite.** Restano due voci, e nessuna delle due è una feature:
 
-Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
-della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i
-pollini. I modelli Swift decodificano già tutti e tre i dati: manca solo la vista.
+**Fase 6E, punto 27 — test iOS e audit Lighthouse.** L'audit è impossibile da qui (vedi sopra),
+non rinviato. I test iOS non esistono e non possono nascere in questo ambiente: non c'è toolchain
+Swift.
+**Fase 6D, punto 17 — radar**: bloccato, quando l'ambiente lo consente.
+
+**Il debito iOS, dichiarato e non nascosto:** iOS è indietro di **cinque** feature — orto,
+fotovoltaico, cielo, mare e ora gli indici lifestyle — e porta **cinque schermate Swift mai
+compilate** (`AlertRulesView`, `SnowPanelView`, `SourcesIndicatorView`, `PollenPanelView`,
+`GardenPanelView`, più le modifiche a `HourlyForecastView`). Un passaggio su simulatore viene
+prima di qualunque altra riga di Swift.
+
+**Nota di prodotto:** la dashboard web è arrivata a una dozzina di riquadri. Prima di
+aggiungerne altri serve un raggruppamento — oggi neve, orto, fotovoltaico, cielo, mare e indici
+stanno tutti sullo stesso piano, e nessuno di essi interessa a tutti gli utenti tutti i giorni.
 
 ---
 

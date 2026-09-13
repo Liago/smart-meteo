@@ -20,6 +20,7 @@ import { buildGardenOutlook, gardenHoursFrom } from '../utils/garden';
 import { buildSolarOutlook, solarHoursFrom } from '../utils/solar';
 import { buildSkyOutlook, skyHoursFrom } from '../utils/sky';
 import { buildSeaOutlook } from '../utils/sea';
+import { buildActivities } from '../utils/activities';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
 import { weightedMean, weightedVote } from '../utils/aggregate';
@@ -61,12 +62,13 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *  13 → blocco solar e radiazione solare sugli slot orari
  *  14 → blocco sky e nuvolosità per quota sugli slot orari
  *  15 → blocco sea (onde e temperatura dell'acqua, solo sulle coste)
+ *  16 → blocco activities ("buona giornata per…")
  *
  * Esportata perché i test la usino invece di ricopiarne il numero: una copia
  * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
  * modifica non c'entra niente.
  */
-export const FORECAST_SCHEMA_VERSION = 15;
+export const FORECAST_SCHEMA_VERSION = 16;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -749,6 +751,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		validForecasts.length
 	);
 
+	// «Buona giornata per…»: si calcola qui perché ha bisogno della qualità
+	// dell'aria già fusa fra le due fonti.
+	const activities = buildActivities(
+		aggregatedHourly as any,
+		mergedAirQuality?.european_aqi,
+		hourKeyOf(new Date().toISOString())
+	);
+
 	const result = {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
@@ -790,6 +800,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		...(snow && { snow }),
 		// Orto: presente ovunque Open-Meteo dia i dati agronomici.
 		...(garden && { garden }),
+		// «Buona giornata per…»: indici calcolati dai dati che già aggreghiamo,
+		// non comprati da un'API a consumo.
+		...(activities && { activities }),
 		// Mare: presente solo dove il modello d'onda copre, cioè sulle coste.
 		...(sea && { sea }),
 		// Cielo: quanto sarà bello il tramonto e quanto si vedranno le stelle.

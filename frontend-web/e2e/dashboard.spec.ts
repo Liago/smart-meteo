@@ -382,6 +382,51 @@ test.describe('mare', () => {
 	});
 });
 
+test.describe('buona giornata per…', () => {
+	test('elenca le attività con il punteggio e il fattore che lo limita', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Buona giornata per…')).toBeVisible();
+		// La migliore apre il riquadro, in minuscolo dentro la frase.
+		await expect(page.getByText('andare in bici: condizioni ottime')).toBeVisible();
+
+		// La riga va cercata nel suo elemento: «62» da solo comparirebbe anche
+		// altrove sulla dashboard (il picco dei pollini, per dirne una).
+		const corsa = page.getByRole('listitem').filter({ hasText: 'Correre' });
+		await expect(corsa).toContainText('62');
+		// Il numero da solo non dice niente: accanto c'è il perché.
+		await expect(corsa).toContainText('limita temperatura');
+	});
+
+	test('di sera dichiara che la finestra è quella di domani', async ({ page }) => {
+		const domani = new Date();
+		domani.setDate(domani.getDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+
+		await mockApi(page, {
+			activities: {
+				date,
+				from: `${date}T08:00`,
+				to: `${date}T19:00`,
+				activities: [{ id: 'running', label: 'Correre', score: 90, limiting: null }],
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Buona giornata per…')).toBeVisible();
+		await expect(page.getByText('domani', { exact: true })).toBeVisible();
+	});
+
+	test('senza ore diurne davanti il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { activities: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Buona giornata per…')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

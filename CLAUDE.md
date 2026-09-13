@@ -26,7 +26,7 @@ smart-meteo/
 │   │   │                          #  snowfall, freezing level and soil temp)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
-│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 15)
+│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 16)
 │   ├── middleware/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
@@ -53,6 +53,7 @@ smart-meteo/
 │   │   ├── solar.ts            # Irradiance -> PV specific yield (kWh/kWp)
 │   │   ├── sky.ts              # Cloud layers -> sunset quality, stargazing
 │   │   ├── sea.ts              # Wave height -> Italian sea-state wording
+│   │   ├── activities.ts       # Lifestyle scores: running, cycling, laundry
 │   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
@@ -80,6 +81,7 @@ smart-meteo/
 │   │   ├── SolarPanel.tsx       # PV yield per day, plant size in localStorage
 │   │   ├── SkyPanel.tsx         # Sunset quality + stargazing outlook
 │   │   ├── SeaPanel.tsx         # Water temperature, waves, sea state
+│   │   ├── ActivitiesPanel.tsx  # "Buona giornata per…" lifestyle scores
 │   │   ├── HourlyDetail.tsx     # Hourly metric modal (precip/wind/humidity/UV/...)
 │   │   ├── WeatherEffects.tsx   # Particle layers for the dynamic background
 │   │   ├── ui/Modal.tsx, ui/MetricSelect.tsx # Shared primitives
@@ -104,9 +106,10 @@ smart-meteo/
 │   │       ├── server.ts       # SSR Supabase client
 │   │       ├── middleware.ts   # Auth session refresh
 │   │       └── locations.ts    # Location CRUD (Supabase)
-│   ├── __tests__/              # 10 Jest suites (api, components, weather-utils,
+│   ├── __tests__/              # 15 Jest suites (api, components, weather-utils,
 │   │                           #  air-quality, narrative, hourly-detail,
-│   │                           #  next-hour, pollen, snow, storm)
+│   │                           #  next-hour, pollen, snow, storm, garden,
+│   │                           #  solar, sky, sea, activities)
 │   ├── middleware.ts           # Next.js middleware (Supabase session)
 │   └── vercel.json             # Vercel deployment config
 │
@@ -241,11 +244,11 @@ cd frontend-web && npm run build
 
 ## Testing
 
-- Web tests are in `frontend-web/__tests__/` (14 suites: api, components, weather-utils,
-  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar, sky, sea), `npm test` from the
-  repo root
+- Web tests are in `frontend-web/__tests__/` (15 suites: api, components, weather-utils,
+  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar, sky,
+  sea, activities), `npm test` from the repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **567 tests in 27 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **588 tests in 28 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -290,6 +293,7 @@ cd frontend-web && npm run build
 - **The garden block is NOT omitted when all is calm**, unlike the snow one. Not an inconsistency: the snow panel would have been *empty* — no depth, no snowfall, no frost — for eight months a year, whereas "no need to water" is a full answer, and the one someone with a garden goes looking for in the evening
 - **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
+- **A lifestyle score is the worst factor, never the mean** (`backend/utils/activities.ts`): a day that is perfect on temperature, wind and air but pours with rain is not half a good day to run — a mean would return 60 and hide the single factor you actually give up over, so the score is the **minimum** of its factors and the panel names that factor next to the number ("65, limita il vento" tells you whether to postpone or change route; "65" alone tells you nothing). The limiting factor is only named **below 80**, or an ordinary good day would read as having a problem. These indices are computed rather than bought: AccuWeather sells them ready-made, but each index is its **own** call on a 50-call/day plan of which `connectors/accuweather.ts` already spends 3 per cache miss (~16 servable forecasts a day), so three indices would have halved the forecasts to buy three numbers — and a bought index cannot say *why*. Within the window precipitation probability and wind take the **max** (one hour at 90% among eleven clear ones is still an outing to postpone) while millimetres **sum**; the window never straddles two days, so in the evening it rolls to tomorrow as a whole and the response declares which day it scored
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals
@@ -324,7 +328,8 @@ DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/tex
 HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, soil_temperature_root, soil_moisture, evapotranspiration, solar_irradiance, sunshine_duration, cloud_cover, cloud_cover_low/mid/high, cape, lifted_index, storm_index, thunder_prob
 AlertRule          // id, metric, comparator ('above'|'below'), threshold, horizon_hours, enabled
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, solar, sky, sea, forecastNextHour
+ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, solar, sky, sea, activities, forecastNextHour
+ActivitiesOutlook  // date, from, to, activities[{id ('running'|'cycling'|'laundry'), label, score, limiting}]
 SeaOutlook         // sea_temperature, wave_height, wave_direction, wave_period, swell_height, state, max_wave_24h, max_wave_at
 SkyOutlook         // sunset/sunrise {at, score, level}, stargazing {score, level, cloud_cover, moon_illumination}
 SolarOutlook       // plane ('tilted'|'horizontal'), tilt_deg, azimuth_deg, performance_ratio, days[{date, kwh_per_kwp, sunshine_hours, peak_w}]
@@ -337,6 +342,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Lifestyle indices** (backend + web): "buona giornata per…" for running, cycling and hanging out the laundry, from the aggregated hourly data we already have — `backend/utils/activities.ts` scores comfort, dryness, wind, UV, humidity and the European AQI over the next daylight window, and `ActivitiesPanel.tsx` renders bar, score and limiting factor. Two of my own design errors were caught by the tests: `dryAirScore` was `100 - humidity`, which scored an ordinary 50% humidity day as mediocre, and the drying-wind floor was low enough that calm air came out as the *limiting* factor of a fine dry day — wind is a bonus for laundry, not a requirement, and `dryingTempScore` was added so the panel doesn't say "stendi pure" at 3 °C. **Web only**, like the four features before it.
 - **Sea state** (backend + web): a new `connectors/openmeteoMarine.ts` against Open-Meteo Marine for waves, swell and water temperature, turned into a `sea` block by `utils/sea.ts` and rendered by `SeaPanel.tsx`. The connector **self-excludes inland**, so no coastline test was needed. **Web only.**
 - **Sunset quality and stargazing** (backend + web): `cloud_cover_low/mid/high` plus hourly total cover from the Open-Meteo call we already made, combined with the moon illumination already in hand. `backend/utils/sky.ts` derives a `sky` block, rendered by `SkyPanel.tsx`, whose headline goes to whichever of the two indices is the more remarkable. **Web only**, like the two features before it.
 - **Photovoltaic yield** (backend + web): `global_tilted_irradiance` (with constant `tilt`/`azimuth` query params), `shortwave_radiation` as fallback and `sunshine_duration`, turned into a per-day specific yield in kWh/kWp by `backend/utils/solar.ts`. `SolarPanel.tsx` multiplies by the plant size the user stores locally. **Web only:** the iOS version needs a settings field for plant size, and that waits on a simulator pass over the Swift views already written.
