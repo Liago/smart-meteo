@@ -68,21 +68,45 @@ struct ForecastResponse: Codable {
     let location: Coordinate
     let generatedAt: String
     let sourcesUsed: [String]
+    /// Offset locale della località rispetto a UTC, in secondi. Le chiavi di
+    /// `hourly` sono in ora locale: senza, non si può dire quale slot è "adesso"
+    /// per una località in un altro fuso.
+    let utcOffsetSeconds: Int?
     let current: ForecastCurrent
     let daily: [DailyForecast]?
     let hourly: [HourlyForecast]?
     let astronomy: AstronomyData?
     let alerts: [WeatherAlert]?
+    /// Quanto le fonti sono d'accordo. Opzionale: manca sulle risposte in cache
+    /// scritte prima della sua introduzione.
+    let confidence: ConfidenceIndex?
+    /// Pollini per specie: presenti solo dove il modello CAMS copre (Europa).
+    let pollen: [PollenReading]?
+    /// Neve e gelate nelle prossime 24 ore. Il backend manda il blocco solo
+    /// quando c'è qualcosa da segnalare, quindi la sua sola presenza basta a
+    /// decidere se mostrare il riquadro.
+    let snow: SnowOutlook?
+    /// Orto: presente ovunque Open-Meteo dia i dati agronomici.
+    let garden: GardenOutlook?
+    /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
+    /// copre il dataset `forecastNextHour` (Italia inclusa).
+    let forecastNextHour: ForecastNextHour?
 
     enum CodingKeys: String, CodingKey {
         case location
         case generatedAt = "generated_at"
         case sourcesUsed = "sources_used"
+        case utcOffsetSeconds = "utc_offset_seconds"
         case current
         case daily
         case hourly
         case astronomy
         case alerts
+        case confidence
+        case pollen
+        case snow
+        case garden
+        case forecastNextHour
     }
 }
 
@@ -98,6 +122,9 @@ struct ForecastCurrent: Codable {
     let humidity: Double?
     let windSpeed: Double?
     let precipitationProb: Double
+    /// mm/h che stanno cadendo adesso. Opzionale: manca sulle risposte in cache
+    /// scritte prima della sua introduzione.
+    let precipitationIntensity: Double?
     let condition: String
     let conditionCode: String?
     let conditionText: String
@@ -119,6 +146,7 @@ struct ForecastCurrent: Codable {
         case humidity
         case windSpeed = "wind_speed"
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case condition
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
@@ -149,16 +177,20 @@ struct DailyForecast: Codable, Identifiable {
     /// mm totali previsti per il giorno. Opzionale: manca sulle risposte in
     /// cache scritte prima dell'introduzione del campo.
     let precipitationMm: Double?
+    /// cm di neve fresca previsti per il giorno.
+    let snowfallCm: Double?
 
     enum CodingKeys: String, CodingKey {
         case date
         case tempMax = "temp_max"
         case tempMin = "temp_min"
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case uvIndexMax = "uv_index_max"
         case precipitationMm = "precipitation_mm"
+        case snowfallCm = "snowfall_cm"
     }
 }
 
@@ -183,11 +215,42 @@ struct HourlyForecast: Codable, Identifiable {
     /// Raffica in m/s, come `windSpeed`.
     let windGust: Double?
     let uvIndex: Double?
+    /// Banda di incertezza della temperatura dai membri dell'ensemble
+    /// (percentili 10 e 90). Presente solo dove il modello di ensemble copre
+    /// l'orizzonte: si assottiglia sulle ore vicine e si allarga in avanti.
+    let tempP10: Double?
+    let tempP90: Double?
+    /// Neve fresca dell'ora in cm (non equivalente in acqua).
+    let snowfallCm: Double?
+    /// Manto nevoso al suolo, in cm.
+    let snowDepthCm: Double?
+    /// Quota dello zero termico, in metri.
+    let freezingLevel: Double?
+    /// Temperatura della superficie del suolo, °C: è lì che si forma la brina.
+    let soilTemperature: Double?
+    /// Temperatura dello strato 0-7 cm, °C: è lì che germinano i semi.
+    let soilTemperatureRoot: Double?
+    /// Contenuto d'acqua volumetrico dello strato 0-7 cm, m³/m³.
+    let soilMoisture: Double?
+    /// Evapotraspirazione di riferimento FAO dell'ora, mm.
+    let evapotranspiration: Double?
+    /// Deficit di pressione di vapore, kPa.
+    let vapourPressureDeficit: Double?
+    /// Energia potenziale convettiva disponibile, J/kg.
+    let cape: Double?
+    /// Lifted index, °C: negativo = instabile.
+    let liftedIndex: Double?
+    /// Indice 0-100 di rischio temporali, calcolato dal backend a partire dagli
+    /// indici convettivi. Presente solo dove i modelli li espongono.
+    let stormIndex: Double?
+    /// Probabilità di tuono in %, da WorldWeatherOnline.
+    let thunderProb: Double?
 
     enum CodingKeys: String, CodingKey {
         case time
         case temp
         case precipitationProb = "precipitation_prob"
+        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case precipitationMm = "precipitation_mm"
@@ -197,6 +260,20 @@ struct HourlyForecast: Codable, Identifiable {
         case windDirection = "wind_direction"
         case windGust = "wind_gust"
         case uvIndex = "uv_index"
+        case tempP10 = "temp_p10"
+        case tempP90 = "temp_p90"
+        case snowfallCm = "snowfall_cm"
+        case snowDepthCm = "snow_depth_cm"
+        case freezingLevel = "freezing_level"
+        case soilTemperature = "soil_temperature"
+        case soilTemperatureRoot = "soil_temperature_root"
+        case soilMoisture = "soil_moisture"
+        case evapotranspiration
+        case vapourPressureDeficit = "vapour_pressure_deficit"
+        case cape
+        case liftedIndex = "lifted_index"
+        case stormIndex = "storm_index"
+        case thunderProb = "thunder_prob"
     }
 }
 
@@ -228,10 +305,178 @@ struct AirQualityDetail: Codable {
     let o3: Double?
     let co: Double?
     let so2: Double?
+    /// Indice europeo (0-100+), da Open-Meteo: scala diversa dall'EPA 1-6.
+    let europeanAqi: Double?
 
     enum CodingKeys: String, CodingKey {
         case aqiUsEpa = "aqi_us_epa"
         case pm25 = "pm2_5"
         case pm10, no2, o3, co, so2
+        case europeanAqi = "european_aqi"
+    }
+}
+
+// MARK: - Pollini
+
+/// Livello pollinico, secondo le soglie della singola specie: 30 granuli/m³ di
+/// graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa.
+struct PollenReading: Codable, Identifiable {
+    var id: String { species }
+    let species: String
+    let label: String
+    /// Granuli/m³ nell'ora corrente.
+    let value: Double?
+    /// Massimo previsto in giornata.
+    let dailyMax: Double?
+    /// "none" | "low" | "moderate" | "high" | "very_high"
+    let level: String
+    let dailyLevel: String
+
+    enum CodingKeys: String, CodingKey {
+        case species, label, value, level
+        case dailyMax = "daily_max"
+        case dailyLevel = "daily_level"
+    }
+}
+
+// MARK: - Neve e gelate
+
+/// Rischio gelate nelle prossime 24 ore.
+struct FrostOutlook: Codable {
+    /// "none" | "possible" | "likely" | "severe"
+    let level: String
+    /// Temperatura minima prevista nella finestra, °C.
+    let minTemp: Double?
+    /// Slot orario del minimo, nella stessa chiave locale degli hourly.
+    let at: String?
+    /// "soil" | "air": se la minima è quella della superficie o quella dei due
+    /// metri. Cambia il significato della frase, e il backend usa soglie
+    /// diverse per le due.
+    let source: String
+
+    enum CodingKeys: String, CodingKey {
+        case level
+        case minTemp = "min_temp"
+        case at
+        case source
+    }
+}
+
+/// Neve e gelate nelle prossime 24 ore.
+///
+/// La quota dello zero termico da sola è un dato da bollettino: quello che
+/// serve sapere è se a *casa propria* verrà giù neve o acqua. `elevation` è la
+/// quota del punto di griglia dichiarata da Open-Meteo, ed è lei a rendere
+/// leggibile `snowLine`.
+struct SnowOutlook: Codable {
+    /// Quota della località secondo i modelli, in metri.
+    let elevation: Double?
+    /// Quota neve più bassa prevista nella finestra, in metri.
+    let snowLine: Double?
+    /// "snow" | "sleet" | "rain"; nil se non è prevista precipitazione.
+    let phase: String?
+    /// Manto nevoso presente adesso, in cm.
+    let snowDepthCm: Double?
+    /// Neve fresca attesa nella finestra, in cm.
+    let snowfallCm: Double?
+    let frost: FrostOutlook
+
+    enum CodingKeys: String, CodingKey {
+        case elevation
+        case snowLine = "snow_line"
+        case phase
+        case snowDepthCm = "snow_depth_cm"
+        case snowfallCm = "snowfall_cm"
+        case frost
+    }
+}
+
+// MARK: - Orto e giardino
+
+/// Orto e giardino nelle prossime 24 ore.
+///
+/// A differenza di `SnowOutlook`, il backend manda questo blocco anche quando è
+/// tutto tranquillo: «non serve innaffiare» è una risposta, ed è quella che chi
+/// ha un orto va a cercare la sera.
+struct GardenOutlook: Codable {
+    /// Umidità volumetrica attuale dello strato 0-7 cm, m³/m³.
+    let soilMoisture: Double?
+    /// "very_dry" | "dry" | "adequate" | "wet"
+    let moistureLevel: String?
+    /// Temperatura media dello strato radicale nella finestra, °C.
+    let soilTemperature: Double?
+    /// Evapotraspirazione attesa nella finestra, mm.
+    let evapotranspirationMm: Double?
+    /// Pioggia attesa nella finestra, mm.
+    let rainMm: Double?
+    /// Evapotraspirazione meno pioggia: positivo = il terreno perde acqua.
+    let waterBalanceMm: Double?
+    /// "rain_expected" | "water_now" | "water_soon" | "not_needed"
+    let advice: String
+    /// Se lo strato radicale è abbastanza caldo per seminare.
+    let sowingOk: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case soilMoisture = "soil_moisture"
+        case moistureLevel = "moisture_level"
+        case soilTemperature = "soil_temperature"
+        case evapotranspirationMm = "evapotranspiration_mm"
+        case rainMm = "rain_mm"
+        case waterBalanceMm = "water_balance_mm"
+        case advice
+        case sowingOk = "sowing_ok"
+    }
+}
+
+// MARK: - Next Hour Precipitation
+
+/// Un minuto della previsione di precipitazione per la prossima ora.
+/// `startTime` è un istante UTC, così come lo restituisce WeatherKit.
+struct MinutelyPrecipitation: Codable, Identifiable {
+    var id: String { startTime }
+    let startTime: String
+    /// 0-100.
+    let precipitationChance: Double
+    /// mm/h.
+    let precipitationIntensity: Double
+}
+
+struct ForecastNextHourSummary: Codable {
+    let condition: String
+    let startTime: String
+    let endTime: String
+}
+
+struct ForecastNextHour: Codable {
+    let summary: [ForecastNextHourSummary]
+    let minutes: [MinutelyPrecipitation]
+}
+
+// MARK: - Confidence
+
+/// Dispersione di una grandezza fra le fonti che hanno risposto.
+struct ConsensusSpread: Codable {
+    /// Deviazione standard pesata.
+    let spread: Double
+    let min: Double
+    let max: Double
+}
+
+/// Quanto le fonti sono d'accordo: 100 = unanimi e numerose, 50 = nessuna
+/// informazione utile (poche fonti, oppure dispersione massima).
+struct ConfidenceIndex: Codable {
+    let score: Int
+    /// "high" | "medium" | "low".
+    let level: String
+    let sourcesCount: Int
+    let temperature: ConsensusSpread?
+    let precipitationProb: ConsensusSpread?
+
+    enum CodingKeys: String, CodingKey {
+        case score
+        case level
+        case sourcesCount = "sources_count"
+        case temperature
+        case precipitationProb = "precipitation_prob"
     }
 }

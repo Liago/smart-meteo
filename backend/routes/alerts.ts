@@ -8,6 +8,11 @@ import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { WeatherAlert } from '../types';
 import { aggregateAlerts, isAlertRelevantForPoint } from '../utils/alertGeo';
+import {
+    HORIZON_DEFAULT_HOURS,
+    RULE_METRICS,
+    validateRule,
+} from '../utils/alertRules';
 
 /**
  * Cache in-memory per le allerte live, evita di chiamare le API ad ogni richiesta.
@@ -339,7 +344,18 @@ alertsRouter.post('/poll', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
     const requestSecret = req.headers['x-cron-secret'] as string;
 
-    if (cronSecret && requestSecret !== cronSecret) {
+    // Senza segreto configurato la richiesta va rifiutata, non lasciata
+    // passare: questo endpoint interroga i provider e fa partire le push, e
+    // prima un deploy con la variabile dimenticata lo lasciava aperto a
+    // chiunque.
+    if (!cronSecret) {
+        console.error('[AlertPoller] CRON_SECRET non configurato: polling rifiutato');
+        return res.status(503).json({
+            error: 'Polling non disponibile: CRON_SECRET non configurato sul server',
+        });
+    }
+
+    if (requestSecret !== cronSecret) {
         return res.status(403).json({ error: 'Unauthorized: invalid cron secret' });
     }
 
@@ -406,3 +422,175 @@ alertsRouter.get('/health', async (_req, res) => {
     }
 });
 
+
+
+/**
+ * Metriche disponibili per le regole di soglia personali.
+ *
+ * Serve ai client per costruire il form senza ricopiare il registro: le unità,
+ * i confronti ammessi e le etichette vivono in un posto solo.
+ */
+alertsRouter.get('/rules/metrics', (_req, res) => {
+    return res.json({
+        metrics: RULE_METRICS.map(m => ({
+            id: m.id,
+            label: m.label,
+            unit: m.unit,
+            aggregation: m.aggregation,
+            decimals: m.decimals,
+            comparators: m.comparators,
+        })),
+        horizon_default_hours: HORIZON_DEFAULT_HOURS,
+    });
+});
+
+/**
+ * Regole di soglia di un device.
+ *
+ * Il device si identifica col proprio token, come in `/subscribe`: il token è
+ * il segreto, e chi non ce l'ha non può leggere le regole altrui. Passa nel
+ * body e non in query string, per non finire nei log del proxy.
+ */
+alertsRouter.post('/rules/list', async (req, res) => {
+    const { deviceToken } = req.body;
+    if (!deviceToken) {
+        return res.status(400).json({ error: 'Manca deviceToken' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('alert_rules')
+            .select('id, metric, comparator, threshold, horizon_hours, enabled, created_at')
+            .eq('device_token', deviceToken)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return res.json({ rules: data || [] });
+    } catch (err: any) {
+        console.error('Error in /alerts/rules/list:', err.message);
+        return res.status(500).json({ error: 'Impossibile leggere le regole', details: err.message });
+    }
+});
+
+/**
+ * Crea una regola di soglia.
+ *
+ * Payload: { deviceToken, metric, comparator, threshold, horizonHours? }
+ */
+alertsRouter.post('/rules', async (req, res) => {
+    const { deviceToken, metric, comparator, threshold, horizonHours = HORIZON_DEFAULT_HOURS } = req.body;
+
+    if (!deviceToken) {
+        return res.status(400).json({ error: 'Manca deviceToken' });
+    }
+
+    const invalid = validateRule(metric, comparator, threshold, horizonHours);
+    if (invalid) {
+        return res.status(400).json({ error: invalid });
+    }
+
+    try {
+        // Il device deve essere già iscritto: una regola senza subscription non
+        // ha una località su cui essere valutata, e nessuno la vedrebbe mai
+        // scattare.
+        const { data: subscription, error: subError } = await supabase
+            .from('alert_subscriptions')
+            .select('id')
+            .eq('device_token', deviceToken)
+            .limit(1);
+
+        if (subError) throw subError;
+        if (!subscription || subscription.length === 0) {
+            return res.status(409).json({
+                error: 'Device non iscritto alle allerte: chiamare prima /alerts/subscribe',
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('alert_rules')
+            .insert({
+                device_token: deviceToken,
+                metric,
+                comparator,
+                threshold,
+                horizon_hours: horizonHours,
+            })
+            .select('id, metric, comparator, threshold, horizon_hours, enabled, created_at')
+            .single();
+
+        if (error) {
+            // Regola identica già presente: è un no-op voluto, non un errore da
+            // 500. Si restituisce quella esistente.
+            if (error.code === '23505') {
+                const { data: existing } = await supabase
+                    .from('alert_rules')
+                    .select('id, metric, comparator, threshold, horizon_hours, enabled, created_at')
+                    .match({ device_token: deviceToken, metric, comparator, threshold, horizon_hours: horizonHours })
+                    .single();
+                return res.status(200).json({ rule: existing, duplicate: true });
+            }
+            throw error;
+        }
+
+        return res.status(201).json({ rule: data });
+    } catch (err: any) {
+        console.error('Error in POST /alerts/rules:', err.message);
+        return res.status(500).json({ error: 'Impossibile creare la regola', details: err.message });
+    }
+});
+
+/**
+ * Abilita o disabilita una regola. Il deviceToken è il lasciapassare: senza,
+ * chiunque conoscesse un id potrebbe spegnere le allerte di un altro.
+ */
+alertsRouter.patch('/rules/:id', async (req, res) => {
+    const { deviceToken, enabled } = req.body;
+    if (!deviceToken || typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'Servono deviceToken e enabled (booleano)' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('alert_rules')
+            .update({ enabled })
+            .match({ id: req.params.id, device_token: deviceToken })
+            .select('id, metric, comparator, threshold, horizon_hours, enabled')
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Regola non trovata per questo device' });
+
+        return res.json({ rule: data });
+    } catch (err: any) {
+        console.error('Error in PATCH /alerts/rules:', err.message);
+        return res.status(500).json({ error: 'Impossibile aggiornare la regola', details: err.message });
+    }
+});
+
+/**
+ * Elimina una regola. Il deviceToken è obbligatorio per lo stesso motivo del
+ * PATCH.
+ */
+alertsRouter.delete('/rules/:id', async (req, res) => {
+    const { deviceToken } = req.body;
+    if (!deviceToken) {
+        return res.status(400).json({ error: 'Manca deviceToken' });
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('alert_rules')
+            .delete()
+            .match({ id: req.params.id, device_token: deviceToken })
+            .select('id')
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Regola non trovata per questo device' });
+
+        return res.json({ success: true });
+    } catch (err: any) {
+        console.error('Error in DELETE /alerts/rules:', err.message);
+        return res.status(500).json({ error: 'Impossibile eliminare la regola', details: err.message });
+    }
+});

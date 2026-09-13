@@ -9,7 +9,8 @@
 		"module": "nodenext",
 		"target": "esnext",
 		// @types/node: globals (process, console) e moduli builtin (assert, crypto)
-		"types": ["node"],
+		// @types/jest: globals della suite in __tests__ (describe, it, expect)
+		"types": ["node", "jest"],
 		// For nodejs:
 		// "lib": ["esnext"],
 		// "types": ["node"],

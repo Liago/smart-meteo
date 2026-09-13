@@ -1,7 +1,9 @@
 # Roadmap Testing — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Stato:** Da implementare
+> **Ultimo aggiornamento:** 2026-09-12
+> **Stato:** §2 e §3 completate (Fase 6B). Restano aperte §4 (copertura web
+> aggiuntiva, in parte assorbita dagli E2E) e §5 (Lighthouse).
 > **Scopo:** Piano completo per la copertura test del progetto (backend, frontend web, E2E)
 
 ---
@@ -19,16 +21,27 @@
 
 ## 1. Stato Attuale
 
+### Stato al 2026-09-12 (dopo la Fase 6B)
+
 | Area | Stato | Dettaglio |
 |------|-------|-----------|
-| Frontend Web — Unit test | ✅ 23 test (3 suite) | `api.test.ts`, `components.test.tsx`, `weather-utils.test.ts` |
-| Frontend Web — E2E | ❌ Non implementato | Playwright non configurato |
-| Backend — Unit test | ❌ Non implementato | Nessun framework test configurato |
-| Backend — Integration test | ❌ Non implementato | Nessun test sulle routes |
-| iOS — Unit test | ❌ Non implementato | Vedi `VALUTAZIONI_TECNICHE.md` (Valutazione 4) |
-| Lighthouse audit | ❌ Non eseguito | Da fare post-deploy |
+| Frontend Web — Unit test | ✅ 137 test (7 suite) | api, components, weather-utils, air-quality, narrative, hourly-detail, next-hour |
+| Frontend Web — E2E | ✅ 25 scenari × 2 viewport | `e2e/` con Playwright, API intercettata |
+| Backend — Unit test | ✅ 171 test | utils (7 suite) + connettori (2 suite) |
+| Backend — Integration test | ✅ 58 test | engine (34) e route con supertest (24) |
+| iOS — Unit test | ❌ Non implementato | Vedi `VALUTAZIONI_TECNICHE.md` §4 |
+| Lighthouse audit | ❌ Non eseguito | Da fare post-deploy, in CI |
 
-**Framework attuale web:** Jest 30 + React Testing Library + ts-jest, ambiente jsdom
+**Totale: 229 test backend + 137 web + 25 E2E.**
+
+**Framework:** Jest 30 + ts-jest su entrambi i lati (jsdom sul web, node sul
+backend), React Testing Library, supertest per le route, axios-mock-adapter per
+i connettori, Playwright per gli E2E.
+
+### Stato originale (2026-03-10, per confronto)
+
+Il backend non aveva alcun framework di test, il web aveva 23 test in 3 suite,
+E2E e Lighthouse erano a zero.
 
 ---
 
@@ -36,9 +49,9 @@
 
 > Corrisponde al Punto 11 del PROJECT_STATUS_SUMMARY (Priorità Media)
 
-### 2.1 — Setup Ambiente Test
+### 2.1 — Setup Ambiente Test ✅
 
-- [ ] Aggiungere dipendenze a `backend/package.json`:
+- [x] Aggiungere dipendenze a `backend/package.json`:
   ```json
   "devDependencies": {
     "jest": "^30.0.0",
@@ -48,7 +61,7 @@
     "@types/supertest": "^6.0.0"
   }
   ```
-- [ ] Creare `backend/jest.config.ts`:
+- [x] Creato `backend/jest.config.js` (CommonJS, con `module: commonjs` nel transform perché il codice compila `nodenext`):
   ```typescript
   export default {
     preset: 'ts-jest',
@@ -58,12 +71,15 @@
     moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
   };
   ```
-- [ ] Aggiungere script in `package.json`: `"test": "jest"`, `"test:watch": "jest --watch"`
-- [ ] Creare directory `backend/__tests__/` con sottocartelle: `connectors/`, `engine/`, `utils/`, `routes/`, `fixtures/`
+- [x] Script in `package.json`: `"test": "jest"`, `"test:watch": "jest --watch"`
+- [x] `jest.setup.ts` con variabili Supabase fittizie: `middleware/auth.ts` costruisce il client a livello di modulo e senza env la suite non partiva
+- [x] `"jest"` aggiunto ai `types` del tsconfig, così `npm run typecheck` copre anche i test
+- [x] Directory `backend/__tests__/` con `connectors/`, `engine/`, `utils/`, `routes/`, `fixtures/`
+- [x] I cinque script `scripts/verify*.ts` portati nella suite e la cartella rimossa: due sistemi di test in parallelo erano un doppio posto da ricordare
 
-### 2.2 — Fixture Dati
+### 2.2 — Fixture Dati ✅
 
-- [ ] Creare `backend/__tests__/fixtures/` con file JSON di risposte mock per ogni connector:
+- [x] `backend/__tests__/fixtures/providers.ts`: **costruttori** e non file JSON statici, così un test parte dalla forma completa e sovrascrive il solo campo che gli interessa. I valori sono nelle unità native di ciascuna API. Provider coperti:
   - `tomorrow-response.json` — Risposta realtime + forecast
   - `openmeteo-response.json` — Risposta current + hourly + daily
   - `owm-response.json` — Risposta weather + forecast
@@ -73,13 +89,20 @@
   - `meteostat-response.json` — Risposta point/hourly
   - `wwo-response.json` — Risposta weather
 
-### 2.3 — Unit Test Connector (8 suite)
+### 2.3 — Unit Test Connector ✅ (64 test in 2 suite)
 
-Per ogni connector testare:
-- [ ] **Risposta null con API key mancante** — Il connector deve ritornare `null` o un oggetto con dati vuoti
-- [ ] **Mapping corretto dei campi** — Da risposta API mockata a `UnifiedForecast`
-- [ ] **Gestione errori di rete** — Axios throws → graceful handling
-- [ ] **Normalizzazione condition_code** — Codice API provider → stringa standard
+Per ogni connector verificato:
+- [x] **Risposta null con API key mancante**, senza nemmeno toccare la rete
+- [x] **Mapping corretto dei campi** da risposta mockata a `UnifiedForecast`
+- [x] **Gestione errori di rete** (`networkError`, 500, errore applicativo in un 200)
+- [x] **Normalizzazione condition_code** (inclusi i 30 codici Tomorrow.io)
+- [x] **Unità di misura**, con un test cross-connettore dedicato: `windUnits.test.ts`
+
+> **Tre bug trovati qui**, non leggendo il codice: Open-Meteo, WWO e Meteostat
+> consegnavano il vento corrente in km/h invece che in m/s, gonfiando di 3.6×
+> il numero più in vista dell'app e contraddicendo il proprio dato orario.
+> Corretti. Un test per connettore non li avrebbe fatti emergere: serviva
+> verificare la convenzione su tutte le fonti insieme.
 
 **Priorità di implementazione:**
 
@@ -94,28 +117,28 @@ Per ogni connector testare:
 | 7 | weatherstack | `connectors/weatherstack.test.ts` | Solo current, conversione km/h → m/s |
 | 8 | meteostat | `connectors/meteostat.test.ts` | Dati storici, non forecast |
 
-### 2.4 — Unit Test Smart Engine
+### 2.4 — Unit Test Smart Engine ✅ (34 test)
 
-- [ ] **File:** `backend/__tests__/engine/smartEngine.test.ts`
-- [ ] **Media pesata corretta:** Con 2-3 forecast mock, verificare che il risultato aggregato sia la media pesata esatta
-- [ ] **Condition voting:** Con 3 fonti (2× "rain", 1× "clear"), il risultato deve essere "rain"
-- [ ] **Daily aggregation:** Forecast di più fonti con stessa data vengono mergiati correttamente
-- [ ] **Hourly aggregation:** Time slot normalizzati e aggregati
-- [ ] **Cache hit/miss:** Mock Supabase, verificare che cache valida ritorni risultato cached
-- [ ] **Dew point Magnus:** Verificare calcolo con valori noti (es. temp=20, humidity=50 → dew_point ≈ 9.3)
-- [ ] **degreesToCompass:** Verificare tutti i 16 quadranti (0°→N, 90°→E, 180°→S, 270°→W, ecc.)
-- [ ] **Gestione fonti vuote:** Se tutti i connector falliscono, engine gestisce gracefully
+- [x] **File:** `backend/__tests__/engine/smartEngine.test.ts` — Supabase e i nove connettori sostituiti da mock
+- [x] **Media pesata corretta:** Con 2-3 forecast mock, verificare che il risultato aggregato sia la media pesata esatta
+- [x] **Condition voting:** Con 3 fonti (2× "rain", 1× "clear"), il risultato deve essere "rain"
+- [x] **Daily aggregation:** Forecast di più fonti con stessa data vengono mergiati correttamente
+- [x] **Hourly aggregation:** Time slot normalizzati e aggregati
+- [x] **Cache hit/miss:** Mock Supabase, verificare che cache valida ritorni risultato cached
+- [x] **Dew point Magnus:** Verificare calcolo con valori noti (es. temp=20, humidity=50 → dew_point ≈ 9.3)
+- [x] **degreesToCompass:** Verificare tutti i 16 quadranti (0°→N, 90°→E, 180°→S, 270°→W, ecc.)
+- [x] **Gestione fonti vuote:** Se tutti i connector falliscono, engine gestisce gracefully
 
-### 2.5 — Unit Test Formatter
+### 2.5 — Unit Test Formatter ✅
 
-- [ ] **File:** `backend/__tests__/utils/formatter.test.ts`
-- [ ] **normalizeCondition:** Testare tutti i pattern (rain, drizzle, thunder → "rain"; snow, sleet → "snow"; fog, mist → "fog"; clear, sunny → "clear"; cloud, overcast → "cloudy")
-- [ ] **UnifiedForecast constructor:** Campi opzionali null, campi completi, campi parziali
+- [x] **File:** `backend/__tests__/utils/formatter.test.ts`
+- [x] **normalizeCondition:** Testare tutti i pattern (rain, drizzle, thunder → "rain"; snow, sleet → "snow"; fog, mist → "fog"; clear, sunny → "clear"; cloud, overcast → "cloudy")
+- [x] **UnifiedForecast constructor:** campi opzionali, arrotondamenti, precedenza del `condition_code` esplicito, distinzione fra zero e assente
 
-### 2.6 — Integration Test Routes
+### 2.6 — Integration Test Routes ✅ (24 test)
 
-- [ ] **File:** `backend/__tests__/routes/sources.test.ts`
-- [ ] Usare `supertest` con l'app Express:
+- [x] **File:** `backend/__tests__/routes/api.test.ts` (unico file: copre fonti, forecast, allerte e CORS)
+- [x] `supertest` sull'app Express reale:
   ```typescript
   import request from 'supertest';
   import app from '../../app';
@@ -128,18 +151,22 @@ Per ogni connector testare:
     });
   });
   ```
-- [ ] `GET /api/sources` — Ritorna lista completa (8 fonti)
-- [ ] `PATCH /api/sources/:id` — Toggle stato corretto (richiede auth mock)
-- [ ] `PATCH /api/sources/invalid-id` — Ritorna 404
-- [ ] `GET /api/health` — Ritorna status OK
-- [ ] `GET /api/forecast` — Con coordinate valide, ritorna forecast (mock connector)
-- [ ] `GET /api/forecast` — Senza coordinate, ritorna 400
+- [x] `GET /api/sources` — Ritorna lista completa (9 fonti)
+- [x] `PATCH /api/sources/:id` — Toggle stato corretto (richiede auth mock)
+- [x] `PATCH /api/sources/invalid-id` — Ritorna 404
+- [x] `GET /api/health` — Ritorna status OK
+- [x] `GET /api/forecast` — Con coordinate valide, ritorna forecast (mock connector)
+- [x] `GET /api/forecast` — Senza coordinate, ritorna 400
+- [x] `GET /api/forecast` — Errore dell'engine → 500 **in JSON**, non una pagina HTML
+- [x] `POST /api/alerts/poll` — 200 col segreto giusto, 403 con quello sbagliato o assente
+- [x] `GET /api/alerts/active` — 400 senza coordinate
+- [x] CORS riflette l'origine e ammette PATCH e POST
 
-### 2.7 — Unit Test Moon Phase
+### 2.7 — Unit Test Moon Phase ✅
 
-- [ ] **File:** `backend/__tests__/utils/moon.test.ts`
-- [ ] Verificare calcolo fase lunare per date note (es. luna piena, luna nuova)
-- [ ] Verificare label italiano corretto
+- [x] **File:** `backend/__tests__/utils/moon.test.ts`
+- [x] Tutte e otto le fasi coperte in un anno, nessun salto fra giorni consecutivi, ciclo sinodico che torna al punto di partenza, gennaio e febbraio (il mese spostato indietro di un anno) che non rompono il calcolo
+- [x] Label italiano sempre dentro il vocabolario delle otto fasi
 
 ---
 
@@ -147,11 +174,10 @@ Per ogni connector testare:
 
 > Corrisponde al Gap 3.3 del PROJECT_STATUS_SUMMARY
 
-### 3.1 — Setup Playwright
+### 3.1 — Setup Playwright ✅
 
-- [ ] Installare: `cd frontend-web && npm install -D @playwright/test`
-- [ ] Installare browser: `npx playwright install`
-- [ ] Creare `frontend-web/playwright.config.ts`:
+- [x] Installato `@playwright/test` in `frontend-web`
+- [x] `frontend-web/playwright.config.ts` creato. Differenze rispetto alla bozza sotto: porta **3100**, progetto mobile su **Pixel 7** (il descrittore `iPhone 14` implica WebKit, non installato in tutti gli ambienti), variabili Supabase fittizie nel `webServer` (senza, il middleware di Next risponde 500 prima della pagina) e `CHROMIUM_PATH` opzionale per puntare a un Chromium di sistema:
   ```typescript
   import { defineConfig, devices } from '@playwright/test';
 
@@ -174,51 +200,62 @@ Per ogni connector testare:
     ],
   });
   ```
-- [ ] Creare directory `frontend-web/e2e/`
-- [ ] Aggiungere script: `"test:e2e": "playwright test"`, `"test:e2e:ui": "playwright test --ui"`
+- [x] Directory `frontend-web/e2e/` con `fixtures/api.ts` per l'intercettazione
+- [x] Script `"test:e2e"` e `"test:e2e:ui"`
+- [x] `e2e/` escluso da Jest, che altrimenti tentava di eseguire gli spec Playwright
 
-### 3.2 — Scenari Dashboard
+### 3.2 — Scenari Dashboard ✅ (16 scenari)
 
-- [ ] **File:** `frontend-web/e2e/dashboard.spec.ts`
-- [ ] Pagina carica e mostra skeleton loader durante fetch
-- [ ] Dopo fetch, mostra temperatura corrente con unità
-- [ ] Mostra condizione meteo con icona
-- [ ] FlippableStat card: click fa il flip e mostra dato retro
-- [ ] Sezione previsioni giornaliere visibile (7 giorni)
-- [ ] Espansione giorno mostra hourly drill-down
-- [ ] Timeline oraria renderizzata con curve e icone
-- [ ] SunWindCard mostra arco solare, vento, pressione
+- [x] **File:** `frontend-web/e2e/dashboard.spec.ts`
+- [x] Pagina carica e mostra skeleton loader durante fetch
+- [x] Dopo fetch, mostra temperatura corrente con unità
+- [x] Mostra condizione meteo con icona
+- [x] FlippableStat card: click fa il flip e mostra dato retro
+- [x] Sezione previsioni giornaliere visibile (7 giorni)
+- [x] Espansione giorno mostra hourly drill-down
+- [x] Timeline oraria renderizzata con curve e icone
+- [x] SunWindCard mostra arco solare, vento, pressione **e i dati lunari** (Fase 6A)
+- [x] Indice di consenso: concordi, in disaccordo con intervallo, assente
+- [x] Nowcast al minuto: pioggia in arrivo, ora asciutta, dataset assente
+- [x] Allerte: banner presente e assente
+- [x] Fallback su errore API invece di pagina bianca
+- [x] Senza località salvata: schermata di benvenuto e **nessuna chiamata all'API**
 
-### 3.3 — Scenari Ricerca
+### 3.3 — Scenari Ricerca ✅ (5 scenari)
 
-- [ ] **File:** `frontend-web/e2e/search.spec.ts`
-- [ ] Barra di ricerca accetta input testo
-- [ ] Digitando una città, appaiono risultati autocompletamento
-- [ ] Selezione risultato aggiorna dashboard con nuova località
-- [ ] Pulsante salva preferiti funziona (richiede login)
-- [ ] Pulsante "home" imposta località predefinita
+- [x] **File:** `frontend-web/e2e/search.spec.ts` — Nominatim intercettato con una **RegExp**: il glob `**nominatim**` non aggancia un host
+- [x] Barra di ricerca accetta input testo
+- [x] Digitando una città, appaiono risultati autocompletamento
+- [x] Selezione risultato aggiorna dashboard con nuova località
+- [x] Pulsante salva preferiti funziona (richiede login)
+- [ ] Pulsante "home" imposta località predefinita — richiede una sessione autenticata
 
-### 3.4 — Scenari Sources
+### 3.4 — Scenari Sources ⚠️ fuori portata per ora
 
-- [ ] **File:** `frontend-web/e2e/sources.spec.ts`
-- [ ] Pagina `/sources` mostra tutte le 8 fonti meteo
-- [ ] Ogni fonte mostra nome, peso, stato (attivo/disattivo)
-- [ ] Toggle source cambia stato (richiede auth)
-- [ ] Indicatore di salute (colore) corretto
+La pagina `/sources` è protetta dal middleware di Next, che verifica la sessione
+Supabase **server-side**: `page.route` intercetta solo le richieste del browser,
+quindi la sessione non è falsificabile dagli E2E. Con le variabili Supabase
+fittizie dell'ambiente di test la visita da ospite finisce sempre sul login.
 
-### 3.5 — Scenari Auth
+- [x] `/sources` reindirizza al login senza autenticazione (in `auth.spec.ts`)
+- [ ] Contenuto autenticato (nove fonti, pesi, toggle, stato di salute) —
+      richiede un progetto Supabase di test con un utente dedicato
 
-- [ ] **File:** `frontend-web/e2e/auth.spec.ts`
-- [ ] Pagina login mostra form email/password
-- [ ] Login con credenziali valide → redirect a dashboard
-- [ ] Logout funziona e torna a stato guest
-- [ ] Pagina sources richiede autenticazione
+### 3.5 — Scenari Auth ✅ (4 scenari)
+
+- [x] **File:** `frontend-web/e2e/auth.spec.ts`
+- [x] Pagina login mostra form email/password
+- [ ] Login con credenziali valide → redirect a dashboard — richiede un progetto Supabase di test
+- [ ] Logout funziona e torna a stato guest — come sopra
+- [x] Pagina sources richiede autenticazione
+- [x] La dashboard resta accessibile da ospite
 
 ### 3.6 — CI/CD Integration
 
-- [ ] Aggiungere step Playwright a GitHub Actions (se configurato)
-- [ ] Configurare screenshot su fallimento per debug
-- [ ] Configurare report HTML: `reporter: [['html', { open: 'never' }]]`
+- [ ] Aggiungere step Playwright a GitHub Actions
+- [x] Screenshot su fallimento (`screenshot: 'only-on-failure'`) e trace al primo retry
+- [x] Reporter HTML in CI, `list` in locale
+- [x] `test-results/`, `playwright-report/` e le cache Playwright in `.gitignore`
 
 ---
 
@@ -300,37 +337,67 @@ npx lighthouse https://smart-meteo.vercel.app --output=json --output=html --outp
 
 ## 6. Checklist Riepilogativa
 
-### Backend Test
+### Backend Test ✅
 
-- [ ] Setup Jest + ts-jest in `backend/`
-- [ ] Fixture dati per 8 connector
-- [ ] Unit test: 8 connector suite
-- [ ] Unit test: smartEngine (8+ test case)
-- [ ] Unit test: formatter (normalizeCondition)
-- [ ] Unit test: moon phase
-- [ ] Integration test: routes con supertest (6+ test case)
-- [ ] Script npm test funzionante
+- [x] Setup Jest + ts-jest in `backend/`
+- [x] Fixture dati per i 9 connector (costruttori con override)
+- [x] Unit test connector: 64 test, unità del vento verificate cross-connettore
+- [x] Unit test smartEngine: 34 test
+- [x] Unit test formatter: normalizeCondition, cloud cover, costruttore
+- [x] Unit test moon phase
+- [x] Integration test routes con supertest: 24 test
+- [x] `npm test` funzionante (229 test) e `npm run typecheck` che copre i test
 
-### Frontend E2E
+### Frontend E2E ✅ (tranne gli scenari che richiedono una sessione reale)
 
-- [ ] Setup Playwright
-- [ ] Scenari dashboard (8+ test)
-- [ ] Scenari ricerca (5+ test)
-- [ ] Scenari sources (4+ test)
-- [ ] Scenari auth (4+ test)
+- [x] Setup Playwright con API intercettata
+- [x] Scenari dashboard (16)
+- [x] Scenari ricerca (5)
+- [ ] Scenari sources — bloccati dalla sessione server-side (vedi §3.4)
+- [x] Scenari auth (4, parte da ospite)
 - [ ] CI/CD integration
 
 ### Frontend Unit (espansione)
 
-- [ ] Test 8 componenti non coperti
-- [ ] Test 3 hook (useForecast, useSources, useLocations)
-- [ ] Test utility aggiuntive (UV, AQI, WMO)
+- [x] Test utility aggiuntive: UV, AQI, WMO, precipitazioni, narrativa, qualità dell'aria (137 test in 7 suite)
+- [~] Componenti: `HourlyForecast`, `ForecastDetails`, `SunWindCard`, `SearchBar` e `SourcesIndicator` sono ora esercitati dagli E2E attraverso la dashboard reale. Test unitari dedicati aggiungerebbero poco: la priorità si sposta sui **hook**
+- [ ] Test 3 hook (useForecast, useSources, **useLocations** — quest'ultimo ha la logica vera: localStorage più sincronizzazione Supabase)
 
 ### Performance
 
-- [ ] Lighthouse audit 3 pagine
+- [ ] Lighthouse audit 3 pagine — da fare in CI o su produzione: in sandbox
+      `next build` non completa perché `next/font` non raggiunge Google Fonts
 - [ ] Documentare metriche baseline
 - [ ] Fix per metriche sotto soglia
+
+### Qualità del codice
+
+- [x] Lint web da 5 errori a 2 (`prefer-const`, import non usati, `any`
+      sull'utente, `require` in un file CommonJS)
+- [ ] I 2 errori rimasti sono `setState` dentro `useEffect` in `app/page.tsx` e
+      `SunWindCard.tsx`, entrambi preesistenti: richiedono un piccolo refactor
+      dei componenti
+
+---
+
+---
+
+## 7. Comportamenti fotografati dai test, non approvati
+
+Due cose che la suite ora **documenta** senza correggerle, perché cambiarle non
+è lavoro di una fase di test:
+
+1. **Il daily e l'hourly usano la media semplice.** `avgSimple` ignora
+   `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria, mentre i mm
+   dello stesso oggetto `daily` sono pesati. Contraddice il piano originale
+   ("media pesata per valori numerici") e rende inerte, su quasi tutto ciò che
+   l'utente guarda, l'intero meccanismo dei pesi dinamici.
+   → `GAP_ANALYSIS_2026-09.md` §3.11, Fase 6C.
+2. **`POST /api/alerts/poll` è aperto senza `CRON_SECRET`.** In assenza della
+   variabile il controllo viene saltato: chiunque può innescare il polling e le
+   push. In produzione la variabile va impostata; il codice dovrebbe rifiutare
+   la richiesta quando manca, invece di lasciarla passare.
+   → `GAP_ANALYSIS_2026-09.md` §3.12.
 
 ---
 

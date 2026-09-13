@@ -1,7 +1,7 @@
 # Riepilogo Stato Progetto — Smart Meteo
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-04-02
+> **Ultimo aggiornamento:** 2026-09-12
 > **Scopo:** Riepilogo dello stato di implementazione, gap identificati e migliorie future
 
 ---
@@ -27,9 +27,9 @@
 - 9 connettori meteo: Tomorrow.io, Open-Meteo, OpenWeatherMap, AccuWeather, WeatherAPI, Weatherstack (disabilitato: HTTP), Meteostat, WWO, Apple WeatherKit
 - Smart Engine V1 con aggregazione pesata (pesi da 0.8 a 1.2) — Weatherstack escluso (peso 0, HTTP non sicuro)
 - Sistema allerte meteo completo: 4 fonti (WeatherKit, WeatherAPI, OWM, MeteoAlarm), push APNs, polling 15min, deduplicazione multi-source, cooldown 6h anti-spam
-- Migrazioni DB fino a 019 (push notifications, alert enhancement, delivery log)
-- API Express: `/api/forecast`, `/api/sources`, `/api/health`
-- Database Supabase con 12 migration, RLS, trigger, funzioni utility
+- Migrazioni DB fino a **021** (push notifications, alert enhancement, delivery log, localizzazione allerte, dedup per device) — prossimo numero libero: 024
+- API Express: `/api/forecast`, `/api/sources`, `/api/accuracy`, `/api/health`, `/api/alerts/*`
+- Database Supabase con **23 migration**, RLS, trigger, funzioni utility
 - Deploy su Netlify Functions (serverless)
 
 ### Fase 2 — Frontend Web
@@ -115,6 +115,53 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
+### Fase 6E — Nicchie e rifiniture (2026-09-13, 4 punti su 9)
+- **Neve multi-fonte da WeatherKit**: `snowfallAmount` e `snowfallIntensity`, che Apple dà in **millimetri di manto** — una lunghezza, non l'equivalente in acqua. Senza la divisione per dieci, 40 mm sarebbero comparsi come «40 cm». Chiude il limite dichiarato al punto 15, dove i centimetri venivano dai soli modelli Open-Meteo
+- **Le due funzioni di fetch WeatherKit unificate**: erano due blocchi copiati, già divergenti sull'arrotondamento del vento, e un campo aggiunto a uno solo sarebbe comparso o sparito a seconda di quale l'engine avesse chiamato
+- **Pannello fonti su iOS** con l'indice di consenso e i pollini: chiude l'asimmetria dichiarata dalla Fase 6A, dove iOS non mostrava nemmeno `sources_used`
+- **Banda di incertezza sul grafico orario iOS**: chiude l'asimmetria dichiarata dalla Fase 6C. Il modello Swift non aveva nemmeno i campi
+- **Orto e giardino**: umidità del suolo, evapotraspirazione FAO e temperatura dello strato radicale da Open-Meteo rispondono a «devo innaffiare stasera?» e alla finestra di semina. **La pioggia ha la precedenza su tutto**: con almeno 5 mm attesi il consiglio è «non innaffiare» anche su terreno molto secco — ed è proprio il caso in cui si sbaglierebbe da soli
+- **Il consiglio mostra sempre il proprio motivo** e il numero grezzo dell'umidità: le soglie dipendono dal tipo di terreno, che l'API non dichiara, quindi chi conosce il proprio suolo deve poter correggere il giudizio
+- ⏳ Restano: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto, test iOS e audit Lighthouse (quest'ultimo **bloccato**: `next build` non scarica i font Google, host negato dalla rete dell'ambiente)
+
+### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
+- **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
+- **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
+- **Quota neve, manto e gelate**: `freezing_level_height`, `snowfall`, `snow_depth` e `soil_temperature_0cm` dalla chiamata Open-Meteo che già facevamo. La quota neve è lo zero termico meno 300 m (il fiocco scende oltre l'isoterma raffreddando l'aria) e viene mostrata **accanto alla quota della località**, che Open-Meteo dichiara: «quota neve 900 m, sei a 1800 m» è una risposta, «zero termico a 1500 m» un dato da bollettino
+- **Gelate giudicate sul suolo**, non a due metri: la brina si forma sulla superficie, e il blocco dichiara quale delle due misure ha usato perché «minima al suolo -1°» e «minima -1°» sono due notti diverse
+- **Il riquadro neve compare solo quando c'è qualcosa da dire**: senza manto, neve prevista o rischio gelate il backend omette il blocco, invece di lasciare un riquadro vuoto per otto mesi l'anno
+- **Indice temporali 0-100** da CAPE, lifted index e inibizione convettiva (`backend/utils/storm.ts`), più la probabilità di tuono di WorldWeatherOnline che era già nella risposta e nessuno leggeva. Nuova metrica «Temporali» nel registry orario di web e iOS: il rischio si deduceva dal solo `condition_code`, che è una fotografia e non una misura
+- **La CIN smorza ma non azzera**: il coperchio si rompe (riscaldamento pomeridiano, orografia, un fronte), e dichiarare «nessun rischio» su 3000 J/kg inibiti è il tipo di previsione che fa male a chi va in montagna
+- **Allerte su soglie personali** (backend + iOS): sette metriche — minima, massima, raffiche, pioggia, neve, rischio temporali, AQI europeo — con soglia e orizzonte scelti dall'utente. Migrazione **024**, quattro endpoint sotto `/api/alerts/rules`, valutazione agganciata al poller a 15 minuti già in produzione, schermata «Avvisi personali» su iOS
+- **Le soglie si valutano sulla previsione aggregata**, la stessa che l'app mostra: valutarle su una fonte grezza darebbe notifiche che annunciano 12 mm mentre lo schermo ne mostra 3
+- **La regola è legata al device, non alla subscription**: `/alerts/subscribe` riscrive quella riga a ogni spostamento del telefono, e con una FK CASCADE le soglie sparirebbero con essa
+- ⏳ **Resta il radar (§5.5), bloccato in sviluppo**: la policy di rete dell'ambiente nega RainViewer, le tile OWM e OpenStreetMap, quindi il contratto dell'API non è verificabile. Motivazione estesa in `GAP_ANALYSIS_2026-09.md` → «Punto 17 — radar: bloccato, non rinviato»
+
+### Fase 6C — Qualità della previsione (2026-09-12, completata)
+- **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
+- **Modelli Open-Meteo come fonti indipendenti**: ICON-D2, ICON-EU, ECMWF IFS, Météo-France e GFS al posto della miscela `best_match`, che è una loro combinazione — affiancarli l'avrebbe contata due volte. Migrazione 022, `OPENMETEO_MODELS=off` per tornare indietro
+- **Accuratezza misurata sull'osservato**: `source_accuracy` conteneva la deviazione dal consenso, quindi penalizzava la fonte che aveva ragione da sola, e la media cumulativa senza finestra congelava i pesi. Ora `services/observations.ts` porta la verità osservata (ERA5, Meteostat dove non arriva), ogni confronto è un campione in `accuracy_samples` (migrazione 023) e il MAE si ricalcola sui 30 giorni
+- **`GET /api/accuracy`** pubblica, **`POST /api/accuracy/recompute`** protetta, scheduled function giornaliera
+- **Meteostat fuori dalle previsioni** (peso 0) e dentro la verifica: chiude `VALUTAZIONI_TECNICHE` §3, aperta da marzo
+- **`/api/alerts/poll` chiuso** senza `CRON_SECRET`: 503 invece di lasciar passare
+- **Banda di incertezza** dai membri di ICON-EU-EPS: percentili 10/90 sugli slot orari e banda disegnata sul grafico web. L'indice di consenso della 6A misura l'accordo fra modelli deterministici, che sovrastima la certezza; un ensemble misura l'incertezza come la intendono i meteorologi
+- Test backend da 229 a **326**
+
+### Fase 6B — Rete di test (2026-09-12)
+- **Backend da 0 a 229 test** in 11 suite: Jest + ts-jest, fixture dei nove provider come costruttori, axios-mock-adapter sui connettori, Supabase e connettori mockati sull'engine, supertest sulle route. I cinque script `verify*.ts` portati nella suite e `scripts/` rimossa
+- **25 scenari E2E** Playwright su due viewport, con l'API backend sempre intercettata
+- **Tre bug di unità sul vento corretti**: Open-Meteo, WWO e Meteostat consegnavano `wind_speed` in km/h invece di m/s, gonfiando di 3.6× il numero più in vista e contraddicendo il proprio dato orario. Trovati da un test cross-connettore, non leggendo il codice
+- `SourcesIndicator` mostrava l'id grezzo di quattro fonti su nove: corretto
+- Lint web da 5 errori a 2 (i rimasti sono `setState` in `useEffect`, preesistenti)
+
+### Fase 6A — Dati già pagati, portati all'utente (2026-09-12)
+- **Nowcast al minuto** (web + iOS): `forecastNextHour` era propagato dall'engine dalla Fase 5E e **nessun client lo leggeva**. Nuovi `NextHourPrecipitation.tsx` e `NextHourPrecipitationView.swift`, con titolo dedotto dai minuti e non dal `summary` di WeatherKit
+- **Indice di consenso** (`backend/utils/consensus.ts`): deviazione standard pesata fra le fonti su temperatura e probabilità di pioggia, contratta verso 50 con `n/(n+2)`; esposta come `confidence` e scritta in `smart_forecasts.confidence_score`, che era `null` dalla migrazione 005. Mostrata in `SourcesIndicator` (solo web: iOS non ha un pannello fonti)
+- **`precipitation_intensity`** aggregato ed esposto su `current`: i mm/h in corso erano estratti da cinque connettori e mai aggregati
+- **Dati lunari sul web**: `moonrise`, `moonset`, `moon_illumination` erano sul filo e mostrati solo da iOS
+- Schema di cache portato a 4; `npm test` del backend include `verifyConsensus` (13 verifiche); suite web a **137 test** in 7 suite
+- Documentazione allineata al codice (`CLAUDE.md`, `AGENTS.md`, `.env.example`, `PHASE_1`, `PHASE_3`, `AUDIT`)
+
 ### Fase 5E — Hourly Arricchiti e ForecastNextHour
 - `HourlyForecast` esteso con `humidity`, `wind_speed`, `uv_index` — estratti da 7 connettori e aggregati nello Smart Engine
 - `ForecastNextHour` (previsione precipitazione minuto-per-minuto da WeatherKit) — nuovi tipi, parser, propagazione nel risultato finale
@@ -148,13 +195,17 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 23 test (3 suite) | Espansione in TODO_TESTING |
-| Frontend web E2E (Playwright) | ❌ Non implementato | → TODO_TESTING §3 |
-| Backend unit/integration test | ❌ Non implementato | → TODO_TESTING §2 |
+| Frontend web unit test | ✅ 196 test (11 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 37 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **504 test in 23 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
-| Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5 |
+| Lighthouse performance audit | ❌ Non eseguibile in sviluppo | `next build` fallisce: `next/font` non raggiunge Google Fonts. Da fare in CI |
 
-> **→ Pianificato in `TODO_TESTING.md` e `VALUTAZIONI_TECNICHE.md`**
+> **La Fase 6B ha prodotto anche cinque ritrovamenti**: tre bug di unità sul vento
+> (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
+> che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
+> (entrambi documentati da test, risolti nella 6C).
+> **Prossimo blocco: Fase 6E punti 22-23 e 25-27** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -174,6 +225,29 @@
 
 ---
 
+### 3.6 Gap verificati sul codice il 2026-09-12
+
+Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`):
+
+| # | Gap | Gravità | Stato |
+|---|-----|:-------:|-------|
+| 1 | `forecastNextHour` servito dal backend e ignorato dai client | 🔴 | ✅ Risolto in Fase 6A |
+| 2 | Dati lunari assenti sul web | 🟡 | ✅ Risolto in Fase 6A |
+| 3 | `confidence_score` mai calcolato dalla migrazione 005 | 🟠 | ✅ Risolto in Fase 6A |
+| 4 | `precipitation_intensity` estratto e mai aggregato | 🟢 | ✅ Risolto in Fase 6A |
+| 5 | Meteostat nell'aggregazione: osservazioni passate mescolate a previsioni | 🔴 | ✅ Risolto in 6C |
+| 6 | `source_accuracy` misura la conformità al consenso, non l'errore vs osservato | 🔴 | ✅ Risolto in 6C (resta il nowcast vs +24h) |
+| 7 | AQI da una sola fonte, senza previsione né fallback | 🟠 | ✅ Risolto in 6D |
+| 8 | `EMAIL_NOTIFICATIONS_PLAN.md` interamente non implementato | 🔴 | ⏳ Decisione pendente (Web Push come alternativa) |
+| 9 | Nessun Jest sul backend, nessun E2E, nessun test iOS, nessun Lighthouse | 🔴 | ✅ 6B (restano iOS e Lighthouse) |
+| 13 | Vento in km/h da tre connettori su otto | 🔴 | ✅ Risolto in 6B |
+| 14 | Daily e hourly ignorano `SOURCE_WEIGHTS` | 🔴 | ✅ Risolto in 6C |
+| 15 | `/api/alerts/poll` aperto senza `CRON_SECRET` | 🟠 | ✅ Risolto in 6C |
+| 16 | `raw_forecasts` archivia solo i valori correnti: si misura il nowcast, non il +24h | 🟠 | ⏳ richiede una modifica di schema |
+| 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Bloccato: host delle tile irraggiungibili in sviluppo |
+| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily windMax) | 🟢 | ◑ La neve è risolta in 6E; il resto resta non estratto finché non c'è una vista che lo consuma |
+| 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |
+
 ## 4. Migliorie Future
 
 ### Alta Priorita — ✅ TUTTI COMPLETATI
@@ -191,7 +265,7 @@
 | # | Miglioramento | Stato | Effort | Documento |
 |---|---------------|:-----:|--------|-----------|
 | 6 | **Test E2E con Playwright** per frontend web | ⏳ | Medio | `TODO_TESTING.md` §3 |
-| 7 | **Algoritmo V2 AI-driven** per pesi dinamici | ✅ | Alto | Fase 5D.1 |
+| 7 | **Algoritmo V2 AI-driven** per pesi dinamici | ✅ | Alto | Fase 5D.1, **corretto in 6C**: misurava la conformità al consenso, non l'accuratezza |
 | 8 | **Widget iOS** per Home Screen | ✅ | Medio | Fase 5D.2 |
 | 9 | **AccuWeather: hourly forecast** (12h) | ✅ | Basso | Fase 5A.3 |
 | 10 | **Dew point diretto da API** (3 fonti + fallback Magnus) | ✅ | Basso | Fase 5A.4 |
@@ -208,7 +282,7 @@
 | 16 | Moonrise/moonset da WWO | ✅ | Fase 5A.5 |
 | 17 | Apple WeatherKit integration | ✅ | Fase 5D.5 — live con peso 1.2 |
 | 18 | Lighthouse performance audit | ⏳ | `VALUTAZIONI_TECNICHE.md` §2 |
-| 19 | Valutare sostituzione/declassamento Meteostat | ⏳ | `VALUTAZIONI_TECNICHE.md` §3 |
+| 19 | Valutare sostituzione/declassamento Meteostat | ✅ | Fase 6C — opzione B, verità osservata |
 | 20 | iOS: test unitari per ViewModel e Service | ⏳ | `VALUTAZIONI_TECNICHE.md` §4 |
 | 21 | Haptic feedback iOS | ✅ | Fase 5D.6 |
 | 22 | Notifiche push per allerte meteo | ✅ | Fase 5D.7 |
@@ -219,6 +293,7 @@
 
 | Documento | Contenuto |
 |-----------|-----------|
+| **`GAP_ANALYSIS_2026-09.md`** | **Verifica di completezza sul codice, gap aperti, doc drift e roadmap Fase 6** |
 | `IMPLEMENTATION_PLAN.md` | Piano architetturale generale e roadmap |
 | `PHASE_1.md` | Checklist Fase 1 (Backend Core) — completata |
 | `PHASE_2.md` | Checklist Fase 2 (Frontend Web) — ~95% |

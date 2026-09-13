@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- file di configurazione CommonJS */
 const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({
@@ -12,6 +13,10 @@ const config = {
 	setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
 	testEnvironment: 'jest-environment-jsdom',
+
+	// Gli spec in e2e/ sono di Playwright: importano @playwright/test e non
+	// vanno eseguiti da Jest.
+	testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/e2e/'],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

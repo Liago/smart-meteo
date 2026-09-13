@@ -7,6 +7,7 @@ export interface DailyForecast {
 	condition_text: string | null;
 	uv_index_max?: number | null;
 	precipitation_mm?: number | null; // mm totali del giorno
+	snowfall_cm?: number | null;      // cm di neve fresca del giorno
 }
 
 export interface HourlyForecast {
@@ -22,6 +23,39 @@ export interface HourlyForecast {
 	wind_gust?: number | null;       // m/s
 	uv_index?: number | null;
 	precipitation_mm?: number | null; // mm accumulati nell'ora
+	/**
+	 * Banda di incertezza della temperatura dai membri dell'ensemble
+	 * (percentili 10 e 90). Presente solo dove il modello di ensemble copre
+	 * l'orizzonte: si assottiglia verso le ore vicine e si allarga in avanti.
+	 */
+	temp_p10?: number | null;
+	temp_p90?: number | null;
+	/** Neve fresca dell'ora, in cm (non equivalente in acqua). */
+	snowfall_cm?: number | null;
+	/** Manto nevoso al suolo, in cm. */
+	snow_depth_cm?: number | null;
+	/** Quota dello zero termico, in metri. */
+	freezing_level?: number | null;
+	/** Temperatura della superficie del suolo, °C: è lì che si forma la brina. */
+	soil_temperature?: number | null;
+	/** Temperatura dello strato 0-7 cm, °C: è lì che germinano i semi. */
+	soil_temperature_root?: number | null;
+	/** Contenuto d'acqua volumetrico dello strato 0-7 cm, m³/m³. */
+	soil_moisture?: number | null;
+	/** Evapotraspirazione di riferimento FAO dell'ora, mm. */
+	evapotranspiration?: number | null;
+	/** Deficit di pressione di vapore, kPa: quanta "sete" ha l'aria. */
+	vapour_pressure_deficit?: number | null;
+	/** Energia potenziale convettiva disponibile, J/kg. */
+	cape?: number | null;
+	/** Lifted index, °C: negativo = instabile. */
+	lifted_index?: number | null;
+	/** Inibizione convettiva, J/kg: il coperchio sull'energia disponibile. */
+	convective_inhibition?: number | null;
+	/** Indice 0-100 di rischio temporali, derivato dai tre qui sopra. */
+	storm_index?: number | null;
+	/** Probabilità di tuono in %, da WorldWeatherOnline. */
+	thunder_prob?: number | null;
 }
 
 /**
@@ -56,6 +90,26 @@ export interface AirQualityDetail {
 	o3: number | null;
 	co: number | null;
 	so2: number | null;
+	/**
+	 * Indice europeo (0-100+), da Open-Meteo Air Quality. Scala diversa da
+	 * quella EPA 1-6: le due convivono perché dicono cose diverse e i lettori
+	 * italiani riconoscono la seconda.
+	 */
+	european_aqi?: number | null;
+}
+
+/** Livello pollinico, secondo le soglie della specie. */
+export type PollenLevel = 'none' | 'low' | 'moderate' | 'high' | 'very_high';
+
+export interface PollenReading {
+	species: string;
+	label: string;
+	/** Granuli/m³ nell'ora corrente. */
+	value: number | null;
+	/** Massimo previsto in giornata. */
+	daily_max: number | null;
+	level: PollenLevel;
+	daily_level: PollenLevel;
 }
 
 export interface UnifiedForecastData {
@@ -87,6 +141,11 @@ export interface UnifiedForecastData {
 	 * restituiscono l'ora locale (open-meteo, weatherapi, wwo).
 	 */
 	utc_offset_seconds?: number | null;
+	/**
+	 * Quota del punto di griglia in metri, quando la fonte la dichiara
+	 * (Open-Meteo). Serve a confrontare la quota neve con quella della località.
+	 */
+	elevation?: number | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

@@ -704,6 +704,7 @@ struct AirQualityBalloon: View {
             humidity: 60,
             windSpeed: 12,
             precipitationProb: 0.1,
+            precipitationIntensity: 0,
             condition: "clear",
             conditionCode: "0",
             conditionText: "Sunny",
@@ -715,7 +716,7 @@ struct AirQualityBalloon: View {
             uvIndex: 6,
             visibility: 10.5,
             cloudCover: 25,
-            airQuality: AirQualityDetail(aqiUsEpa: 2, pm25: 12.3, pm10: 20.1, no2: 15.0, o3: 40.0, co: 200.0, so2: 5.0)
+            airQuality: AirQualityDetail(aqiUsEpa: 2, pm25: 12.3, pm10: 20.1, no2: 15.0, o3: 40.0, co: 200.0, so2: 5.0, europeanAqi: 42)
         ), today: DailyForecast(
             date: "2026-03-02",
             tempMax: 30,
@@ -724,7 +725,8 @@ struct AirQualityBalloon: View {
             conditionCode: "0",
             conditionText: "Clear",
             uvIndexMax: 8,
-            precipitationMm: 0
+            precipitationMm: 0,
+            snowfallCm: 0
         ), astronomy: AstronomyData(
             sunrise: "2026-03-02T06:45:00Z",
             sunset: "2026-03-02T18:10:00Z",

@@ -22,7 +22,7 @@
 | `windDirection` | ✅ | ✅ | |
 | `windGust` | ✅ | ✅ | Convertito da km/h a m/s |
 | `precipitationChance` → `precipitation_prob` | ✅ | ✅ | Convertito da 0-1 a 0-100 |
-| `precipitationIntensity` | ✅ | ❌ | Estratto ma non aggregato (non presente in AggregationData) |
+| `precipitationIntensity` | ✅ | ✅ | Aggregato su `current` dalla Fase 6A (gate sulla frazione bagnata) |
 | `pressure` | ✅ | ✅ | |
 | `temperatureDewPoint` → `dew_point` | ✅ | ✅ | |
 | `uvIndex` → `uv_index` | ✅ | ✅ | |
@@ -37,10 +37,10 @@
 | `temperatureMax/Min` | ✅ | ✅ | |
 | `precipitationChance` | ✅ | ✅ | |
 | `conditionCode` | ✅ | ✅ | |
-| `maxUvIndex` → `uv_index_max` | ✅ | ❌ | **Estratto ma NON incluso nell'output daily aggregato** |
+| `maxUvIndex` → `uv_index_max` | ✅ | ✅ | Incluso nel daily aggregato (commit `1e84908`) |
 | `sunrise` / `sunset` | ✅ | ✅ | Via astronomy |
 | `moonPhase` | ✅ | ✅ | Via astronomy |
-| `precipitationAmount` | ❌ | — | Non estratto |
+| `precipitationAmount` | ✅ | ✅ | Estratto come `precipitation_mm` daily |
 | `snowfallAmount` | ❌ | — | Non estratto |
 | `windSpeedMax` | ❌ | — | Non estratto |
 | `windGustSpeedMax` | ❌ | — | Non estratto |
@@ -57,7 +57,8 @@
 | `visibility` | ❌ | — | Disponibile ma non estratto |
 | `uvIndex` | ✅ | ✅ | Aggregato hourly |
 | `windSpeed` | ✅ | ✅ | Convertito da km/h a m/s, aggregato hourly |
-| `windDirection` | ❌ | — | Disponibile ma non estratto |
+| `windDirection` | ✅ | ✅ | Estratto e aggregato con media circolare |
+| `precipitationAmount` | ✅ | ✅ | Come `precipitation_mm` orario |
 | `cloudCover` | ❌ | — | Disponibile ma non estratto |
 | `snowfallIntensity` | ❌ | — | Disponibile ma non estratto |
 
@@ -130,7 +131,7 @@ Forecast request → Smart Engine → WeatherKit API (con weatherAlerts)
 
 ---
 
-### 2.2 — `forecastNextHour` ✅ IMPLEMENTATO
+### 2.2 — `forecastNextHour` ✅ IMPLEMENTATO (backend 2026-04-02, client 2026-09-12)
 
 **Cosa fornisce:** Previsione precipitazioni minuto-per-minuto per la prossima ora (disponibile solo in alcuni paesi, inclusa l'Italia).
 
@@ -143,6 +144,13 @@ Forecast request → Smart Engine → WeatherKit API (con weatherAlerts)
 3. ✅ **Parser** `parseForecastNextHour()` in `backend/connectors/weatherkit.ts` — estrae summary + minutes, normalizza precipitationChance da 0-1 a 0-100
 4. ✅ **`UnifiedForecast`** esteso con campo `forecastNextHour` in `backend/utils/formatter.ts`
 5. ✅ **Smart Engine** propaga `forecastNextHour` dalla fonte WeatherKit al risultato finale (non aggregabile, singola fonte)
+6. ✅ **Client** (Fase 6A, 2026-09-12): `NextHourPrecipitation.tsx` e
+   `NextHourPrecipitationView.swift`. Fino a quel momento il dataset arrivava
+   nella risposta API ma **nessun client lo dichiarava nei propri tipi**, quindi
+   la feature era invisibile all'utente pur essendo pagata.
+   Il titolo è dedotto dai minuti e non dal campo `summary`: i due possono
+   discordare e i minuti sono ciò che viene disegnato. Una pausa deve durare
+   almeno 3 minuti prima di annunciare che la pioggia è finita.
 
 ---
 
@@ -175,8 +183,14 @@ Forecast request → Smart Engine → WeatherKit API (con weatherAlerts)
 | 2 | **`uv_index_max`** nell'aggregazione daily | Basso | Basso | ✅ Completato (commit `1e84908`) |
 | 3 | **`forecastNextHour`** → Previsione precipitazione minuto-per-minuto | Medio | Medio | ✅ Completato |
 | 4 | **Hourly arricchiti** (humidity, wind, UV per ora) | Medio | Medio | ✅ Completato |
-| 5 | **Daily arricchiti** (precipitationAmount, snowfall, windMax) | Basso | Basso | Da fare |
+| 5 | **Daily arricchiti** (precipitationAmount, snowfall, windMax) | Basso | Basso | ⚠️ Parziale: `precipitationAmount` estratto; restano `snowfallAmount`, `windSpeedMax`, `windGustSpeedMax` |
+| 6 | **Hourly residui** (pressure, visibility, cloudCover, snowfallIntensity) | Basso | Basso | Da fare |
+| 7 | **UI del nowcast minutale** su web e iOS | Alto | Basso | ✅ Completato (Fase 6A) |
 
 ---
 
-> **Prossimo passo:** Punto 5 (daily arricchiti) rimane l'unico gap aperto — bassa priorità.
+> **Aggiornamento 2026-09-12:** la tabella sopra era in parte obsoleta —
+> `precipitationAmount` e `windDirection` risultavano "non estratti" ma sono in
+> codice. Restano aperti i punti 5 (parziale) e 6, entrambi a bassa priorità:
+> la neve di WeatherKit avrebbe senso insieme alla quota neve di Open-Meteo
+> (`GAP_ANALYSIS_2026-09.md` §5.2), non da sola.

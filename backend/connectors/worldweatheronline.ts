@@ -63,6 +63,11 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 							wind_gust: h.WindGustKmph != null ? Number((Number(h.WindGustKmph) / 3.6).toFixed(2)) : null,
 							uv_index: h.uvIndex != null ? Number(h.uvIndex) : null,
 							precipitation_mm: h.precipMM != null ? Number(h.precipMM) : null,
+							// L'unica fonte che dà una probabilità di tuono: gli
+							// indici convettivi di Open-Meteo dicono quanta
+							// energia c'è, questa quanto è probabile che si
+							// scarichi.
+							thunder_prob: h.chanceofthunder != null ? Number(h.chanceofthunder) : null,
 						};
 					});
 					hourly.push(...dayHourly);
@@ -116,7 +121,8 @@ export async function fetchFromWWO(lat: number, lon: number): Promise<UnifiedFor
 			temp: Number(current.temp_C),
 			feels_like: Number(current.FeelsLikeC),
 			humidity: Number(current.humidity),
-			wind_speed: Number(current.windspeedKmph),
+			// Il nome del campo dice l'unità: km/h → m/s, come nell'hourly.
+			wind_speed: current.windspeedKmph != null ? Number((Number(current.windspeedKmph) / 3.6).toFixed(2)) : null,
 			wind_direction: Number(current.winddirDegree),
 			wind_gust: current.WindGustKmph ? Number(current.WindGustKmph) / 3.6 : null,
 			condition_text: weatherDesc,

@@ -38,6 +38,22 @@ export interface WeightedValue {
  * @returns i mm aggregati arrotondati a un decimale, o null se non ci sono dati.
  */
 export function aggregatePrecipitationMm(items: WeightedValue[]): number | null {
+	return aggregateWithWetGate(items, WET_THRESHOLD_MM);
+}
+
+/**
+ * La regola sopra, con una soglia di "bagnato" configurabile.
+ *
+ * Serve perché la neve si misura in centimetri, non in millimetri: 0.1 cm di
+ * neve fresca non è la stessa quantità di 0.1 mm di pioggia, e usare la stessa
+ * soglia per entrambe classificherebbe come nevicata un valore che il modello
+ * ha di fatto arrotondato a zero. Il gate sulla frazione bagnata invece è
+ * identico, ed è la parte che non conviene scrivere due volte.
+ */
+export function aggregateWithWetGate(
+	items: WeightedValue[],
+	wetThreshold: number
+): number | null {
 	if (!items || items.length === 0) return null;
 
 	// Ignora pesi non positivi o non finiti: renderebbero la media insensata.
@@ -52,10 +68,10 @@ export function aggregatePrecipitationMm(items: WeightedValue[]): number | null 
 
 	for (const { val, weight } of valid) {
 		// Alcune fonti restituiscono valori negativi minimi per arrotondamento.
-		const mm = Math.max(0, val);
+		const amount = Math.max(0, val);
 		totalWeight += weight;
-		weightedSum += mm * weight;
-		if (mm >= WET_THRESHOLD_MM) wetWeight += weight;
+		weightedSum += amount * weight;
+		if (amount >= wetThreshold) wetWeight += weight;
 	}
 
 	if (totalWeight === 0) return null;

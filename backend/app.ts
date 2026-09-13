@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { getSmartForecast } from './engine/smartEngine';
 import { initializeAPNs } from './services/apns';
 import sourcesRouter from './routes/sources';
+import accuracyRouter from './routes/accuracy';
 import { alertsRouter } from './routes/alerts';
 import { requireAuth } from './middleware/auth';
 
@@ -65,6 +66,8 @@ app.get('/', (req: Request, res: Response) => {
 			'GET /api/forecast?lat=&lon=',
 			'GET /api/sources',
 			'PATCH /api/sources/:id',
+			'GET /api/accuracy',
+			'POST /api/accuracy/recompute',
 			'POST /api/alerts/subscribe',
 			'POST /api/alerts/unsubscribe',
 			'GET /api/alerts/active?lat=&lon=',
@@ -78,6 +81,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/sources', sourcesRouter);
+app.use('/api/accuracy', accuracyRouter);
 app.use('/api/alerts', alertsRouter);
 
 app.get('/api/forecast', async (req: Request, res: Response) => {

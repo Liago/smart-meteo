@@ -13,7 +13,10 @@ Questo documento traccia i progressi dettagliati della Fase 1.
 ### Sviluppo Backend (Node.js)
 - [x] Setup progetto Node.js in `/backend` (o `/functions` per Netlify)
 - [x] Implementare Connector: **Tomorrow.io**
-- [x] Implementare Connector: **Meteomatics**
+- [ ] ~~Implementare Connector: **Meteomatics**~~ — **mai realizzato.** La spunta era
+  errata: `backend/connectors/` non contiene un connettore Meteomatics. Il ruolo di
+  fonte europea ad alta risoluzione è stato preso da **Open-Meteo** (gratuita, senza
+  chiave), che non figurava nel piano iniziale. Verificato il 2026-09-12.
 - [x] Implementare Connector: **OpenWeatherMap**
 - [x] Implementare Connector: **WeatherAPI**
 - [x] Implementare Connector: **AccuWeather**
@@ -25,8 +28,14 @@ Questo documento traccia i progressi dettagliati della Fase 1.
 - [x] Definire Schema Supabase `raw_forecasts`
 - [x] Popolare DB con API Keys (encrypt o env vars)
 
-## Problemi Incontrati & Soluzioni
-*(Aggiungi qui eventuali blocchi o bug risolti durante lo sviluppo)*
+### Connettori effettivamente presenti (verifica 2026-09-12)
 
-- **Problema**: [Descrizione del problema]
-  **Soluzione**: [Come è stato risolto]
+Tomorrow.io, Open-Meteo, OpenWeatherMap, WeatherAPI, AccuWeather, World Weather
+Online, Meteostat, Weatherstack (disabilitato, peso 0) e Apple WeatherKit, più
+MeteoAlarm per le sole allerte: **nove fonti previsionali**, non cinque.
+
+## Problemi Incontrati & Soluzioni
+
+- **Problema**: la checklist dichiarava implementato il connettore Meteomatics.
+  **Soluzione**: corretta la spunta. La fonte non è mai stata integrata; il piano
+  è stato cambiato in favore di Open-Meteo senza aggiornare il documento.

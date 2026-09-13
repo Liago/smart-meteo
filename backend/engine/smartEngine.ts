@@ -1,5 +1,7 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
-import { fetchFromOpenMeteo } from '../connectors/openmeteo';
+import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS } from '../connectors/openmeteo';
+import { fetchTemperatureBand } from '../connectors/openmeteoEnsemble';
+import { fetchAirQuality } from '../connectors/openmeteoAirQuality';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -11,11 +13,16 @@ import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
+import { aggregateSnowfallCm, buildSnowOutlook } from '../utils/snow';
+import { stormIndex } from '../utils/storm';
+import { buildGardenOutlook, gardenHoursFrom } from '../utils/garden';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
+import { computeConsensus } from '../utils/consensus';
+import { weightedMean, weightedVote } from '../utils/aggregate';
 import { WeatherConditionWeights, AirQualityDetail, WeatherAlert } from '../types';
 import { sources } from '../routes/sources';
 import { supabase } from '../services/supabase';
-import { getAccuracyMap, logAccuracyDeviations } from '../services/accuracy';
+import { getAccuracyMap } from '../services/accuracy';
 import { aggregateAlerts } from '../utils/alertGeo';
 
 /**
@@ -31,8 +38,28 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   1 → forma originale
  *   2 → aggiunge precipitation_mm su hourly e daily
  *   3 → aggiunge feels_like, wind_direction e wind_gust su hourly
+ *   4 → aggiunge precipitation_intensity e confidence su current
+ *   5 → daily e hourly passano dalla media semplice a quella pesata: i valori
+ *       cambiano, quindi le righe in cache vanno rigenerate
+ *   6 → i modelli Open-Meteo entrano come fonti distinte: sources_used cambia
+ *       forma e i valori aggregati con essa
+ *   7 → banda di incertezza (temp_p10/temp_p90) sugli slot orari
+ *   8 → european_aqi su air_quality e blocco pollen
+ *   9 → blocco snow (quota neve, manto, gelate), snowfall_cm su daily/hourly
+ *       e soil_temperature sugli slot orari
+ *  10 → indici convettivi (cape, lifted_index, storm_index, thunder_prob)
+ *       sugli slot orari
+ *  11 → utc_offset_seconds sulla risposta: gli slot orari sono in ora locale
+ *       della località, e senza l'offset nessun consumatore può sapere quale
+ *       di essi è "adesso"
+ *  12 → blocco garden e campi agronomici (umidità e temperatura del suolo,
+ *       evapotraspirazione, deficit di pressione di vapore) sugli slot orari
+ *
+ * Esportata perché i test la usino invece di ricopiarne il numero: una copia
+ * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
+ * modifica non c'entra niente.
  */
-const FORECAST_SCHEMA_VERSION = 3;
+export const FORECAST_SCHEMA_VERSION = 12;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -42,8 +69,16 @@ const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'accuweather': 1.1,
 	'worldweatheronline': 1.0,
 	'weatherstack': 0, // Disabilitato: il piano free usa HTTP non cifrato (no HTTPS)
-	'meteostat': 0.8,
-	'apple_weatherkit': 1.2
+	// Meteostat fornisce OSSERVAZIONI, non previsioni: dalla Fase 6C non entra
+	// più nell'aggregazione (le sue rilevazioni passate finivano nella media
+	// della temperatura *attuale*, con ore di ritardo). Resta in uso come
+	// verità osservata per la verifica dell'accuratezza, in
+	// `services/observations.ts`.
+	'meteostat': 0,
+	'apple_weatherkit': 1.2,
+	// I modelli Open-Meteo: i pesi vivono nel connettore, accanto alla
+	// descrizione di ciascun modello.
+	...Object.fromEntries(OPENMETEO_MODELS.map(m => [m.sourceId, m.weight])),
 };
 
 const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<UnifiedForecast | null>> = {
@@ -55,7 +90,13 @@ const SOURCE_FETCHERS: Record<string, (lat: number, lon: number) => Promise<Unif
 	'worldweatheronline': fetchFromWWO,
 	'weatherstack': fetchFromWeatherstack,
 	'meteostat': fetchFromMeteostat,
-	'apple_weatherkit': fetchFromWeatherKit
+	'apple_weatherkit': fetchFromWeatherKit,
+	...Object.fromEntries(
+		OPENMETEO_MODELS.map(m => [
+			m.sourceId,
+			(lat: number, lon: number) => fetchFromOpenMeteoModel(lat, lon, m),
+		])
+	),
 };
 
 interface AggregationData {
@@ -66,6 +107,7 @@ interface AggregationData {
 	wind_direction: { val: number; weight: number }[];
 	wind_gust: { val: number; weight: number }[];
 	precipitation_prob: { val: number; weight: number }[];
+	precipitation_intensity: { val: number; weight: number }[];
 	aqi: { val: number; weight: number }[];
 	pressure: { val: number; weight: number }[];
 	uv_index: { val: number; weight: number }[];
@@ -169,8 +211,27 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
+	// Banda di incertezza e qualità dell'aria partono subito, in parallelo alle
+	// fonti: sono arricchimenti e non devono allungare il percorso critico.
+	const ensemblePromise = fetchTemperatureBand(lat, lon);
+	const airQualityPromise = fetchAirQuality(lat, lon);
+
 	// 3. Fetch from External & Load Accuracies
-	const activeSources = sources.filter(s => s.active && (SOURCE_WEIGHTS[s.id] ?? 1) > 0);
+	//
+	// I modelli Open-Meteo *sostituiscono* la fonte `open-meteo`, non la
+	// affiancano: `best_match` è una miscela degli stessi modelli, quindi
+	// usarle insieme conterebbe due volte gli stessi dati e sovrapeserebbe
+	// qualunque modello Open-Meteo scelga per quella località.
+	const models = activeOpenMeteoModels();
+	const modelSourceIds = new Set(models.map(m => m.sourceId));
+	const enabledModelIds = new Set(OPENMETEO_MODELS.map(m => m.sourceId));
+
+	const activeSources = sources.filter(s => {
+		if ((SOURCE_WEIGHTS[s.id] ?? 1) <= 0 || !s.active) return false;
+		if (s.id === 'open-meteo') return models.length === 0;
+		if (enabledModelIds.has(s.id)) return modelSourceIds.has(s.id);
+		return true;
+	});
 	const accuracyMapPromise = getAccuracyMap();
 
 	// Raccoglie le allerte da tutte le fonti durante il fetch
@@ -260,6 +321,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		wind_direction: [],
 		wind_gust: [],
 		precipitation_prob: [],
+		precipitation_intensity: [],
 		aqi: [],
 		pressure: [],
 		uv_index: [],
@@ -271,7 +333,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 
 	const accuracyMap = await accuracyMapPromise;
 
-	// Peso dinamico della fonte: base_weight * (1 / (1 + MAE)).
+	// Peso dinamico della fonte: base_weight * (1 / (1 + MAE)), dove il MAE è
+	// l'errore medio rispetto alle temperature OSSERVATE sulla finestra
+	// scorrevole (`services/accuracy.ts`). Le fonti con troppi pochi campioni
+	// non compaiono nella mappa e restano al peso statico.
 	// Estratto qui perché serve anche alle aggregazioni daily/hourly più sotto.
 	const weightOf = (source: string) => {
 		const baseWeight = SOURCE_WEIGHTS[source] || 1.0;
@@ -295,6 +360,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		pushValue('wind_direction', f.wind_direction);
 		pushValue('wind_gust', f.wind_gust);
 		pushValue('precipitation_prob', f.precipitation_prob);
+		pushValue('precipitation_intensity', f.precipitation_intensity);
 		pushValue('aqi', f.aqi);
 		pushValue('pressure', f.pressure);
 		pushValue('uv_index', f.uv_index);
@@ -307,35 +373,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		aggregation.conditions[code] += weight;
 	});
 
-	const avg = (items: { val: number; weight: number }[]) => {
-		if (items.length === 0) return null;
-		const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-		const weightedSum = items.reduce((sum, item) => sum + (item.val * item.weight), 0);
-		return Number((weightedSum / totalWeight).toFixed(1));
-	};
+	const avg = weightedMean;
 
-	const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-
-	let bestCondition = 'unknown';
-	let maxScore = -1;
-	
-	const numericScores: Record<string, number> = {};
-	const stringScores: Record<string, number> = {};
-
-	Object.entries(aggregation.conditions).forEach(([code, score]) => {
-		if (isNumericCondition(code)) numericScores[code] = score;
-		else stringScores[code] = score;
-	});
-
-	if (Object.keys(numericScores).length > 0) {
-		Object.entries(numericScores).forEach(([code, score]) => {
-			if (score > maxScore) { maxScore = score; bestCondition = code; }
-		});
-	} else {
-		Object.entries(stringScores).forEach(([code, score]) => {
-			if (score > maxScore) { maxScore = score; bestCondition = code; }
-		});
-	}
+	// `aggregation.conditions` è già una mappa codice → peso accumulato.
+	let bestCondition = weightedVote(
+		Object.entries(aggregation.conditions).map(([code, weight]) => ({ code, weight }))
+	);
 
 	const aggCloudCover = avg(aggregation.cloud_cover);
 	const rawBestCondition = bestCondition; // Preserve WMO code before normalization
@@ -345,42 +388,43 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const dailyMap = new Map<string, any>();
 	validForecasts.forEach(f => {
 		if (f.daily && Array.isArray(f.daily)) {
+			// Ogni valore porta il peso della sua fonte: prima solo i millimetri
+			// lo facevano, e le temperature giornaliere finivano in una media
+			// aritmetica che ignorava SOURCE_WEIGHTS.
+			const sourceWeight = weightOf(f.source);
 			f.daily.forEach(d => {
 				if (!dailyMap.has(d.date)) {
-					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [] });
+					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [], snowfall_cm: [] });
 				}
 				const entry = dailyMap.get(d.date)!;
-				if (d.temp_max !== null) entry.temp_max.push(d.temp_max);
-				if (d.temp_min !== null) entry.temp_min.push(d.temp_min);
-				if (d.precipitation_prob !== null) entry.precip_prob.push(d.precipitation_prob);
+				if (d.temp_max !== null) entry.temp_max.push({ val: d.temp_max, weight: sourceWeight });
+				if (d.temp_min !== null) entry.temp_min.push({ val: d.temp_min, weight: sourceWeight });
+				if (d.precipitation_prob !== null) entry.precip_prob.push({ val: d.precipitation_prob, weight: sourceWeight });
 				if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
-				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: weightOf(f.source) });
-				entry.codes.push(d.condition_code);
+				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: sourceWeight });
+				if (d.snowfall_cm != null) entry.snowfall_cm.push({ val: d.snowfall_cm, weight: sourceWeight });
+				entry.codes.push({ code: d.condition_code, weight: sourceWeight });
 			});
 		}
 	});
 
 	const aggregatedDaily = Array.from(dailyMap.keys()).sort().slice(0, 7).map(date => {
 		const data = dailyMap.get(date)!;
-		const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
-		const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-		const numericCodes = data.codes.filter(isNumericCondition);
-		const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
+		const bestCode = weightedVote(data.codes);
 
-		const codeCounts: Record<string, number> = {};
-		targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
-		const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
-
+		// L'UV è un estremo: mediarlo fra fonti smorzerebbe il picco di cui
+		// l'utente va avvisato.
 		const uvMax = data.uv_index_max.length > 0 ? Math.max(...data.uv_index_max) : undefined;
 		return {
 			date,
-			temp_max: avgSimple(data.temp_max),
-			temp_min: avgSimple(data.temp_min),
-			precipitation_prob: avgSimple(data.precip_prob) || 0,
+			temp_max: weightedMean(data.temp_max),
+			temp_min: weightedMean(data.temp_min),
+			precipitation_prob: weightedMean(data.precip_prob) || 0,
 			condition_code: bestCode,
 			condition_text: bestCode.toUpperCase(),
 			...(uvMax !== undefined && { uv_index_max: uvMax }),
 			...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
+			...(data.snowfall_cm.length > 0 && { snowfall_cm: aggregateSnowfallCm(data.snowfall_cm) }),
 		};
 	});
 
@@ -413,31 +457,72 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		return normalizedTime.slice(0, 13) + ':00';
 	};
 
-	const hourlyMap = new Map<string, { temps: number[]; feels_like: number[]; probs: number[]; codes: string[]; humidities: number[]; wind_speeds: number[]; uv_indices: number[]; precip_mm: { val: number; weight: number }[]; wind_directions: { val: number; weight: number }[]; wind_gusts: { val: number; weight: number }[] }>();
+	type Weighted = { val: number; weight: number };
+	const hourlyMap = new Map<string, {
+		temps: Weighted[];
+		feels_like: Weighted[];
+		probs: Weighted[];
+		codes: { code: string; weight: number }[];
+		humidities: Weighted[];
+		wind_speeds: Weighted[];
+		uv_indices: Weighted[];
+		precip_mm: Weighted[];
+		wind_directions: Weighted[];
+		wind_gusts: Weighted[];
+		snowfall_cm: Weighted[];
+		snow_depth_cm: Weighted[];
+		freezing_levels: Weighted[];
+		soil_temperatures: Weighted[];
+		soil_temperatures_root: Weighted[];
+		soil_moistures: Weighted[];
+		evapotranspirations: Weighted[];
+		vapour_deficits: Weighted[];
+		capes: Weighted[];
+		lifted_indices: Weighted[];
+		cins: Weighted[];
+		thunder_probs: Weighted[];
+	}>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
 			const sourceWeight = weightOf(f.source);
 			f.hourly.forEach(h => {
 				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [] });
+					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [], soil_temperatures_root: [], soil_moistures: [], evapotranspirations: [], vapour_deficits: [], capes: [], lifted_indices: [], cins: [], thunder_probs: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
-				if (h.temp != null) entry.temps.push(h.temp);
-				if (h.feels_like != null) entry.feels_like.push(h.feels_like);
-				if (h.precipitation_prob != null) entry.probs.push(h.precipitation_prob);
-				if (h.humidity != null) entry.humidities.push(h.humidity);
-				if (h.wind_speed != null) entry.wind_speeds.push(h.wind_speed);
-				if (h.uv_index != null) entry.uv_indices.push(h.uv_index);
-				// Direzione e raffica non sono medie aritmetiche: la prima è circolare,
-				// la seconda va presa al massimo. Entrambe portano quindi il peso della fonte.
+				if (h.temp != null) entry.temps.push({ val: h.temp, weight: sourceWeight });
+				if (h.feels_like != null) entry.feels_like.push({ val: h.feels_like, weight: sourceWeight });
+				if (h.precipitation_prob != null) entry.probs.push({ val: h.precipitation_prob, weight: sourceWeight });
+				if (h.humidity != null) entry.humidities.push({ val: h.humidity, weight: sourceWeight });
+				if (h.wind_speed != null) entry.wind_speeds.push({ val: h.wind_speed, weight: sourceWeight });
+				if (h.uv_index != null) entry.uv_indices.push({ val: h.uv_index, weight: sourceWeight });
+				// Direzione e raffica non sono medie: la prima è circolare, la
+				// seconda va presa al massimo.
 				if (h.wind_direction != null) entry.wind_directions.push({ val: h.wind_direction, weight: sourceWeight });
 				if (h.wind_gust != null) entry.wind_gusts.push({ val: h.wind_gust, weight: sourceWeight });
 				// NB: openweathermap non popola precipitation_mm sull'hourly perché i suoi
 				// slot sono totali su 3 ore e non sono confrontabili con gli accumuli orari
 				// delle altre fonti. Contribuisce solo alla somma giornaliera.
 				if (h.precipitation_mm != null) entry.precip_mm.push({ val: h.precipitation_mm, weight: sourceWeight });
-				entry.codes.push(h.condition_code);
+				// Neve: la portano solo i modelli Open-Meteo, le altre fonti non
+				// espongono né il manto né la quota dello zero termico.
+				if (h.snowfall_cm != null) entry.snowfall_cm.push({ val: h.snowfall_cm, weight: sourceWeight });
+				if (h.snow_depth_cm != null) entry.snow_depth_cm.push({ val: h.snow_depth_cm, weight: sourceWeight });
+				if (h.freezing_level != null) entry.freezing_levels.push({ val: h.freezing_level, weight: sourceWeight });
+				if (h.soil_temperature != null) entry.soil_temperatures.push({ val: h.soil_temperature, weight: sourceWeight });
+				// Dati agronomici: li porta solo Open-Meteo.
+				if (h.soil_temperature_root != null) entry.soil_temperatures_root.push({ val: h.soil_temperature_root, weight: sourceWeight });
+				if (h.soil_moisture != null) entry.soil_moistures.push({ val: h.soil_moisture, weight: sourceWeight });
+				if (h.evapotranspiration != null) entry.evapotranspirations.push({ val: h.evapotranspiration, weight: sourceWeight });
+				if (h.vapour_pressure_deficit != null) entry.vapour_deficits.push({ val: h.vapour_pressure_deficit, weight: sourceWeight });
+				// Indici convettivi: li portano i modelli Open-Meteo, la
+				// probabilità di tuono la sola WorldWeatherOnline.
+				if (h.cape != null) entry.capes.push({ val: h.cape, weight: sourceWeight });
+				if (h.lifted_index != null) entry.lifted_indices.push({ val: h.lifted_index, weight: sourceWeight });
+				if (h.convective_inhibition != null) entry.cins.push({ val: h.convective_inhibition, weight: sourceWeight });
+				if (h.thunder_prob != null) entry.thunder_probs.push({ val: h.thunder_prob, weight: sourceWeight });
+				entry.codes.push({ code: h.condition_code, weight: sourceWeight });
 			});
 		}
 	});
@@ -445,29 +530,95 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const aggregatedHourly = Array.from(hourlyMap.entries())
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([time, data]) => {
-			const avgSimple = (arr: number[]) => arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
-			const isNumericCondition = (s: string) => !isNaN(Number(s)) && s.trim() !== '';
-			const numericCodes = data.codes.filter(isNumericCondition);
-			const targetCodes = numericCodes.length > 0 ? numericCodes : data.codes;
+			const bestCode = weightedVote(data.codes);
 
-			const codeCounts: Record<string, number> = {};
-			targetCodes.forEach((c: string) => codeCounts[c] = (codeCounts[c] || 0) + 1);
-			const bestCode = Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
+			// L'indice temporali si calcola UNA volta sugli indici già mediati,
+			// non mediando gli indici delle singole fonti: la funzione non è
+			// lineare, e le due strade danno risultati diversi. Mediare prima
+			// tiene il calcolo coerente con ogni altro campo aggregato, dove il
+			// consenso fra le fonti viene prima della derivazione.
+			const cape = weightedMean(data.capes);
+			const liftedIndex = weightedMean(data.lifted_indices);
+			const cin = weightedMean(data.cins);
+			const storm = stormIndex({
+				cape,
+				lifted_index: liftedIndex,
+				convective_inhibition: cin,
+			});
+
 			return {
 				time,
-				temp: avgSimple(data.temps) ?? 0,
-				precipitation_prob: avgSimple(data.probs) ?? 0,
+				temp: weightedMean(data.temps) ?? 0,
+				precipitation_prob: weightedMean(data.probs) ?? 0,
 				condition_code: bestCode,
 				condition_text: bestCode.toUpperCase(),
-				...(data.feels_like.length > 0 && { feels_like: avgSimple(data.feels_like) }),
-				...(data.humidities.length > 0 && { humidity: avgSimple(data.humidities) }),
-				...(data.wind_speeds.length > 0 && { wind_speed: avgSimple(data.wind_speeds) }),
+				...(data.feels_like.length > 0 && { feels_like: weightedMean(data.feels_like) }),
+				...(data.humidities.length > 0 && { humidity: weightedMean(data.humidities) }),
+				...(data.wind_speeds.length > 0 && { wind_speed: weightedMean(data.wind_speeds) }),
 				...(data.wind_directions.length > 0 && { wind_direction: aggregateWindDirection(data.wind_directions) }),
 				...(data.wind_gusts.length > 0 && { wind_gust: aggregateWindGust(data.wind_gusts) }),
-				...(data.uv_indices.length > 0 && { uv_index: avgSimple(data.uv_indices) }),
+				...(data.uv_indices.length > 0 && { uv_index: weightedMean(data.uv_indices) }),
 				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
+				...(data.snowfall_cm.length > 0 && { snowfall_cm: aggregateSnowfallCm(data.snowfall_cm) }),
+				// Manto e zero termico sono stati continui, non accumuli: media
+				// pesata come per la temperatura.
+				...(data.snow_depth_cm.length > 0 && { snow_depth_cm: weightedMean(data.snow_depth_cm) }),
+				...(data.freezing_levels.length > 0 && { freezing_level: weightedMean(data.freezing_levels) }),
+				...(data.soil_temperatures.length > 0 && { soil_temperature: weightedMean(data.soil_temperatures) }),
+				...(data.soil_temperatures_root.length > 0 && { soil_temperature_root: weightedMean(data.soil_temperatures_root) }),
+				// Queste tre vivono fra 0 e 1: con un solo decimale l'umidità
+				// volumetrica passerebbe da 0.25 a 0.3, e da 0.06 a 0.1 — cioè
+				// da «molto secco» ad «asciutto».
+				...(data.soil_moistures.length > 0 && { soil_moisture: weightedMean(data.soil_moistures, 3) }),
+				...(data.evapotranspirations.length > 0 && { evapotranspiration: weightedMean(data.evapotranspirations, 3) }),
+				...(data.vapour_deficits.length > 0 && { vapour_pressure_deficit: weightedMean(data.vapour_deficits, 3) }),
+				...(cape != null && { cape }),
+				...(liftedIndex != null && { lifted_index: liftedIndex }),
+				...(storm != null && { storm_index: storm }),
+				...(data.thunder_probs.length > 0 && { thunder_prob: weightedMean(data.thunder_probs) }),
 			};
 		});
+
+	// Banda di incertezza sugli slot orari: le chiavi passano dallo stesso
+	// `hourKeyOf` delle fonti, altrimenti un ensemble in ora locale e una fonte
+	// in UTC finirebbero in fasce diverse.
+	const ensemble = await ensemblePromise;
+	if (ensemble) {
+		const bandByHour = new Map(ensemble.bands.map(b => [hourKeyOf(b.time), b]));
+		let applicate = 0;
+		for (const slot of aggregatedHourly) {
+			const band = bandByHour.get(slot.time);
+			if (!band) continue;
+			(slot as any).temp_p10 = band.p10;
+			(slot as any).temp_p90 = band.p90;
+			applicate++;
+		}
+		console.log(`[Ensemble] ${ensemble.model}: banda applicata a ${applicate}/${aggregatedHourly.length} slot`);
+	}
+
+	// Orto: umidità del suolo, evapotraspirazione, finestra di semina. A
+	// differenza del riquadro neve non si omette quando è tutto tranquillo —
+	// «non serve innaffiare» è la risposta che chi ha un orto cerca la sera.
+	const garden = buildGardenOutlook(gardenHoursFrom(aggregatedHourly as any), hourKeyOf(new Date().toISOString()));
+
+	// Neve e gelate. La quota del punto di griglia la dichiara solo Open-Meteo:
+	// senza di lei la quota neve resta un numero da bollettino, perché è il
+	// confronto con l'altitudine della località a dire se nevica o piove.
+	// I modelli non concordano sull'orografia della cella, quindi si media.
+	const elevations = validForecasts
+		.filter(f => f.elevation != null)
+		.map(f => ({ val: f.elevation as number, weight: weightOf(f.source) }));
+	const elevation = elevations.length > 0 ? weightedMean(elevations) : null;
+
+	// La finestra parte dall'ora corrente *locale*: le fonti portano anche slot
+	// passati, e un manto di ieri non è quello di adesso.
+	const currentHourKey = hourKeyOf(new Date().toISOString());
+	const snow = buildSnowOutlook(elevation, aggregatedHourly, currentHourKey);
+	if (snow) {
+		console.log(
+			`[Snow] quota ${elevation ?? '?'} m, quota neve ${snow.snow_line ?? '—'} m, fase ${snow.phase ?? 'nessuna precipitazione'}, gelate ${snow.frost.level}`
+		);
+	}
 
 	// Prefer astronomy source with moonrise/moonset, then real moon_phase, then any
 	const sourceWithAstronomy =
@@ -492,17 +643,50 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
-	// Find air_quality detail (only WeatherAPI provides this)
+	// Qualità dell'aria: WeatherAPI porta l'indice EPA e gli inquinanti,
+	// Open-Meteo l'indice europeo e i pollini. Si fondono invece di scegliere:
+	// finché WeatherAPI era l'unica fonte, un suo errore lasciava la dashboard
+	// senza AQI.
 	const sourceWithAirQuality = validForecasts.find(f => f.air_quality);
+	const openMeteoAir = await airQualityPromise;
+
+	const mergedAirQuality: AirQualityDetail | null = (() => {
+		const fromWeatherApi = sourceWithAirQuality?.air_quality;
+		if (!fromWeatherApi && !openMeteoAir) return null;
+		return {
+			aqi_us_epa: fromWeatherApi?.aqi_us_epa ?? null,
+			// Su ogni inquinante WeatherAPI ha la precedenza quando c'è: sono i
+			// valori che l'utente vede da mesi e le due fonti non usano la
+			// stessa unità per il monossido di carbonio.
+			pm2_5: fromWeatherApi?.pm2_5 ?? openMeteoAir?.pm2_5 ?? null,
+			pm10: fromWeatherApi?.pm10 ?? openMeteoAir?.pm10 ?? null,
+			no2: fromWeatherApi?.no2 ?? openMeteoAir?.no2 ?? null,
+			o3: fromWeatherApi?.o3 ?? openMeteoAir?.o3 ?? null,
+			co: fromWeatherApi?.co ?? openMeteoAir?.co ?? null,
+			so2: fromWeatherApi?.so2 ?? openMeteoAir?.so2 ?? null,
+			...(openMeteoAir?.european_aqi != null && { european_aqi: openMeteoAir.european_aqi }),
+		};
+	})();
 
 	const aggTemp = avg(aggregation.temp);
 	const aggHumidity = avg(aggregation.humidity);
 	// Media circolare: la media aritmetica di 350° e 10° darebbe sud invece di nord.
 	const aggWindDir = aggregateWindDirection(aggregation.wind_direction);
+	// Quanto le fonti sono d'accordo: è l'informazione che solo un aggregatore ha.
+	const consensus = computeConsensus(
+		aggregation.temp,
+		aggregation.precipitation_prob,
+		validForecasts.length
+	);
 
 	const result = {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
+		// Offset locale della località rispetto a UTC. Le chiavi di `hourly`
+		// sono in ora locale: senza questo campo chi consuma la risposta non
+		// può dire quale slot corrisponde a "adesso" — il poller delle regole
+		// scartava ore future per le località a ovest di Greenwich.
+		utc_offset_seconds: tzOffsetMs / 1000,
 		sources_used: validForecasts.map(f => f.source),
 		current: {
 			temperature: aggTemp,
@@ -513,6 +697,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			wind_direction_label: aggWindDir !== null ? degreesToCompass(aggWindDir) : null,
 			wind_gust: avg(aggregation.wind_gust),
 			precipitation_prob: avg(aggregation.precipitation_prob) || 0,
+			// mm/h che stanno cadendo adesso: stessa regola dei mm previsti
+			// (gate sulla frazione bagnata), così una fonte isolata non inventa
+			// pioggia in corso.
+			precipitation_intensity: aggregatePrecipitationMm(aggregation.precipitation_intensity),
 			dew_point: avg(aggregation.dew_point) ?? ((aggTemp !== null && aggHumidity !== null) ? calculateDewPoint(aggTemp, aggHumidity) : null),
 			aqi: avg(aggregation.aqi),
 			pressure: avg(aggregation.pressure),
@@ -522,8 +710,16 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			uv_index: avg(aggregation.uv_index),
 			visibility: avg(aggregation.visibility),
 			cloud_cover: aggCloudCover,
-			air_quality: sourceWithAirQuality?.air_quality ?? null,
+			air_quality: mergedAirQuality,
 		},
+		confidence: consensus,
+		// Pollini: solo dove il modello CAMS copre, cioè in Europa.
+		...(openMeteoAir?.pollen && { pollen: openMeteoAir.pollen }),
+		// Neve e gelate: presente solo quando c'è qualcosa da dire, altrimenti
+		// sarebbe un riquadro vuoto per otto mesi l'anno.
+		...(snow && { snow }),
+		// Orto: presente ovunque Open-Meteo dia i dati agronomici.
+		...(garden && { garden }),
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,
@@ -565,16 +761,13 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_text: result.current.condition_text,
 			sources_used: result.sources_used,
 			sources_count: result.sources_used.length,
-			confidence_score: null,
+			confidence_score: consensus?.score ?? null,
 			// Lo schema_version viaggia solo nella cache: viene rimosso prima di
 			// restituire la risposta, così l'API non cambia forma.
 			full_data: { ...result, schema_version: FORECAST_SCHEMA_VERSION }
 		});
 		if (smartError) console.error('Error saving smart forecast:', smartError);
 	}
-
-	// 7. Log Deviations for AI Accuracy
-	logAccuracyDeviations(result, validForecasts);
 
 	// 8. Le allerte vengono solo restituite, non notificate.
 	//    L'invio delle push è compito esclusivo del poller schedulato

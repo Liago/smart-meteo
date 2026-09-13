@@ -1,8 +1,8 @@
 # Valutazioni Tecniche — Decisioni Pendenti
 
 > **Data:** 2026-03-10
-> **Ultimo aggiornamento:** 2026-04-01
-> **Stato:** Parzialmente risolto
+> **Ultimo aggiornamento:** 2026-09-12
+> **Stato:** §1 e §3 risolte · §2 (Lighthouse) e §4 (test iOS) aperte
 > **Scopo:** Analisi e raccomandazioni per decisioni che richiedono valutazione prima dell'implementazione
 
 ---
@@ -137,9 +137,11 @@ Motivazione:
 
 ---
 
-## 3. Meteostat — Sostituzione o Declassamento
+## 3. Meteostat — Sostituzione o Declassamento ✅ RISOLTO
 
-> Punto 19 del PROJECT_STATUS_SUMMARY (Bassa Priorità)
+> Punto 19 del PROJECT_STATUS_SUMMARY — **Risolto 2026-09-12, Fase 6C**
+> **Decisione:** Opzione B — spostato a ruolo di validazione, come raccomandato
+> qui sotto da marzo.
 
 ### Contesto
 
@@ -183,22 +185,36 @@ Motivazione:
 | C | **Sostituire con WeatherKit** (Punto 17) | Fonte previsioni completa | Costo Apple Developer, effort alto |
 | D | **Disabilitare** | Semplicità | -1 fonte, perdiamo ground truth |
 
-### Raccomandazione
+### Raccomandazione (accolta)
 
 **Opzione B — Spostare a ruolo di validazione**
 
 Motivazione:
 - I dati osservati di Meteostat sono preziosi come "ground truth" per calcolare l'accuratezza degli altri provider
-- Questo è esattamente il caso d'uso ideale per il **Punto 6 (Algoritmo V2 AI-driven)** della Fase 5D
 - Rimuovere Meteostat dall'aggregazione previsioni ma usarlo come benchmark di accuratezza
 
-**Implementazione suggerita:**
-1. Escludere Meteostat dall'aggregazione in `smartEngine.ts` (filtro per tipo "historical")
-2. Continuare a salvare dati Meteostat in `raw_forecasts` con flag `type: 'observation'`
-3. Usare i dati osservati nel servizio `accuracy.ts` (Punto 6) per calcolare MAE dei forecast
-4. Aggiungere campo `source_type` a tabella `sources`: `'forecast' | 'observation'`
+### Come è stata implementata (Fase 6C, 2026-09-12)
 
-**Tempistica:** Implementare insieme all'Algoritmo V2 (Fase 5D.1)
+1. ✅ **Peso 0 in `SOURCE_WEIGHTS` e nel registro delle fonti**: il filtro sul
+   peso che già escludeva Weatherstack esclude ora anche Meteostat, senza
+   introdurre un secondo meccanismo. Un test dell'engine verifica che non
+   compaia in `sources_used`.
+2. ✅ **Usato come verità osservata** in `backend/services/observations.ts`,
+   come fonte alternativa quando l'archivio ERA5 di Open-Meteo non ha dati per
+   quel punto. La chiave `METEOSTAT_KEY` serve ora a questo.
+3. ✅ **Il MAE delle altre fonti si misura sull'osservato** e non più sulla
+   deviazione dal consenso (`services/accuracy.ts`, migrazione 023).
+4. ⚠️ **Il campo `source_type` sulla tabella `sources` non è stato aggiunto.**
+   Il peso a 0 ottiene lo stesso risultato con un meccanismo già esistente;
+   una colonna in più andrebbe mantenuta in due posti (DB e registro in
+   memoria) senza cambiare nulla di osservabile. Da rivalutare se serviranno
+   altre fonti di sole osservazioni.
+
+> **Differenza rispetto al piano di marzo:** la verità osservata primaria è
+> l'**archivio ERA5 di Open-Meteo**, non Meteostat: è gratuito, senza chiave e
+> copre ogni località, mentre Meteostat ha copertura disomogenea e una quota
+> mensile da consumare. Meteostat resta come secondo tentativo, dove ERA5 non
+> arriva.
 
 ---
 

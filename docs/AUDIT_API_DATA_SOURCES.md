@@ -324,7 +324,8 @@ Params: key=KEY, q={lat},{lon}, aqi=yes
 
 ## 6. Weatherstack
 
-**Peso aggregazione:** 0.9
+**Peso aggregazione:** 0 — **connettore disabilitato dal 2026-04-01** (il piano free
+non offre HTTPS). Il file resta in repository per un'eventuale riattivazione.
 **Piano richiesto:** Free (1000 req/mese, solo HTTPS su piani Paid)
 **Documentazione:** https://weatherstack.com/documentation
 
@@ -559,7 +560,15 @@ Params: key=KEY, q={lat},{lon}, format=json, num_of_days=7, fx=yes, cc=yes, mca=
 
 ## Raccomandazioni Prioritarie
 
-> **Aggiornamento 2026-03-10:** Le raccomandazioni #1-#9 sono state implementate (vedi `CHANGELOG_API_IMPROVEMENTS.md`). Rimangono aperte le #10-#14 e alcuni gap residui documentati in `PROJECT_STATUS_SUMMARY.md`.
+> **Aggiornamento 2026-03-10:** Le raccomandazioni #1-#9 sono state implementate (vedi `CHANGELOG_API_IMPROVEMENTS.md`).
+>
+> **Aggiornamento 2026-09-12** (verifica sul codice, `GAP_ANALYSIS_2026-09.md`):
+> #10 risolta (cloud cover da 3 fonti + `normalizeConditionWithCloudCover`),
+> #11 risolta (moonrise/moonset da WWO, e dal 2026-09 mostrati anche sul web),
+> #12 risolta (dew point diretto da 3 API con fallback Magnus),
+> #13 risolta per disabilitazione (Weatherstack a peso 0),
+> **#14 ancora aperta**: Meteostat resta nell'aggregazione con peso 0.8, quindi
+> osservazioni passate continuano a mescolarsi alle previsioni future.
 
 ### Alta Priorità (Bug / Incoerenze)
 
@@ -584,8 +593,18 @@ Params: key=KEY, q={lat},{lon}, format=json, num_of_days=7, fx=yes, cc=yes, mca=
 
 | # | Miglioramento | Stato |
 |---|---------------|-------|
-| 10 | Cloud cover da più fonti per condition_code più accurato | **PARZIALE** (Open-Meteo + WeatherAPI) |
-| 11 | Moonrise/moonset da WWO | Aperto |
-| 12 | Dew point diretto da API invece di calcolo Magnus | Aperto |
-| 13 | Migrazione Weatherstack a HTTPS (richiede piano Paid) | Aperto |
-| 14 | Considerare sostituzione Meteostat (dati storici, non previsioni, peso già 0.8) | Aperto |
+| 10 | Cloud cover da più fonti per condition_code più accurato | **RISOLTO** (Open-Meteo, WeatherAPI, Tomorrow.io, WeatherKit + `normalizeConditionWithCloudCover`) |
+| 11 | Moonrise/moonset da WWO | **RISOLTO** (estratti, e visualizzati su iOS e web) |
+| 12 | Dew point diretto da API invece di calcolo Magnus | **RISOLTO** (Open-Meteo, Tomorrow.io, WeatherAPI, WeatherKit; Magnus solo come fallback) |
+| 13 | Migrazione Weatherstack a HTTPS (richiede piano Paid) | **CHIUSO** — connettore disabilitato (peso 0) invece di migrare |
+| 14 | Considerare sostituzione Meteostat (dati storici, non previsioni, peso già 0.8) | **APERTO** — vedi `VALUTAZIONI_TECNICHE.md` §3 e `GAP_ANALYSIS_2026-09.md` §3.3 |
+
+### Dati ancora non sfruttati (verifica 2026-09-12)
+
+Oltre alla #14, l'audit del 2026-03 non copriva alcune API che le fonti già a
+contratto espongono e che restano inutilizzate: pollini e AQI previsionale
+(Open-Meteo Air Quality), quota neve e `freezing_level_height`, indici convettivi
+(CAPE), radiazione solare, onde, suolo, normali climatiche e — soprattutto — i
+**modelli multipli** di Open-Meteo (`&models=icon_d2,ifs04,…`), che da una sola
+fonte gratuita ne ricavano cinque indipendenti. Dettaglio e priorità in
+`GAP_ANALYSIS_2026-09.md` §5.

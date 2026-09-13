@@ -8,6 +8,24 @@ interface SunWindCardProps {
 	current?: ForecastCurrent;
 }
 
+/**
+ * Orario di un evento lunare.
+ *
+ * Il backend passa i valori delle fonti senza riscriverli: WWO li manda in ISO
+ * con offset, WeatherKit in UTC con `Z`, WeatherAPI come "07:42 PM" convertito a
+ * 24h. Si prova quindi il parsing come data e si ricade sui caratteri della
+ * stringa quando non è una data valida, invece di mostrare "Invalid Date".
+ */
+function formatMoonTime(iso?: string): string | null {
+	if (!iso) return null;
+	const d = new Date(iso);
+	if (!isNaN(d.getTime())) {
+		return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+	}
+	const match = iso.match(/(\d{1,2}):(\d{2})/);
+	return match ? `${match[1]!.padStart(2, '0')}:${match[2]}` : null;
+}
+
 export default function SunWindCard({ astronomy, current }: SunWindCardProps) {
 	const [sunPosition, setSunPosition] = useState(0); // 0 to 100 on the arc
 
@@ -36,6 +54,9 @@ export default function SunWindCard({ astronomy, current }: SunWindCardProps) {
 	const angleRad = (angleDeg * Math.PI) / 180;
 	const sunX = Math.round(centerX + radius * Math.cos(angleRad));
 	const sunY = Math.round(centerY - radius * Math.sin(angleRad));
+
+	const moonrise = formatMoonTime(astronomy?.moonrise);
+	const moonset = formatMoonTime(astronomy?.moonset);
 
 	return (
 		<div className="glass p-6" style={{ color: 'var(--color-duet-ink)' }}>
@@ -89,6 +110,27 @@ export default function SunWindCard({ astronomy, current }: SunWindCardProps) {
 					<div className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>Stabile</div>
 				</div>
 			</div>
+
+			{/* Luna: in parità con il pannello iOS (MoonInfoSection). Mostrata solo
+			    se il backend ha trovato una fonte che fornisce i dati lunari. */}
+			{(moonrise || moonset || astronomy?.moon_illumination != null) && (
+				<div className="grid grid-cols-3 gap-3 pt-4 mt-4" style={{ borderTop: '1px solid var(--color-duet-border)' }}>
+					<div>
+						<div className="text-[11px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--color-duet-muted)' }}>Luna &uarr;</div>
+						<div className="font-semibold text-sm">{moonrise || '--:--'}</div>
+					</div>
+					<div>
+						<div className="text-[11px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--color-duet-muted)' }}>Luna &darr;</div>
+						<div className="font-semibold text-sm">{moonset || '--:--'}</div>
+					</div>
+					<div>
+						<div className="text-[11px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--color-duet-muted)' }}>Illuminata</div>
+						<div className="font-semibold text-sm">
+							{astronomy?.moon_illumination != null ? `${Math.round(astronomy.moon_illumination)}%` : '--'}
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

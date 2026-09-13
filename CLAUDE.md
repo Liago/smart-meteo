@@ -9,26 +9,49 @@ Smart Meteo is a full-stack weather forecasting app that aggregates data from mu
 ```
 smart-meteo/
 ├── backend/                    # Express API (TypeScript, deployed on Netlify Functions)
-│   ├── connectors/             # 8 weather API integrations
+│   ├── connectors/             # 9 forecast providers + 1 alerts-only source
+│   │   ├── weatherkit.ts       # Apple WeatherKit (weight: 1.2) - JWT auth, alerts, forecastNextHour, snow
 │   │   ├── tomorrow.ts         # Tomorrow.io (weight: 1.2)
-│   │   ├── openmeteo.ts        # Open-Meteo (weight: 1.1)
-│   │   ├── openweathermap.ts   # OpenWeatherMap (weight: 1.0)
+│   │   ├── openmeteo.ts        # Open-Meteo: best_match (1.1) + 5 models as separate sources
 │   │   ├── accuweather.ts      # AccuWeather (weight: 1.1)
-│   │   ├── weatherapi.ts       # WeatherAPI (weight: 1.0)
-│   │   ├── weatherstack.ts     # WeatherStack (weight: 0.9)
-│   │   ├── meteostat.ts        # Meteostat (weight: 0.8)
-│   │   └── worldweatheronline.ts # WWO (weight: 1.0)
+│   │   ├── openweathermap.ts   # OpenWeatherMap (weight: 1.0) + One Call alerts
+│   │   ├── weatherapi.ts       # WeatherAPI (weight: 1.0) - only AQI source, + alerts
+│   │   ├── worldweatheronline.ts # WWO (weight: 1.0) - only thunder-probability source
+│   │   ├── meteostat.ts        # Meteostat (weight: 0) - observations only, used as ground truth
+│   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
+│   │   ├── openmeteoEnsemble.ts # Ensemble members -> temperature p10/p50/p90 band
+│   │   ├── openmeteoAirQuality.ts # European AQI, pollutants and CAMS pollen
+│   │   │                          # (openmeteo.ts also carries snow depth,
+│   │   │                          #  snowfall, freezing level and soil temp)
+│   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
-│   │   └── smartEngine.ts      # Weighted aggregation from multiple sources
+│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 12)
 │   ├── middleware/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
-│   │   └── sources.ts          # /api/sources, /api/forecast, /api/health
+│   │   ├── sources.ts          # /api/sources
+│   │   ├── accuracy.ts         # /api/accuracy, /api/accuracy/recompute
+│   │   └── alerts.ts           # /api/alerts/* (subscribe, active, poll, health, rules)
 │   ├── services/
-│   │   └── supabase.ts         # Supabase client
+│   │   ├── supabase.ts         # Supabase client
+│   │   ├── apns.ts             # Apple push notifications
+│   │   ├── alertProcessor.ts   # Alert -> subscription matching, push, delivery log
+│   │   ├── alertPoller.ts      # Background alert polling by subscription cluster
+│   │   ├── ruleProcessor.ts    # Personal threshold rules -> push (claim-then-send)
+│   │   ├── observations.ts     # Ground truth: observed temperatures (ERA5 archive, Meteostat)
+│   │   └── accuracy.ts         # Source MAE vs OBSERVED data -> dynamic weights
 │   ├── utils/
 │   │   ├── formatter.ts        # Data normalization (UnifiedForecast)
-│   │   └── moon.ts             # Moon phase calculations
+│   │   ├── moon.ts             # Moon phase calculations
+│   │   ├── precipitation.ts    # mm aggregation (wet-fraction gate)
+│   │   ├── wind.ts             # Circular mean for direction, max for gusts
+│   │   ├── consensus.ts        # Source agreement -> confidence score
+│   │   ├── snow.ts             # Snow line, snow phase, frost risk
+│   │   ├── storm.ts            # CAPE + lifted index -> 0-100 storm risk
+│   │   ├── garden.ts           # Soil moisture + ET0 -> irrigation advice
+│   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
+│   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
+│   ├── scripts/                # verify*.ts - pure-function checks run by npm test
 │   ├── app.ts                  # Express app setup (CORS, routes)
 │   ├── server.ts               # Dev server entry point
 │   └── types.ts                # TypeScript interfaces
@@ -43,6 +66,16 @@ smart-meteo/
 │   │   └── auth/callback/route.ts  # OAuth callback handler
 │   ├── components/
 │   │   ├── CurrentWeather.tsx   # Current conditions + AQI
+│   │   ├── NextHourPrecipitation.tsx # Minute-by-minute nowcast (WeatherKit)
+│   │   ├── WeatherAlerts.tsx    # Alert banners + header badge
+│   │   ├── DayNarrative.tsx     # Discursive day summary by time band
+│   │   ├── AirQualitySummary.tsx / AirQualityPanel.tsx # AQI tile + pollutant modal
+│   │   ├── PollenPanel.tsx      # Pollen species, daily peak
+│   │   ├── SnowPanel.tsx        # Snow line vs altitude, snow depth, frost
+│   │   ├── GardenPanel.tsx      # Soil moisture, water balance, sowing window
+│   │   ├── HourlyDetail.tsx     # Hourly metric modal (precip/wind/humidity/UV/...)
+│   │   ├── WeatherEffects.tsx   # Particle layers for the dynamic background
+│   │   ├── ui/Modal.tsx, ui/MetricSelect.tsx # Shared primitives
 │   │   ├── HourlyForecast.tsx   # 12h timeline with astronomy events
 │   │   ├── ForecastDetails.tsx  # 7-day forecast with hourly drill-down
 │   │   ├── SunWindCard.tsx      # Sun arc, wind turbines, pressure
@@ -64,10 +97,9 @@ smart-meteo/
 │   │       ├── server.ts       # SSR Supabase client
 │   │       ├── middleware.ts   # Auth session refresh
 │   │       └── locations.ts    # Location CRUD (Supabase)
-│   ├── __tests__/
-│   │   ├── api.test.ts         # API client tests
-│   │   ├── components.test.tsx # Component rendering tests
-│   │   └── weather-utils.test.ts # Utility tests
+│   ├── __tests__/              # 10 Jest suites (api, components, weather-utils,
+│   │                           #  air-quality, narrative, hourly-detail,
+│   │                           #  next-hour, pollen, snow, storm)
 │   ├── middleware.ts           # Next.js middleware (Supabase session)
 │   └── vercel.json             # Vercel deployment config
 │
@@ -105,7 +137,12 @@ smart-meteo/
 │               │   │   ├── CurrentWeatherView.swift  # Current conditions
 │               │   │   ├── HourlyForecastView.swift  # Hourly graph + timeline
 │               │   │   ├── DailyForecastView.swift   # Daily forecast + WMO icons
-│               │   │   └── SunWindCard.swift         # Sun arc, wind, pressure
+│               │   │   ├── SunWindCard.swift         # Sun arc, wind, pressure
+│               │   │   ├── SourcesIndicatorView.swift # Sources + consensus index
+│               │   │   ├── PollenPanelView.swift     # Pollen species, daily peak
+│               │   │   ├── SnowPanelView.swift       # Snow line, depth, frost
+│               │   │   ├── GardenPanelView.swift     # Irrigation advice, sowing
+│               │   │   └── NextHourPrecipitationView.swift # Minute-by-minute nowcast
 │               │   ├── Login/LoginView.swift
 │               │   ├── Search/SearchView.swift
 │               │   └── Settings/
@@ -113,6 +150,7 @@ smart-meteo/
 │               │       ├── GeneralSettingsView.swift
 │               │       ├── SourcesView.swift         # Toggle weather sources
 │               │       ├── FavoritesView.swift       # Saved locations
+│               │       ├── AlertRulesView.swift      # Personal threshold rules
 │               │       └── SidebarView.swift
 │               └── Onboarding/SplashView.swift
 │
@@ -120,7 +158,7 @@ smart-meteo/
 │   └── functions/
 │       └── api.ts              # serverless-http wrapper for Express
 ├── supabase/
-│   └── migrations/             # 12 migration files (001-012)
+│   └── migrations/             # 24 migration files (001-024)
 └── docs/                       # Implementation plans (PHASE_1-3, BACKEND_DB_INTEGRATION)
 ```
 
@@ -163,7 +201,16 @@ cd frontend-web && npm run build
 **Backend** (`backend/.env` - see `backend/.env.example`):
 - `PORT`, `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `FRONTEND_URL` (CORS origin)
-- Weather API keys: `TOMORROW_API_KEY`, `OPENWEATHER_API_KEY`, `WEATHERAPI_KEY`, `ACCUWEATHER_API_KEY`, `METEOMATICS_USER`, `METEOMATICS_PASSWORD`
+- Weather API keys: `TOMORROW_API_KEY`, `OPENWEATHER_API_KEY`, `WEATHERAPI_KEY`, `ACCUWEATHER_API_KEY`, `METEOSTAT_KEY`, `WORLDWEATHER_KEY`, `WEATHERSTACK_KEY` (unused: source disabled)
+- Apple WeatherKit (JWT): `APPLE_TEAM_ID`, `APPLE_SERVICE_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`
+- Push notifications (APNs): `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`, `APNS_BUNDLE_ID`, `APNS_PRODUCTION`
+- Scheduled alert polling: `CRON_SECRET` (guards `POST /api/alerts/poll`; without it the endpoint answers 503 rather than staying open)
+- `OPENMETEO_MODELS` (optional): comma-separated model ids to narrow the Open-Meteo models, or `off` to fall back to the single `best_match` source
+- `OPENMETEO_ENSEMBLE` (optional): ensemble model for the uncertainty band (default `icon_eu`), or `off` to drop the band
+- Open-Meteo Air Quality needs no key either: it supplies the European AQI, the pollutants and the CAMS pollen species
+- Open-Meteo needs no key. There is **no** Meteomatics connector: it was in the
+  original plan (`docs/IMPLEMENTATION_PLAN.md`) but was replaced by Open-Meteo,
+  so `METEOMATICS_*` in `.env.example` is dead configuration.
 
 **Frontend Web** (`frontend-web/.env.local` - see `frontend-web/.env.example`):
 - `NEXT_PUBLIC_API_URL` (backend URL, `http://localhost:3000` for dev)
@@ -172,22 +219,68 @@ cd frontend-web && npm run build
 
 - `GET /api/forecast?lat=<lat>&lon=<lon>` - Smart aggregated forecast
 - `GET /api/sources` - List weather sources with status/weights
-- `PATCH /api/sources/:id` - Enable/disable a weather source
+- `PATCH /api/sources/:id` - Enable/disable a weather source (auth required)
 - `GET /api/health` - Backend health check
+- `POST /api/alerts/subscribe` / `POST /api/alerts/unsubscribe` - Device push registration
+- `GET /api/alerts/active?lat=&lon=` - Active alerts for an area
+- `POST /api/alerts/poll` - Alert polling, guarded by the `X-Cron-Secret` header
+- `GET /api/accuracy` - Per-source MAE against observed temperatures, sample count, window and resulting weight multiplier (public read)
+- `POST /api/accuracy/recompute` - Daily verification job, guarded by `X-Cron-Secret`
+- `GET /api/alerts/health` - APNs status, subscription count, 24h delivery stats
+- `POST /api/alerts/test-push` - Manual push test
+- `GET /api/alerts/rules/metrics` - Registry of thresholdable metrics (id, label, unit, allowed comparators)
+- `POST /api/alerts/rules/list` - A device's personal threshold rules (device token in the body, not the query string)
+- `POST /api/alerts/rules` / `PATCH /api/alerts/rules/:id` / `DELETE /api/alerts/rules/:id` - Rule CRUD, each gated on the device token
 
 ## Testing
 
-- Tests are in `frontend-web/__tests__/` (3 suites: api, components, weather-utils)
-- Framework: Jest 30 + React Testing Library + ts-jest
-- Environment: jsdom
-- Backend has no automated tests
-- iOS has no automated tests
+- Web tests are in `frontend-web/__tests__/` (11 suites: api, components, weather-utils,
+  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden), `npm test`
+  from the repo root
+- Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
+- Backend tests: `cd backend && npm test` - **504 tests in 23 suites** (Jest + ts-jest,
+  node environment). `__tests__/utils/` for the pure aggregation functions,
+  `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
+  in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
+  Supabase and connectors mocked, `__tests__/routes/` for the HTTP contract via supertest
+- `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
+  per-connector test would not catch a unit mismatch, since each one is self-consistent
+- `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
+- E2E: `cd frontend-web && npm run test:e2e` - 37 scenarios × 2 viewports (Playwright).
+  The backend API is never contacted: every scenario starts from a known response built
+  in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
+  downloaded. `e2e/` is excluded from Jest
+- iOS has no automated tests. The Lighthouse audit is **blocked in this environment**, not merely
+  pending: `next build` fails because `next/font` cannot reach `fonts.googleapis.com`. Dev mode
+  falls back to a system font, so the E2E suite still runs - it is only the production build that
+  is impossible. Both tracked in `docs/TODO_TESTING.md`
 
 ## Key Patterns
 
 - **Weather connectors** implement a common interface in `backend/connectors/` - each normalizes provider-specific data into a unified `UnifiedForecast` format defined in `backend/types.ts` and `backend/utils/formatter.ts`
-- **Smart engine** (`backend/engine/smartEngine.ts`) fetches from up to 8 sources in parallel, aggregates using weighted averaging, and caches results
-- **Source weights** range from 0.8 (Meteostat) to 1.2 (Tomorrow.io), stored in `SOURCE_WEIGHTS` constant
+- **Smart engine** (`backend/engine/smartEngine.ts`) fetches from up to 9 sources in parallel, aggregates using weighted averaging, and caches results for 30 minutes
+- **Cache invalidation by shape**: `FORECAST_SCHEMA_VERSION` is stored inside `full_data`; a cached row with a different version is ignored and regenerated. Bump it whenever response fields are added or renamed. It is exported so the engine tests read it rather than copying the number
+- **Open-Meteo multi-model**: Open-Meteo is a free frontend over national weather services' models, not a model of its own. It is queried **one model at a time** (`&models=`), so ICON-D2, ICON-EU, ECMWF IFS, Météo-France and GFS enter the aggregation as five independent sources (`open-meteo:icon_d2` …), giving more statistical diversity than several commercial providers that rebrand the same GFS/ECMWF. The models **replace** the `open-meteo` (`best_match`) source rather than joining it: `best_match` is a blend of the same models, so using both would double-count. Switch off with `OPENMETEO_MODELS=off`, or narrow it with a comma-separated list of model ids
+- **Source weights** range from 0 (Weatherstack, disabled) through 0.8 (Meteostat) to 1.2 (Tomorrow.io, WeatherKit, ICON-D2), stored in the `SOURCE_WEIGHTS` constant (model weights live next to each model in `connectors/openmeteo.ts`), then scaled at runtime by `1 / (1 + MAE)` from the `source_accuracy` table
+- **The MAE is measured against observations**, not against the consensus of the other sources. Until Phase 6C it was the deviation from the aggregate, which rewarded conformity and penalised a source that was right while the others were wrong. `services/observations.ts` gets the observed temperatures from Open-Meteo Archive (ERA5, free, no key) with Meteostat as a fallback; each comparison is a row in `accuracy_samples`, and the MAE is **recomputed** over a 30-day sliding window instead of being updated as a never-decaying cumulative average. A source needs 20 samples before its MAE moves its weight
+- **What is verified is the nowcast**, not the +24h horizon: `raw_forecasts` stores each source's *current* values, not its forecast per horizon. Extending it needs a schema change - see `docs/GAP_ANALYSIS_2026-09.md` §3.4
+- **Meteostat is not a forecast source**: it reports observations, sometimes hours old, and they used to land in the average of the *current* temperature. It now has weight 0 and serves as ground truth for the accuracy job
+- **Air quality has two sources now**: WeatherAPI (EPA index 1-6 and pollutants) and Open-Meteo Air Quality (European AQI, same pollutants, plus pollen). They are merged rather than chosen between - while WeatherAPI was the only one, an outage left the dashboard with no AQI at all. WeatherAPI keeps precedence on each pollutant: those are the values users have seen for months, and the two sources do not use the same unit for carbon monoxide
+- **Pollen thresholds are per species** (`connectors/openmeteoAirQuality.ts`): 30 grains/m³ of grass is a heavy day for an allergy sufferer, the same 30 of olive is nothing. A single threshold would mislabel half the species. The panel shows the **daily peak**, not the current hour: people decide in the morning whether to go out. Pollen is modelled in Europe only - outside it the fields come back null and the block is omitted rather than shown as zero
+- **The snow line is not the freezing level**: a snowflake keeps falling past the 0 °C isotherm, cooling the air around it, and reaches the ground 200-400 m lower — `backend/utils/snow.ts` subtracts 300 m, the conventional value for moderate precipitation. The number is only useful **next to the location's own altitude**, which Open-Meteo declares as `elevation` alongside the forecast: "snow line 900 m, you are at 1800 m" is an answer, "freezing level 1500 m" is a bulletin reading. Within 150 m of the line the phase is reported as sleet rather than guessed
+- **Frost is judged on the ground when the data is there**: frost forms on the surface, not at the 2 m where stations measure — `soil_temperature_0cm` uses the physical threshold (0 °C), the 2 m fallback a compensated one (+3 °C, because on clear nights the surface radiates and stays 3-4 degrees below the air). The block declares which one it used, and both clients write it out
+- **The storm risk is an index, not raw CAPE**: "1800 J/kg" means nothing to a reader, a 0-100 scale with four named bands does — but the CAPE stays in the caption, so whoever can read it has the number and nobody has to trust a unitless score. `backend/utils/storm.ts` averages CAPE and lifted index (the same instability measured two ways), then damps by convective inhibition down to a **floor of 0.3, never to zero**: the cap breaks (afternoon heating, orographic lift, a passing front), and calling 3000 J/kg under a lid "no risk" is the kind of forecast that hurts someone in the mountains. The index is computed **once, on the already-averaged fields** — the function is non-linear, so averaging per-source indices instead gives a different number
+- **Apple gives snow in millimetres of depth**, not centimetres and not water equivalent: `snowfallAmount` and `snowfallIntensity` are lengths, so `connectors/weatherkit.ts` divides by ten. Without it 40 mm would have surfaced as "40 cm" — an order of magnitude on a number people use to decide whether to fit snow chains. An absent field stays `null` rather than becoming zero, or WeatherKit's 1.2 weight would dilute the snow the other models forecast
+- **Thunder probability is a second chart section, not an ingredient**: the convective indices say how much energy is there, WWO's `chanceofthunder` how likely it is to discharge — two questions, two sources, and merging them into one number loses one of them
+- **Personal threshold rules are evaluated on the aggregated forecast**, the same one the app shows: evaluating on a raw source would produce notifications announcing 12 mm while the screen shows 3 — neither wrong, just two different sources, which is worse. The threshold is stored in the unit the user typed (km/h for wind, not m/s) and `backend/utils/alertRules.ts` converts on read. Millimetres **sum** over the window rather than taking the max, because "more than 10 mm tomorrow" is a total
+- **A rule belongs to the device, not the subscription**: `/alerts/subscribe` rewrites the subscription row on every significant move and cleans up leftovers, so a CASCADE foreign key would take the rules with it — the same incident migration 021 fixed for dedup. The dedup signature is `rule + day of the trigger`: the poller runs every 15 minutes, so without it four notifications an hour, and keyed on the rule id alone tonight's frost would mute tomorrow's. Rules live in their own table because `weather_alerts`' cooldown is per severity, where an AQI rule would silence a frost rule for six hours
+- **Rain outranks everything in the irrigation advice** (`backend/utils/garden.ts`): with 5 mm or more expected in the window the answer is "don't water", even on very dry soil — that is precisely the case a user gets wrong alone, looking at dry earth and reaching for the watering can without knowing a storm is three hours out. The advice always shows its own reason ("the soil loses 4.8 mm more than it receives"): advice without a reason is an oracle, and nobody trusts an oracle about their garden
+- **Soil moisture thresholds depend on soil type and the API does not declare it**: field capacity runs ~0.15 m³/m³ for sand and ~0.40 for clay, so the thresholds are a loam's and the raw number is always shown next to the verdict — as percent of volume, because "25% vol." reads and "0.25 m³/m³" does not. Note the **two** soil temperatures: `soil_temperature_0cm` is the surface, where frost forms; `soil_temperature_0_to_7cm` is the root zone, which decides whether a seed germinates
+- **`weightedMean` takes a precision argument**: it rounded to one decimal, which on volumetric soil moisture turned 0.25 into 0.3 and 0.06 into 0.1 — from "very dry" to merely "dry". Quantities living between 0 and 1 pass their own `decimals`
+- **The garden block is NOT omitted when all is calm**, unlike the snow one. Not an inconsistency: the snow panel would have been *empty* — no depth, no snowfall, no frost — for eight months a year, whereas "no need to water" is a full answer, and the one someone with a garden goes looking for in the evening
+- **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
+- **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
+- **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals
 - **Location management** uses localStorage for guests with automatic Supabase sync on login
@@ -206,8 +299,9 @@ cd frontend-web && npm run build
 ## Database
 
 - Supabase (PostgreSQL) with schema in `backend/supabase_schema.sql`
-- 12 migrations in `supabase/migrations/` (extensions, tables, RLS policies, indexes, triggers, seeds, utility functions)
-- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`
+- 24 migrations in `supabase/migrations/` (001-024): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources, accuracy samples, personal alert rules
+- The next free migration number is **025**
+- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `accuracy_samples`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`, `alert_rules`, `alert_rule_hits`
 - `upsert_location` utility function for location management
 - Automatic `updated_at` triggers on all tables
 
@@ -216,15 +310,29 @@ cd frontend-web && npm run build
 ```typescript
 // Frontend types (frontend-web/lib/types.ts)
 ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/gust/label), precipitation_prob, dew_point, aqi, pressure, condition
-DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text
-HourlyForecast     // time, temp, precipitation_prob, condition_code/text
+DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text, snowfall_cm
+HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, soil_temperature_root, soil_moisture, evapotranspiration, cape, lifted_index, storm_index, thunder_prob
+AlertRule          // id, metric, comparator ('above'|'below'), threshold, horizon_hours, enabled
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, sources_used, current, daily[], hourly[], astronomy
+ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, forecastNextHour
+GardenOutlook      // soil_moisture, moisture_level, soil_temperature, evapotranspiration_mm, rain_mm, water_balance_mm, advice, sowing_ok
+SnowOutlook        // elevation, snow_line, phase ('snow'|'sleet'|'rain'), snow_depth_cm, snowfall_cm, frost
+FrostOutlook       // level ('none'|'possible'|'likely'|'severe'), min_temp, at, source ('soil'|'air')
 WeatherSource      // id, name, weight, active, description, lastError, lastResponseMs
 WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | 'unknown'
 ```
 
 ## Recent Implementations
+
+- **Garden and soil** (backend + web + iOS): `soil_moisture_0_to_7cm`, `et0_fao_evapotranspiration`, `soil_temperature_0_to_7cm` and `vapour_pressure_deficit` from the Open-Meteo call we already made, turned into a `garden` block that answers "do I need to water tonight?" and "is the soil warm enough to sow?". Rendered by `GardenPanel.tsx` / `GardenPanelView.swift`.
+- **iOS parity, three declared debts closed** (6E): `SourcesIndicatorView.swift` brings the sources list and the consensus index to iOS (declared open since Phase 6A — iOS showed neither), `PollenPanelView.swift` the pollen panel, and `HourlyForecastView`'s chart finally draws the ensemble band (declared open since 6C; the Swift model did not even carry `temp_p10`/`temp_p90`). The band interpolates at the sunrise/sunset markers, includes the percentiles in the Y scale, and stops where the ensemble's coverage does. **None of it is compiled or tested here**: there is no Swift toolchain in this environment and the project still has no iOS tests.
+- **Personal threshold alerts** (backend + iOS): seven metrics — min, max, gusts, rain, snow, storm index, European AQI — with a threshold and horizon the user picks. Migration **024** (`alert_rules`, `alert_rule_hits`), four endpoints under `/api/alerts/rules`, evaluation hooked into the 15-minute poller already in production, and an "Avvisi personali" screen on iOS. **iOS only:** rules hang off an APNs device token and the web has no push, so a web screen would configure alerts that never arrive — it needs the still-open Web Push decision.
+- **Storm risk index** (backend + web + iOS): `cape`, `lifted_index` and `convective_inhibition` from the Open-Meteo call we already made, plus WWO's `chanceofthunder`, which was in the response and nobody read. `backend/utils/storm.ts` turns them into a 0-100 `storm_index` on each hourly slot; the new "Temporali" entry in the metric registry (`lib/metrics.ts` / `MetricScale.swift`) draws it with a second section for the thunder probability. Until now the storm risk could only be inferred from `condition_code`, which is a snapshot rather than a measurement. **Limit:** the risk is thermodynamic only — wind shear and storm relative helicity, which separate an isolated cell from an organised one, are not on the Open-Meteo forecast endpoint.
+- **Snow line, snow depth and frost risk** (backend + web + iOS): `freezing_level_height`, `snowfall`, `snow_depth` and `soil_temperature_0cm` hourly, `snowfall_sum` daily, plus the grid point's `elevation` — again from the call we already made. `backend/utils/snow.ts` derives a `snow` block, rendered by `SnowPanel.tsx` / `SnowPanelView.swift`, which the backend omits entirely when there is nothing to report.
+- **Minute-by-minute nowcast** (backend + web + iOS): WeatherKit's `forecastNextHour` was already propagated by the engine but no client read it. `NextHourPrecipitation.tsx` / `NextHourPrecipitationView.swift` derive the headline from the minutes themselves ("inizia fra 12 minuti", "smette fra 20"), not from WeatherKit's `summary`, and require 3 consecutive dry minutes before announcing the rain has stopped. Dry hour renders as a single line, no chart.
+- **Source confidence** (backend + web): `backend/utils/consensus.ts` computes a weighted standard deviation across sources on temperature and precipitation probability, shrunk toward 50 by `n / (n + 2)` because two agreeing sources are not nine. Exposed as `confidence` on the response and finally written to `smart_forecasts.confidence_score`, which had been null since migration 005. Shown in `SourcesIndicator` with the coldest-to-warmest range. **Web only for now**: iOS has no sources panel to host it.
+- **Current precipitation intensity**: `precipitation_intensity` (mm/h now) was extracted by five connectors and never aggregated. It now reuses the wet-fraction gate of the forecast mm, so one isolated source cannot invent ongoing rain.
+- **Moon data on web**: `moonrise`, `moonset` and `moon_illumination` were on the wire and displayed only by iOS. Now in `SunWindCard`, with a fallback parser because the providers disagree on the time format.
 
 - **Air quality detail (web)**: parity with the iOS "Qualità dell'aria" panel. `frontend-web/lib/air-quality.ts` is the port of `Models/WeatherDescriptionEngine.swift` — EPA 1-6 category scale (`getAqiScale`, returning both a fill colour and a Tailwind text class), the `POLLUTANTS` registry with WHO 2021 thresholds, and `generateAirQualityDescription`. `AirQualityPanel.tsx` renders the description plus the 3×2 pollutant grid inside the shared `ui/Modal`, opened from an info button on the flipped AQI tile of `CurrentWeather`. Web AQI labels now match iOS (`Buona / Moderata / …`). **No backend change**: `current.air_quality` was already on the wire — only WeatherAPI supplies it, so all of this is gated on its presence.
 - **Hourly detail metric picker** (backend + web + iOS): the precipitation detail modal is now a generic hourly-metric view. The title is a dropdown selecting between precipitation, wind, humidity, apparent temperature and UV index. What each metric draws lives in a registry — `frontend-web/lib/metrics.ts` and `UI/DesignSystem/MetricScale.swift` — so the view (`HourlyDetail.tsx` / `HourlyDetailView.swift`) is metric-agnostic and adding one means adding a registry entry. Backend gained `feels_like`, `wind_direction` and `wind_gust` on `HourlyForecast`. `backend/utils/wind.ts` aggregates direction with a **circular** mean (350° and 10° average to 0°, not 180°) and gusts with a **max** rather than a mean; the circular mean is reused at the `current` level too. Schema version bumped to 3.

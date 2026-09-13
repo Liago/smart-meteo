@@ -56,6 +56,10 @@ struct HourlyForecastView: View {
         let time: Date
         let type: TimelineItemType
         let temp: Double
+        /// Banda di incertezza dell'ensemble. Nil dove il modello non copre
+        /// l'orizzonte: la banda si interrompe invece di essere inventata.
+        var p10: Double? = nil
+        var p90: Double? = nil
     }
     
     @State private var chartData: ChartData?
@@ -234,7 +238,7 @@ struct HourlyForecastView: View {
         // Weather Items
         let weatherItems = hourly.compactMap { h -> TimelineItem? in
             guard let date = parseDate(h.time) else { return nil }
-            return TimelineItem(time: date, type: .weather(h), temp: h.temp)
+            return TimelineItem(time: date, type: .weather(h), temp: h.temp, p10: h.tempP10, p90: h.tempP90)
         }
         
         // Filter: If we have valid weather items, try to show relevant ones.
@@ -286,16 +290,35 @@ struct HourlyForecastView: View {
                          // Interpolate Temp
                          let sortedWeather = displayWeather.sorted { $0.time < $1.time }
                          
-                         var temp: Double = 0
-                         if let before = sortedWeather.last(where: { $0.time <= eventDate }),
-                            let after = sortedWeather.first(where: { $0.time > eventDate }) {
-                             let ratio = eventDate.timeIntervalSince(before.time) / after.time.timeIntervalSince(before.time)
-                             temp = before.temp + (after.temp - before.temp) * ratio
-                         } else if let nearest = sortedWeather.min(by: { abs($0.time.timeIntervalSince(eventDate)) < abs($1.time.timeIntervalSince(eventDate)) }) {
-                             temp = nearest.temp
+                         // I marker solari cadono fra due ore piene: temperatura
+                         // e percentili vanno interpolati, altrimenti la banda
+                         // si spezzerebbe proprio all'alba e al tramonto.
+                         let before = sortedWeather.last(where: { $0.time <= eventDate })
+                         let after = sortedWeather.first(where: { $0.time > eventDate })
+                         let nearest = sortedWeather.min {
+                             abs($0.time.timeIntervalSince(eventDate)) < abs($1.time.timeIntervalSince(eventDate))
                          }
-                         
-                         items.append(TimelineItem(time: eventDate, type: .sun(label: label, icon: icon), temp: temp))
+
+                         func interpolate(_ value: (TimelineItem) -> Double?) -> Double? {
+                             if let before, let after,
+                                let a = value(before), let b = value(after) {
+                                 let span = after.time.timeIntervalSince(before.time)
+                                 guard span > 0 else { return a }
+                                 let ratio = eventDate.timeIntervalSince(before.time) / span
+                                 return a + (b - a) * ratio
+                             }
+                             return nearest.flatMap(value)
+                         }
+
+                         let temp = interpolate { $0.temp } ?? 0
+
+                         items.append(TimelineItem(
+                             time: eventDate,
+                             type: .sun(label: label, icon: icon),
+                             temp: temp,
+                             p10: interpolate { $0.p10 },
+                             p90: interpolate { $0.p90 }
+                         ))
                      }
                 }
             }
@@ -313,7 +336,10 @@ struct HourlyForecastView: View {
              return
         }
         
-        let temps = items.map { $0.temp }
+        // La scala comprende anche i percentili: senza, la banda uscirebbe dal
+        // grafico proprio nelle ore in cui è più larga, cioè quelle che
+        // giustificano il disegnarla.
+        let temps = items.map { $0.temp } + items.compactMap { $0.p10 } + items.compactMap { $0.p90 }
         let minTemp = (temps.min() ?? 0) - 2
         let maxTemp = (temps.max() ?? 0) + 2
         
@@ -370,39 +396,83 @@ private struct Layout {
 
 struct ChartPath: View {
     let data: HourlyForecastView.ChartData
-    
+
+    /// Aggiunge la curva morbida a un tracciato già iniziato, senza spostarsi.
+    ///
+    /// Serve separata da `smoothPath` perché il bordo inferiore della banda
+    /// deve **continuare** il poligono, non aprirne uno nuovo: `Path.addPath`
+    /// porta con sé il proprio `move(to:)` e spezzerebbe la figura in due
+    /// sottotracciati aperti, che il riempimento renderebbe come due schegge
+    /// invece che come una banda.
+    private func appendSmoothCurve(to path: inout Path, through points: [CGPoint]) {
+        guard points.count > 1 else { return }
+
+        for i in 0..<(points.count - 1) {
+            let p1 = points[i]
+            let p2 = points[i + 1]
+            let mid = CGPoint(x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2)
+            let cp1 = CGPoint(x: (p1.x + mid.x) / 2, y: p1.y)
+            let cp2 = CGPoint(x: (mid.x + p2.x) / 2, y: p2.y)
+
+            path.addQuadCurve(to: mid, control: cp1)
+            path.addQuadCurve(to: p2, control: cp2)
+        }
+    }
+
+    /// Curva morbida che passa per i punti dati.
+    ///
+    /// La usano sia la linea della temperatura sia i due bordi della banda: tre
+    /// copie della stessa interpolazione si sarebbero disallineate al primo
+    /// ritocco, e una banda che non segue la curva è peggio di nessuna banda.
+    private func smoothPath(through points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        appendSmoothCurve(to: &path, through: points)
+        return path
+    }
+
     var body: some View {
         Canvas { context, size in
-            let points = data.items.enumerated().map { index, item -> CGPoint in
-                let x = CGFloat(index) * 80 + 40 // Center in 80px slot
-                
-                let yRange = data.maxTemp - data.minTemp
-                let range = yRange == 0 ? 1 : yRange
-                
-                let availableHeight = size.height - Layout.totalPadding
-                let yStep = availableHeight / range
-                
-                let y = size.height - Layout.bottomPadding - ((item.temp - data.minTemp) * yStep)
-                return CGPoint(x: x, y: y)
+            let yRange = data.maxTemp - data.minTemp
+            let range = yRange == 0 ? 1 : yRange
+            let availableHeight = size.height - Layout.totalPadding
+            let yStep = availableHeight / range
+
+            func x(_ index: Int) -> CGFloat { CGFloat(index) * 80 + 40 } // centro dello slot da 80px
+            func y(_ value: Double) -> CGFloat {
+                size.height - Layout.bottomPadding - ((value - data.minTemp) * yStep)
             }
-            
+
+            let points = data.items.enumerated().map { index, item in
+                CGPoint(x: x(index), y: y(item.temp))
+            }
+
             guard points.count > 1 else { return }
-            
-            var path = Path()
-            path.move(to: points[0])
-            
-            // Cubic Bezier Smoothing
-            for i in 0..<points.count-1 {
-                let p1 = points[i]
-                let p2 = points[i+1]
-                let mid = CGPoint(x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2)
-                let cp1 = CGPoint(x: (p1.x + mid.x)/2, y: p1.y)
-                let cp2 = CGPoint(x: (mid.x + p2.x)/2, y: p2.y)
-                
-                path.addQuadCurve(to: mid, control: cp1)
-                path.addQuadCurve(to: p2, control: cp2)
+
+            // Banda di incertezza dell'ensemble, disegnata sotto alla linea.
+            //
+            // Si disegna solo sul tratto iniziale continuo in cui entrambi i
+            // percentili ci sono: il modello di ensemble copre meno ore della
+            // previsione, e chiudere il poligono su un buco disegnerebbe una
+            // banda dove non c'è alcun dato.
+            let banded = Array(data.items.enumerated().prefix { $0.element.p10 != nil && $0.element.p90 != nil })
+            if banded.count > 1 {
+                let upper = banded.map { CGPoint(x: x($0.offset), y: y($0.element.p90!)) }
+                let lower = banded.map { CGPoint(x: x($0.offset), y: y($0.element.p10!)) }
+
+                // Si percorre il bordo superiore, si scende a destra, si torna
+                // indietro sul bordo inferiore e si chiude.
+                var band = smoothPath(through: upper)
+                band.addLine(to: lower[lower.count - 1])
+                appendSmoothCurve(to: &band, through: Array(lower.reversed()))
+                band.closeSubpath()
+
+                context.fill(band, with: .color(.black.opacity(0.08)))
             }
             
+            let path = smoothPath(through: points)
+
             // Draw gradient fill below the line
             var fillPath = path
             fillPath.addLine(to: CGPoint(x: points.last!.x, y: size.height - Layout.bottomPadding))
