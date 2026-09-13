@@ -100,6 +100,12 @@ export interface HourlyForecast {
 	solar_irradiance?: number | null;
 	/** Secondi di sole pieno nell'ora. */
 	sunshine_duration?: number | null;
+	/** Copertura nuvolosa totale dell'ora, %. */
+	cloud_cover?: number | null;
+	/** Copertura per quota, %: il tramonto nasce dalle nuvole alte. */
+	cloud_cover_low?: number | null;
+	cloud_cover_mid?: number | null;
+	cloud_cover_high?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */
@@ -262,6 +268,38 @@ export interface SolarOutlook {
 	days: SolarDay[];
 }
 
+/** Fasce dei due indici del cielo. */
+export type SkyLevel = 'plain' | 'fair' | 'good' | 'excellent';
+
+export interface SkyEvent {
+	/** Slot orario valutato, nella chiave locale degli hourly. */
+	at: string;
+	score: number;
+	level: SkyLevel;
+}
+
+export interface StargazingOutlook {
+	score: number;
+	level: SkyLevel;
+	/** Copertura media della notte, %. */
+	cloud_cover: number;
+	/** Percentuale di disco lunare illuminato, quando la conosciamo. */
+	moon_illumination: number | null;
+}
+
+/**
+ * Tramonti e cielo notturno.
+ *
+ * Nasce dall'osservazione che la copertura totale non basta: un tramonto
+ * memorabile vuole nuvole **alte** illuminate e l'orizzonte libero, e un cielo
+ * terso e uno coperto danno entrambi un tramonto ordinario per ragioni opposte.
+ */
+export interface SkyOutlook {
+	sunset: SkyEvent | null;
+	sunrise: SkyEvent | null;
+	stargazing: StargazingOutlook | null;
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -305,6 +343,8 @@ export interface ForecastResponse {
 	garden?: GardenOutlook;
 	/** Fotovoltaico: resa specifica per giorno. */
 	solar?: SolarOutlook;
+	/** Cielo: qualità di alba/tramonto e osservazione astronomica. */
+	sky?: SkyOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

@@ -110,13 +110,18 @@ const CURRENT_PARAMS =
 // `soil_temperature_0_to_7cm` è lo strato delle radici, che è quello che decide
 // se un seme germina. Sono due domande diverse e due campi diversi.
 //
-// Gli ultimi tre servono al fotovoltaico (`utils/solar.ts`).
+// Le quattro nuvolosità servono ai tramonti e al cielo notturno
+// (`utils/sky.ts`): separate per quota, perché il tramonto spettacolare nasce
+// da nuvole ALTE illuminate con l'orizzonte libero — la copertura totale da
+// sola non distingue quel caso da un cielo plumbeo.
+//
+// Tre servono al fotovoltaico (`utils/solar.ts`).
 // `global_tilted_irradiance` è la radiazione sul piano dei pannelli, calcolata
 // da Open-Meteo con l'inclinazione e l'orientamento che passiamo in query;
 // `shortwave_radiation` è quella sul piano orizzontale, e resta come ripiego se
 // il primo non arriva.
 const HOURLY_PARAMS =
-	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm,et0_fao_evapotranspiration,vapour_pressure_deficit,shortwave_radiation,global_tilted_irradiance,sunshine_duration';
+	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm,et0_fao_evapotranspiration,vapour_pressure_deficit,shortwave_radiation,global_tilted_irradiance,sunshine_duration,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high';
 /**
  * Piano dei pannelli per `global_tilted_irradiance`.
  *
@@ -208,6 +213,10 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 				hourly.shortwave_radiation?.[realIndex] ??
 				null,
 			sunshine_duration: hourly.sunshine_duration?.[realIndex] ?? null,
+			cloud_cover: hourly.cloud_cover?.[realIndex] ?? null,
+			cloud_cover_low: hourly.cloud_cover_low?.[realIndex] ?? null,
+			cloud_cover_mid: hourly.cloud_cover_mid?.[realIndex] ?? null,
+			cloud_cover_high: hourly.cloud_cover_high?.[realIndex] ?? null,
 			cape: hourly.cape?.[realIndex] ?? null,
 			lifted_index: hourly.lifted_index?.[realIndex] ?? null,
 			convective_inhibition: hourly.convective_inhibition?.[realIndex] ?? null,

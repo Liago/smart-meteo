@@ -298,6 +298,41 @@ test.describe('fotovoltaico', () => {
 	});
 });
 
+test.describe('cielo', () => {
+	test('mette in cima il tramonto e mostra gli ingredienti della notte', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Cielo')).toBeVisible();
+		await expect(page.getByText('Tramonto spettacolare verso le 20:00')).toBeVisible();
+		await expect(page.getByText('30% di nuvole, luna al 60%')).toBeVisible();
+	});
+
+	test('cede il titolo alla notte quando è lei la notevole', async ({ page }) => {
+		// Senza questa regola una notte ottima sotto un tramonto ordinario
+		// resterebbe invisibile.
+		await mockApi(page, {
+			sky: {
+				sunset: { at: `${new Date().toISOString().slice(0, 10)}T20:00`, score: 10, level: 'plain' },
+				sunrise: null,
+				stargazing: { score: 92, level: 'excellent', cloud_cover: 5, moon_illumination: 4 },
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Notte ottima per le stelle')).toBeVisible();
+		await expect(page.getByText('cielo terso, luna quasi nuova')).toBeVisible();
+	});
+
+	test('senza nuvolosità per quota il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { sky: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Cielo')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

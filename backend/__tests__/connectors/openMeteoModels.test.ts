@@ -207,6 +207,10 @@ describe('campi neve e quota', () => {
 			expect(hourly).toContain('soil_temperature_0_to_7cm');
 			expect(hourly).toContain('global_tilted_irradiance');
 			expect(hourly).toContain('shortwave_radiation');
+			// Le nuvole per quota: la copertura totale non distingue un cielo
+			// plumbeo da cirri illuminati.
+			expect(hourly).toContain('cloud_cover_low');
+			expect(hourly).toContain('cloud_cover_high');
 			// Il piano dei pannelli viaggia come parametro della query, non
 			// come campo: senza, `global_tilted_irradiance` sarebbe orizzontale.
 			expect(config.params.tilt).toBe(30);
@@ -248,6 +252,8 @@ describe('campi neve e quota', () => {
 		// Preferisce il piano dei pannelli all'orizzontale.
 		expect(r!.hourly![0]!.solar_irradiance).toBe(680);
 		expect(r!.solar_plane).toBe('tilted');
+		expect(r!.hourly![0]!.cloud_cover_low).toBe(10);
+		expect(r!.hourly![0]!.cloud_cover_high).toBe(50);
 		expect(r!.daily![1]!.snowfall_cm).toBe(1.5);
 	});
 
@@ -276,6 +282,8 @@ describe('campi neve e quota', () => {
 		delete senzaNeve.hourly.global_tilted_irradiance;
 		delete senzaNeve.hourly.shortwave_radiation;
 		delete senzaNeve.hourly.sunshine_duration;
+		delete senzaNeve.hourly.cloud_cover_low;
+		delete senzaNeve.hourly.cloud_cover_high;
 		delete senzaNeve.daily.snowfall_sum;
 		delete senzaNeve.elevation;
 		mock.onGet(/open-meteo\.com/).reply(200, senzaNeve);
@@ -292,6 +300,7 @@ describe('campi neve e quota', () => {
 		expect(r!.hourly![0]!.lifted_index).toBeNull();
 		expect(r!.hourly![0]!.soil_moisture).toBeNull();
 		expect(r!.hourly![0]!.solar_irradiance).toBeNull();
+		expect(r!.hourly![0]!.cloud_cover_high).toBeNull();
 		expect(r!.solar_plane).toBeNull();
 		expect(r!.hourly![0]!.evapotranspiration).toBeNull();
 		expect(r!.daily![0]!.snowfall_cm).toBeNull();

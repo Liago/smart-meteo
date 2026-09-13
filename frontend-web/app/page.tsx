@@ -14,6 +14,7 @@ import PollenPanel from '@/components/PollenPanel';
 import SnowPanel from '@/components/SnowPanel';
 import GardenPanel from '@/components/GardenPanel';
 import SolarPanel from '@/components/SolarPanel';
+import SkyPanel from '@/components/SkyPanel';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -235,6 +236,7 @@ export default function Home() {
 								<SnowPanel snow={data.snow} />
 								<GardenPanel garden={data.garden} />
 								<SolarPanel solar={data.solar} />
+								<SkyPanel sky={data.sky} />
 								<PollenPanel pollen={data.pollen} />
 								<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
 							</div>

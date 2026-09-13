@@ -88,6 +88,10 @@ export function openMeteoResponse(overrides?: { current?: Overrides }) {
 			shortwave_radiation: [610, 520],
 			global_tilted_irradiance: [680, 590], // piano dei pannelli
 			sunshine_duration: [3600, 2400],
+			cloud_cover: [75, 60],
+			cloud_cover_low: [10, 20],
+			cloud_cover_mid: [25, 30],
+			cloud_cover_high: [50, 40],
 		},
 	};
 }

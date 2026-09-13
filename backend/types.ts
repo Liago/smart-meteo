@@ -54,6 +54,16 @@ export interface HourlyForecast {
 	solar_irradiance?: number | null;
 	/** Secondi di sole pieno nell'ora. */
 	sunshine_duration?: number | null;
+	/** Copertura nuvolosa totale dell'ora, %. */
+	cloud_cover?: number | null;
+	/**
+	 * Copertura per quota, %. Il tramonto spettacolare nasce da nuvole ALTE
+	 * illuminate con l'orizzonte libero: la copertura totale non distingue
+	 * quel caso da un cielo plumbeo.
+	 */
+	cloud_cover_low?: number | null;
+	cloud_cover_mid?: number | null;
+	cloud_cover_high?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */

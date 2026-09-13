@@ -1273,3 +1273,86 @@ describe('fotovoltaico', () => {
 		expect(r.solar.days[0].kwh_per_kwp).toBeGreaterThan(3);
 	});
 });
+
+
+describe('cielo: tramonti e stelle', () => {
+	/** Una giornata con la copertura indicata a tutte le ore, da domani. */
+	const giornata = (over: Record<string, any>) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+		return Array.from({ length: 24 }, (_, h) => ({
+			time: `${date}T${String(h).padStart(2, '0')}:00`,
+			temp: 20,
+			precipitation_prob: 0,
+			condition_code: '1',
+			condition_text: 'Sereno',
+			...over,
+		}));
+	};
+
+	const domaniAlle = (hour: string) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		return `${domani.toISOString().slice(0, 10)}T${hour}:00`;
+	};
+
+	it('valuta il tramonto sulle nuvole alte, non sulla copertura totale', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({ cloud_cover: 55, cloud_cover_low: 0, cloud_cover_mid: 0, cloud_cover_high: 50 }),
+			astronomy: {
+				sunrise: domaniAlle('05:30'),
+				sunset: domaniAlle('20:44'),
+				moon_phase: 'Luna Nuova',
+				moon_illumination: 5,
+			},
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sky).toBeDefined();
+		// Copertura totale 55% ma tutta alta e orizzonte libero: spettacolare.
+		expect(r.sky.sunset.score).toBe(100);
+		expect(r.sky.sunset.level).toBe('excellent');
+	});
+
+	it('usa l illuminazione lunare riconciliata fra le fonti', async () => {
+		// La luna arriva da una fonte diversa da quella astronomica principale:
+		// il riquadro cielo si compone dopo quel merge, non prima.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({ cloud_cover: 0 }),
+			astronomy: { sunrise: domaniAlle('05:30'), sunset: domaniAlle('20:44'), moon_phase: 'Luna Piena' },
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			astronomy: {
+				sunrise: domaniAlle('05:31'),
+				sunset: domaniAlle('20:45'),
+				moon_phase: 'Full Moon',
+				moon_illumination: 100,
+			},
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sky.stargazing.moon_illumination).toBe(100);
+		// Cielo terso ma luna piena: buono per i pianeti, non per il profondo.
+		expect(r.sky.stargazing.score).toBeLessThan(50);
+	});
+
+	it('senza nuvolosità per quota il blocco non compare', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({}),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('sky');
+	});
+});

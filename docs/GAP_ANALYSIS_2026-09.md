@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 5 punti su 9.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 6 punti su 9.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -464,12 +464,13 @@ Implementata in `backend/utils/garden.ts` (blocco `garden`), `GardenPanel.tsx` e
 Da attivare solo per località costiere (test sulla distanza dal mare): temperatura dell'acqua e
 onde sono la prima domanda di chi va al mare.
 
-#### 5.12 Alba/tramonto "spettacolari" e cielo notturno
+#### 5.12 Alba/tramonto "spettacolari" e cielo notturno ⭐ ✅ IMPLEMENTATA (6E)
 
-`cloud_cover_low/mid/high` separati (Open-Meteo) + visibilità: nuvole alte con cielo basso libero
-danno i tramonti migliori. Con `moon_illumination`, `moonrise`/`moonset` (già in casa, §3.2) e la
-copertura nuvolosa si costruisce un indice per l'osservazione astronomica. Feature "carina",
-effort molto basso, ottima per la condivisione.
+`cloud_cover_low/mid/high` separati più la copertura totale oraria, dallo stesso endpoint
+Open-Meteo, uniti all'illuminazione lunare che avevamo già in casa (§3.2).
+
+Implementata in `backend/utils/sky.ts` (blocco `sky`) e `SkyPanel.tsx`. Le decisioni sono nel
+registro, §7 → Fase 6E punto 6.
 
 ### Tier 3 — ingegneria dei dati (invisibile, alto impatto sulla qualità)
 
@@ -572,7 +573,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 23 | Radiazione solare e resa fotovoltaica | §5.9 | ✅ |
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
 | 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
-| 26 | Alba/tramonto e cielo notturno | §5.12 | ⏳ |
+| 26 | Alba/tramonto e cielo notturno | §5.12 | ✅ |
 | 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
 
 ### 6.6 Decisione richiesta: notifiche email
@@ -977,7 +978,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (5 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (6 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1135,6 +1136,58 @@ simulatore.
 **Verifiche:** 524 test backend (24 suite), 214 web (12 suite), 40 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
+#### 6. Tramonti spettacolari e cielo notturno
+
+Chiude §5.12. Commit `feat(6E): tramonti spettacolari e cielo notturno`.
+
+Due indici che nascono dalla stessa intuizione: **la copertura nuvolosa totale non basta, conta
+la quota**. Schema di cache alla versione 14.
+
+**Decisioni**
+
+- **Il tramonto è un prodotto di due fattori, non una somma.** La *tela* sono le nuvole alte che
+  possono accendersi — massimo a metà copertura, zero sia col cielo terso (non c'è niente da
+  illuminare) sia con la volta chiusa; la *luce* è quanto l'orizzonte è libero. Con una somma, un
+  cielo perfettamente sereno prenderebbe comunque metà punteggio per il solo fatto di non avere
+  nuvole basse, e verrebbe annunciato come mezzo spettacolo.
+- **Le nuvole basse pesano più delle medie** nel bloccare la luce: stanno fra il sole e chi guarda
+  all'orizzonte e spengono la scena, mentre le medie la attenuano soltanto.
+- **La luna penalizza l'osservazione ma non l'azzera.** Con la luna piena si vedono benissimo
+  pianeti, luna stessa e stelle luminose: sono gli oggetti deboli a sparire. Il fattore 0.6 lascia
+  un cielo terso con luna piena intorno al 40, cioè «discreta», che è la verità.
+- **La copertura totale, quando manca, si ricava dal massimo delle quote e non dalla somma**: tre
+  strati al 40% non fanno un cielo coperto al 120%.
+- **La notte si prende con un OR, non con un intervallo.** È a cavallo della mezzanotte: con un
+  `22 <= ora <= 3` non resterebbe nessuna ora.
+- **Il riquadro cielo si compone dopo la riconciliazione dei dati lunari fra le fonti**, non
+  durante l'aggregazione oraria: l'illuminazione della luna è uno dei due ingredienti e spesso
+  arriva da una fonte diversa da quella astronomica principale.
+- **In cima va l'indice più alto fra il solare e la notte.** Il pannello ha una riga sola di
+  titolo: con un titolo fisso sul tramonto, una notte eccezionale sotto un tramonto ordinario
+  resterebbe invisibile — ed è proprio il caso che fa aprire il pannello.
+- **Il giudizio sulla notte mostra i suoi due ingredienti** (nuvole e luna): un verdetto senza il
+  perché è un verdetto senza appello.
+
+**Ritrovamento, e non era un flake.** Il test E2E «da ospite il salvataggio nei preferiti è
+disabilitato» era fallito due volte a intermittenza. Guardandolo: il pulsante è
+`disabled={!coords}` — dipende dall'avere una località, **non dall'essere autenticati** — e gli
+ospiti possono salvare nei preferiti per progetto dichiarato (localStorage, con sincronizzazione
+su Supabase al login). Il test asseriva quindi un comportamento che il prodotto non ha mai avuto,
+e passava solo vincendo la corsa con l'effetto che legge la località di casa da localStorage.
+Sostituito con due test che verificano il comportamento reale: il pulsante è inerte senza
+località, e un ospite salva regolarmente in locale. La suite completa gira ora verde due volte di
+fila.
+
+**Limite dichiarato:** solo backend e web, come le due voci precedenti.
+
+**Nota di prodotto:** la dashboard ha ora nove riquadri (allerte, nowcast, corrente, sole e vento,
+narrativa, AQI, pollini, neve, orto, fotovoltaico, cielo, fonti). Sono tutti utili a qualcuno e
+quasi nessuno a tutti: prima di aggiungerne altri conviene decidere come raggrupparli — sezioni
+richiudibili, o una scelta di quali mostrare.
+
+**Verifiche:** 549 test backend (25 suite), 231 web (13 suite), 44 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1144,8 +1197,7 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 
 ### Prossimo blocco
 
-**Fase 6E, punti 22 e 25-27**: mare e maree, indici lifestyle, alba/tramonto, test iOS e audit
-Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
+**Fase 6E, punti 22, 25 e 27**: mare e maree, indici lifestyle, test iOS e audit Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
 schermate non compilate: un passaggio su simulatore viene prima.
 **Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
 
