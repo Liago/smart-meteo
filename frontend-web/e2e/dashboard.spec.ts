@@ -168,6 +168,56 @@ test.describe('pollini', () => {
 	});
 });
 
+test.describe('neve e gelate', () => {
+	test('in montagna dichiara la neve e la confronta con la quota della località', async ({ page }) => {
+		await mockApi(page, {
+			snow: {
+				elevation: 1800,
+				snow_line: 900,
+				phase: 'snow',
+				snow_depth_cm: 40,
+				snowfall_cm: 12,
+				frost: { level: 'severe', min_temp: -6.2, at: '2026-01-15T06:00', source: 'air' },
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Neve e gelate')).toBeVisible();
+		await expect(page.getByText('Neve prevista, circa 12 cm')).toBeVisible();
+		// Il confronto con l'altitudine è il motivo per cui la quota neve è
+		// leggibile: senza, resterebbe un dato da bollettino.
+		await expect(page.getByText('sei a 1800 m')).toBeVisible();
+		await expect(page.getByText('Gelata forte')).toBeVisible();
+	});
+
+	test('in pianura resta il solo rischio gelate', async ({ page }) => {
+		await mockApi(page, {
+			snow: {
+				elevation: 122,
+				snow_line: 1200,
+				phase: 'rain',
+				snow_depth_cm: null,
+				snowfall_cm: null,
+				frost: { level: 'likely', min_temp: -1.4, at: '2026-01-15T06:00', source: 'soil' },
+			},
+		});
+		await page.goto('/');
+
+		// "al suolo" non è pedanteria: fra la superficie e i due metri ci sono
+		// tre o quattro gradi, e il backend le giudica con soglie diverse.
+		await expect(page.getByText('Gelata probabile, minima al suolo -1° alle 06:00')).toBeVisible();
+		await expect(page.getByText('Neve al suolo')).toHaveCount(0);
+	});
+
+	test('in una giornata mite il riquadro non compare', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Neve e gelate')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

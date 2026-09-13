@@ -13,6 +13,7 @@ import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
+import { aggregateSnowfallCm, buildSnowOutlook } from '../utils/snow';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
 import { weightedMean, weightedVote } from '../utils/aggregate';
@@ -42,8 +43,14 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *       forma e i valori aggregati con essa
  *   7 → banda di incertezza (temp_p10/temp_p90) sugli slot orari
  *   8 → european_aqi su air_quality e blocco pollen
+ *   9 → blocco snow (quota neve, manto, gelate), snowfall_cm su daily/hourly
+ *       e soil_temperature sugli slot orari
+ *
+ * Esportata perché i test la usino invece di ricopiarne il numero: una copia
+ * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
+ * modifica non c'entra niente.
  */
-const FORECAST_SCHEMA_VERSION = 8;
+export const FORECAST_SCHEMA_VERSION = 9;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -378,7 +385,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			const sourceWeight = weightOf(f.source);
 			f.daily.forEach(d => {
 				if (!dailyMap.has(d.date)) {
-					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [] });
+					dailyMap.set(d.date, { temp_max: [], temp_min: [], precip_prob: [], codes: [], uv_index_max: [], precip_mm: [], snowfall_cm: [] });
 				}
 				const entry = dailyMap.get(d.date)!;
 				if (d.temp_max !== null) entry.temp_max.push({ val: d.temp_max, weight: sourceWeight });
@@ -386,6 +393,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				if (d.precipitation_prob !== null) entry.precip_prob.push({ val: d.precipitation_prob, weight: sourceWeight });
 				if (d.uv_index_max != null) entry.uv_index_max.push(d.uv_index_max);
 				if (d.precipitation_mm != null) entry.precip_mm.push({ val: d.precipitation_mm, weight: sourceWeight });
+				if (d.snowfall_cm != null) entry.snowfall_cm.push({ val: d.snowfall_cm, weight: sourceWeight });
 				entry.codes.push({ code: d.condition_code, weight: sourceWeight });
 			});
 		}
@@ -407,6 +415,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			condition_text: bestCode.toUpperCase(),
 			...(uvMax !== undefined && { uv_index_max: uvMax }),
 			...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
+			...(data.snowfall_cm.length > 0 && { snowfall_cm: aggregateSnowfallCm(data.snowfall_cm) }),
 		};
 	});
 
@@ -451,6 +460,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		precip_mm: Weighted[];
 		wind_directions: Weighted[];
 		wind_gusts: Weighted[];
+		snowfall_cm: Weighted[];
+		snow_depth_cm: Weighted[];
+		freezing_levels: Weighted[];
+		soil_temperatures: Weighted[];
 	}>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
@@ -458,7 +471,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			f.hourly.forEach(h => {
 				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [] });
+					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push({ val: h.temp, weight: sourceWeight });
@@ -475,6 +488,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				// slot sono totali su 3 ore e non sono confrontabili con gli accumuli orari
 				// delle altre fonti. Contribuisce solo alla somma giornaliera.
 				if (h.precipitation_mm != null) entry.precip_mm.push({ val: h.precipitation_mm, weight: sourceWeight });
+				// Neve: la portano solo i modelli Open-Meteo, le altre fonti non
+				// espongono né il manto né la quota dello zero termico.
+				if (h.snowfall_cm != null) entry.snowfall_cm.push({ val: h.snowfall_cm, weight: sourceWeight });
+				if (h.snow_depth_cm != null) entry.snow_depth_cm.push({ val: h.snow_depth_cm, weight: sourceWeight });
+				if (h.freezing_level != null) entry.freezing_levels.push({ val: h.freezing_level, weight: sourceWeight });
+				if (h.soil_temperature != null) entry.soil_temperatures.push({ val: h.soil_temperature, weight: sourceWeight });
 				entry.codes.push({ code: h.condition_code, weight: sourceWeight });
 			});
 		}
@@ -497,6 +516,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				...(data.wind_gusts.length > 0 && { wind_gust: aggregateWindGust(data.wind_gusts) }),
 				...(data.uv_indices.length > 0 && { uv_index: weightedMean(data.uv_indices) }),
 				...(data.precip_mm.length > 0 && { precipitation_mm: aggregatePrecipitationMm(data.precip_mm) }),
+				...(data.snowfall_cm.length > 0 && { snowfall_cm: aggregateSnowfallCm(data.snowfall_cm) }),
+				// Manto e zero termico sono stati continui, non accumuli: media
+				// pesata come per la temperatura.
+				...(data.snow_depth_cm.length > 0 && { snow_depth_cm: weightedMean(data.snow_depth_cm) }),
+				...(data.freezing_levels.length > 0 && { freezing_level: weightedMean(data.freezing_levels) }),
+				...(data.soil_temperatures.length > 0 && { soil_temperature: weightedMean(data.soil_temperatures) }),
 			};
 		});
 
@@ -515,6 +540,25 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			applicate++;
 		}
 		console.log(`[Ensemble] ${ensemble.model}: banda applicata a ${applicate}/${aggregatedHourly.length} slot`);
+	}
+
+	// Neve e gelate. La quota del punto di griglia la dichiara solo Open-Meteo:
+	// senza di lei la quota neve resta un numero da bollettino, perché è il
+	// confronto con l'altitudine della località a dire se nevica o piove.
+	// I modelli non concordano sull'orografia della cella, quindi si media.
+	const elevations = validForecasts
+		.filter(f => f.elevation != null)
+		.map(f => ({ val: f.elevation as number, weight: weightOf(f.source) }));
+	const elevation = elevations.length > 0 ? weightedMean(elevations) : null;
+
+	// La finestra parte dall'ora corrente *locale*: le fonti portano anche slot
+	// passati, e un manto di ieri non è quello di adesso.
+	const currentHourKey = hourKeyOf(new Date().toISOString());
+	const snow = buildSnowOutlook(elevation, aggregatedHourly, currentHourKey);
+	if (snow) {
+		console.log(
+			`[Snow] quota ${elevation ?? '?'} m, quota neve ${snow.snow_line ?? '—'} m, fase ${snow.phase ?? 'nessuna precipitazione'}, gelate ${snow.frost.level}`
+		);
 	}
 
 	// Prefer astronomy source with moonrise/moonset, then real moon_phase, then any
@@ -607,6 +651,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		confidence: consensus,
 		// Pollini: solo dove il modello CAMS copre, cioè in Europa.
 		...(openMeteoAir?.pollen && { pollen: openMeteoAir.pollen }),
+		// Neve e gelate: presente solo quando c'è qualcosa da dire, altrimenti
+		// sarebbe un riquadro vuoto per otto mesi l'anno.
+		...(snow && { snow }),
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,

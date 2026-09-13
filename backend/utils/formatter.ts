@@ -65,6 +65,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	visibility: number | null;
 	cloud_cover: number | null;
 	utc_offset_seconds: number | null;
+	elevation: number | null;
 	air_quality?: AirQualityDetail;
 	raw_data?: any;
 	daily?: DailyForecast[];
@@ -96,6 +97,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.visibility = data.visibility ?? null;
 		this.cloud_cover = data.cloud_cover ?? null;
 		this.utc_offset_seconds = data.utc_offset_seconds ?? null;
+		this.elevation = data.elevation ?? null;
 		this.raw_data = data.raw_data;
 		if (data.air_quality) {
 			this.air_quality = data.air_quality;

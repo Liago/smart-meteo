@@ -67,6 +67,12 @@ export interface ForecastOptions {
 	alerts?: unknown[];
 	/** Rimuove i pollini, come fuori dalla copertura del modello CAMS. */
 	withoutPollen?: boolean;
+	/**
+	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
+	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
+	 * serena di settembre.
+	 */
+	snow?: Record<string, unknown>;
 }
 
 export function buildForecast(options: ForecastOptions = {}) {
@@ -146,6 +152,10 @@ export function buildForecast(options: ForecastOptions = {}) {
 			{ species: 'olive', label: 'Olivo', value: 3, daily_max: 20, level: 'low', daily_level: 'moderate' },
 			{ species: 'birch', label: 'Betulla', value: 0, daily_max: 0, level: 'none', daily_level: 'none' },
 		];
+	}
+
+	if (options.snow) {
+		forecast.snow = options.snow;
 	}
 
 	if (!options.withoutNextHour) {

@@ -27,6 +27,9 @@ const merge = (base: any, overrides?: Overrides) => ({ ...base, ...(overrides ??
 export function openMeteoResponse(overrides?: { current?: Overrides }) {
 	return {
 		utc_offset_seconds: 7200,
+		// Quota del punto di griglia: senza di lei la quota neve non è
+		// confrontabile con l'altitudine della località.
+		elevation: 122,
 		current: merge(
 			{
 				time: '2026-09-12T14:00',
@@ -56,6 +59,7 @@ export function openMeteoResponse(overrides?: { current?: Overrides }) {
 			sunrise: ['2026-09-12T06:52', '2026-09-13T06:53'],
 			sunset: ['2026-09-12T19:44', '2026-09-13T19:42'],
 			uv_index_max: [6, 4],
+			snowfall_sum: [0, 1.5],
 		},
 		hourly: {
 			time: ['2026-09-12T14:00', '2026-09-12T15:00'],
@@ -70,6 +74,10 @@ export function openMeteoResponse(overrides?: { current?: Overrides }) {
 			wind_direction_10m: [180, 190],
 			wind_gusts_10m: [GUST_KMH, GUST_KMH],
 			uv_index: [5.2, 4.8],
+			snowfall: [0, 0.8],
+			snow_depth: [0.12, 0.14], // METRI: l'API non usa i centimetri qui
+			freezing_level_height: [1500, 1420],
+			soil_temperature_0cm: [21.4, 22.1],
 		},
 	};
 }

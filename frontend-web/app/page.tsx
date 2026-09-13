@@ -11,6 +11,7 @@ import SunWindCard from '@/components/SunWindCard';
 import NextHourPrecipitation from '@/components/NextHourPrecipitation';
 import AirQualitySummary from '@/components/AirQualitySummary';
 import PollenPanel from '@/components/PollenPanel';
+import SnowPanel from '@/components/SnowPanel';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -229,6 +230,7 @@ export default function Home() {
 							/>
 							<div className="flex flex-col gap-5">
 								<AirQualitySummary data={data.current} sourcesCount={data.sources_used.length} />
+								<SnowPanel snow={data.snow} />
 								<PollenPanel pollen={data.pollen} />
 								<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
 							</div>

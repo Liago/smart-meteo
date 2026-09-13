@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (1 punto su 5) · 6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (2 punti su 5) · 6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -343,18 +343,21 @@ Tre risultati in un colpo:
 
 **Effort:** medio (nuovo connettore + tipi + pannello web/iOS). **Impatto:** alto.
 
-#### 5.2 Quota neve, neve al suolo, gelate (Open-Meteo) ⭐
+#### 5.2 Quota neve, neve al suolo, gelate (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6D)
 
-Parametri da aggiungere alla chiamata che **già facciamo**: `freezing_level_height`,
-`snow_depth`, `snowfall` (hourly), `snowfall_sum` (daily), `soil_temperature_0cm`.
+Parametri aggiunti alla chiamata che **già facevamo**: `freezing_level_height`, `snow_depth`,
+`snowfall` e `soil_temperature_0cm` (hourly), `snowfall_sum` (daily), più l'`elevation` del punto
+di griglia — nessuna richiesta HTTP in più.
 
 Per un'app usata su località alpine (i documenti stessi citano Bormio) la quota neve è
 l'informazione più richiesta dell'inverno, e il rischio gelata notturna quella più richiesta a
-marzo-aprile. Con `snow_depth` si mostra anche il manto attuale. WeatherKit ci darebbe in più
-`snowfallAmount` daily e `snowfallIntensity` hourly (§3.10), rendendo il dato multi-fonte.
+marzo-aprile. Con `snow_depth` si mostra anche il manto attuale.
 
-**Effort:** basso lato backend (stringa di parametri + campi), medio lato UI.
-**Impatto:** alto in stagione.
+Implementata in `backend/utils/snow.ts` (blocco `snow` sulla risposta), `SnowPanel.tsx` e
+`SnowPanelView.swift`. Le decisioni sono nel registro, §7 → Fase 6D punto 2.
+
+**Resta aperto:** WeatherKit espone `snowfallAmount` daily e `snowfallIntensity` hourly (§3.10)
+e renderebbe multi-fonte i centimetri di neve, oggi presi dai soli modelli Open-Meteo → 6E.
 
 #### 5.3 Indice di consenso e banda di incertezza ⭐
 
@@ -530,7 +533,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | # | Intervento | Chiude | Stato |
 |---|-----------|--------|:-----:|
 | 14 | Connettore Open-Meteo Air Quality: pollini + AQI multi-fonte | §3.6, §5.1 | ✅ |
-| 15 | Quota neve, neve al suolo, rischio gelate | §5.2 | ⏳ |
+| 15 | Quota neve, neve al suolo, rischio gelate | §5.2 | ✅ |
 | 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 | ⏳ |
 | 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 | ⏳ |
 | 18 | Allerte su soglie personali | §5.15 | ⏳ |
@@ -541,8 +544,8 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
   mostrato. Chiude l'asimmetria dichiarata in §3.5.
 - Mare e maree (§5.11), fotovoltaico (§5.9), giardino (§5.10), indici lifestyle (§5.6, con
   cache per il limite AccuWeather), alba/tramonto e cielo notturno (§5.12).
-- Residui WeatherKit (§3.10): la neve ha senso insieme alla quota neve di Open-Meteo (§5.2),
-  non da sola.
+- Residui WeatherKit (§3.10): `snowfallAmount` e `snowfallIntensity` renderebbero i centimetri
+  di neve multi-fonte, oggi presi dai soli modelli Open-Meteo (§5.2, ora implementata).
 - Test iOS e audit Lighthouse (`VALUTAZIONI_TECNICHE` §2 e §4).
 
 ### 6.6 Decisione richiesta: notifiche email
@@ -769,15 +772,14 @@ consenso`):
 **Verifiche finali:** 326 test backend (16 suite), 137 web (7 suite), 27 scenari E2E × 2
 viewport, typecheck pulito su entrambi i lati, lint web a 2 errori preesistenti.
 
-### Fase 6D — in corso (1 punto su 5 al 2026-09-13)
+### Fase 6D — in corso (2 punti su 5 al 2026-09-13)
 
-Commit `feat(6D): pollini e qualità dell'aria da Open-Meteo`.
+#### 1. Qualità dell'aria a due fonti e pollini
 
-**Fatto**
+Chiude §3.6 e §5.1. Commit `feat(6D): pollini e qualità dell'aria da Open-Meteo`.
 
-1. **Qualità dell'aria a due fonti e pollini** (§3.6, §5.1). Indice europeo e inquinanti da
-   Open-Meteo accanto all'EPA di WeatherAPI, fusi invece che alternativi; sei specie polliniche
-   dal modello CAMS con etichette in italiano.
+Indice europeo e inquinanti da Open-Meteo accanto all'EPA di WeatherAPI, fusi invece che
+alternativi; sei specie polliniche dal modello CAMS con etichette in italiano.
 
 **Decisioni**
 
@@ -796,10 +798,55 @@ Commit `feat(6D): pollini e qualità dell'aria da Open-Meteo`.
 
 **Verifiche:** 352 test backend (17 suite), 148 web (8 suite), 29 scenari E2E × 2 viewport.
 
+#### 2. Quota neve, manto e rischio gelate
+
+Chiude §5.2. Commit `feat(6D): quota neve, manto nevoso e rischio gelate`.
+
+`freezing_level_height`, `snowfall`, `snow_depth` e `soil_temperature_0cm` sull'orario,
+`snowfall_sum` sul giornaliero, più l'`elevation` del punto di griglia: tutti dalla chiamata
+Open-Meteo che già facevamo, senza una richiesta HTTP in più. `backend/utils/snow.ts` ne ricava
+un blocco `snow` sulla risposta; `SnowPanel.tsx` e `SnowPanelView.swift` lo mostrano su web e
+iOS. Schema di cache alla versione 9.
+
+**Decisioni**
+
+- **La quota neve non è lo zero termico.** Il fiocco continua a scendere raffreddando l'aria
+  attorno a sé e arriva 200-400 m più in basso dell'isoterma di 0 °C: si sottraggono 300 m,
+  il valore convenzionale per precipitazione moderata.
+- **Il numero da solo non serve: serve accanto alla quota della località.** «Zero termico a
+  1500 m» è un dato da bollettino; «quota neve 900 m, sei a 1800 m» è una risposta. Open-Meteo
+  dichiara l'`elevation` del punto di griglia insieme alla previsione, ed è quella che rende
+  leggibile tutto il resto. I modelli non concordano sull'orografia della cella, quindi si media.
+- **A ridosso della quota si dichiara la mista.** Entro 150 m dalla quota neve nessun modello
+  risolve la differenza fra pioggia e neve: scegliere sarebbe fingere una certezza.
+- **Senza precipitazioni la fase non viene calcolata.** Con cielo sereno la quota neve è un
+  numero senza conseguenze.
+- **Le gelate si giudicano sul suolo quando il dato c'è.** La brina si forma sulla superficie,
+  non a due metri da terra, dove misurano le stazioni: `soil_temperature_0cm` ha le soglie
+  fisiche (0 °C), i 2 metri quelle di compenso (+3 °C, perché nelle notti serene la superficie
+  irraggia e resta 3-4 gradi sotto l'aria). Il blocco dichiara quale delle due ha usato, e i
+  client lo scrivono: «minima al suolo -1°» e «minima -1°» descrivono due notti diverse.
+- **Il manto non si somma, la neve fresca sì.** Il primo è uno stato del suolo, la seconda un
+  accumulo orario: sommare 20 cm di manto per 24 ore darebbe 480 cm di neve a Milano.
+- **Il riquadro compare solo quando c'è qualcosa da dire.** Niente manto, niente neve prevista,
+  nessun rischio di gelata e pioggia normale → il backend omette il blocco. Senza questa regola
+  sarebbe un riquadro vuoto per otto mesi l'anno.
+- **La quota si formatta a mano, non con `toLocaleString('it-IT')`.** La regola italiana non
+  raggruppa i numeri a quattro cifre (`minimumGroupingDigits: 2`): Node la rispetta, Chromium
+  no, e la stessa quota diventava «1800 m» sul server e «1.800 m» nel browser — due test in
+  disaccordo e un rischio di disallineamento in idratazione.
+
+**Limite dichiarato:** i centimetri di neve vengono dai soli modelli Open-Meteo. WeatherKit
+espone `snowfallAmount` e `snowfallIntensity` (§3.10) e li renderebbe multi-fonte come il resto:
+resta in 6E.
+
+**Verifiche:** 395 test backend (18 suite), 168 web (9 suite), 32 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
 ### Prossimo blocco
 
-**Fase 6D, punti 15-18**: quota neve e rischio gelate (§5.2), indice temporali da CAPE (§5.8),
-radar (§5.5), allerte su soglie personali (§5.15).
+**Fase 6D, punti 16-18**: indice temporali da CAPE (§5.8), radar (§5.5), allerte su soglie
+personali (§5.15).
 
 Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
 della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i

@@ -57,6 +57,7 @@ export interface DailyForecast {
 	condition_text: string | null;
 	uv_index_max?: number | null;
 	precipitation_mm?: number | null; // mm totali del giorno
+	snowfall_cm?: number | null;      // cm di neve fresca del giorno
 }
 
 export interface HourlyForecast {
@@ -79,6 +80,14 @@ export interface HourlyForecast {
 	 */
 	temp_p10?: number | null;
 	temp_p90?: number | null;
+	/** Neve fresca dell'ora, in cm (non equivalente in acqua). */
+	snowfall_cm?: number | null;
+	/** Manto nevoso al suolo, in cm. */
+	snow_depth_cm?: number | null;
+	/** Quota dello zero termico, in metri. */
+	freezing_level?: number | null;
+	/** Temperatura della superficie del suolo, °C. */
+	soil_temperature?: number | null;
 }
 
 export interface AstronomyData {
@@ -125,6 +134,50 @@ export interface ConfidenceIndex {
 	precipitation_prob: ConsensusSpread | null;
 }
 
+/** Fase della precipitazione alla quota della località. */
+export type SnowPhase = 'snow' | 'sleet' | 'rain';
+
+/** Rischio gelate nelle prossime 24 ore. */
+export type FrostLevel = 'none' | 'possible' | 'likely' | 'severe';
+
+/**
+ * Da dove viene la minima su cui è giudicato il rischio.
+ *
+ * Cambia il significato della frase: "minima 1°" e "minima al suolo 1°"
+ * descrivono due notti diverse, e il backend usa soglie diverse per le due.
+ */
+export type FrostSource = 'soil' | 'air';
+
+export interface FrostOutlook {
+	level: FrostLevel;
+	/** Temperatura minima prevista nella finestra, °C. */
+	min_temp: number | null;
+	/** Slot orario del minimo, nella stessa chiave locale degli hourly. */
+	at: string | null;
+	source: FrostSource;
+}
+
+/**
+ * Neve e gelate nelle prossime 24 ore.
+ *
+ * Il backend lo omette quando non c'è niente da dire — niente manto, niente
+ * neve prevista, nessun rischio di gelata e pioggia normale — quindi la sua
+ * sola presenza è già il segnale che il pannello va mostrato.
+ */
+export interface SnowOutlook {
+	/** Quota della località secondo i modelli, in metri. */
+	elevation: number | null;
+	/** Quota neve più bassa prevista nella finestra, in metri. */
+	snow_line: number | null;
+	/** Fase attesa alla quota della località; null se non è prevista precipitazione. */
+	phase: SnowPhase | null;
+	/** Manto nevoso presente adesso, in cm. */
+	snow_depth_cm: number | null;
+	/** Neve fresca attesa nella finestra, in cm. */
+	snowfall_cm: number | null;
+	frost: FrostOutlook;
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -156,6 +209,8 @@ export interface ForecastResponse {
 	confidence?: ConfidenceIndex | null;
 	/** Pollini: presenti solo dove il modello CAMS copre, cioè in Europa. */
 	pollen?: PollenReading[];
+	/** Neve e gelate: presente solo quando c'è qualcosa da segnalare. */
+	snow?: SnowOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

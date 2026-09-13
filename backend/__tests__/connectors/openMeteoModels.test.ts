@@ -160,3 +160,76 @@ describe('fetchFromOpenMeteo (best_match)', () => {
 		expect(f.source).toBe('open-meteo');
 	});
 });
+
+describe('campi neve e quota', () => {
+	it('chiede zero termico, neve fresca e manto all API', async () => {
+		// Sono i tre parametri da cui dipende tutto il riquadro neve: se un
+		// refactoring li togliesse dalla query, il riquadro sparirebbe in
+		// silenzio senza che nessun altro test se ne accorga.
+		mock.onGet(/open-meteo\.com/).reply((config) => {
+			const hourly = String(config.params.hourly);
+			expect(hourly).toContain('freezing_level_height');
+			expect(hourly).toContain('snowfall');
+			expect(hourly).toContain('snow_depth');
+			// La brina si forma sulla superficie, non a due metri da terra.
+			expect(hourly).toContain('soil_temperature_0cm');
+			expect(String(config.params.daily)).toContain('snowfall_sum');
+			return [200, openMeteoResponse()];
+		});
+
+		expect(await fetchFromOpenMeteo(LAT, LON)).not.toBeNull();
+	});
+
+	it('converte il manto da metri a centimetri', async () => {
+		// L'API dà la neve fresca in cm e il manto in METRI: senza conversione
+		// 0.12 m diventerebbero "0.12 cm", cioè un millimetro di neve.
+		mock.onGet(/open-meteo\.com/).reply(200, openMeteoResponse());
+
+		const r = await fetchFromOpenMeteo(LAT, LON);
+
+		expect(r!.hourly![0]!.snow_depth_cm).toBe(12);
+		expect(r!.hourly![1]!.snow_depth_cm).toBe(14);
+	});
+
+	it('lascia la neve fresca e lo zero termico nelle unità dell API', async () => {
+		mock.onGet(/open-meteo\.com/).reply(200, openMeteoResponse());
+
+		const r = await fetchFromOpenMeteo(LAT, LON);
+
+		expect(r!.hourly![1]!.snowfall_cm).toBe(0.8);
+		expect(r!.hourly![0]!.freezing_level).toBe(1500);
+		expect(r!.hourly![0]!.soil_temperature).toBe(21.4);
+		expect(r!.daily![1]!.snowfall_cm).toBe(1.5);
+	});
+
+	it('espone la quota del punto di griglia', async () => {
+		mock.onGet(/open-meteo\.com/).reply(200, openMeteoResponse());
+
+		const r = await fetchFromOpenMeteo(LAT, LON);
+
+		expect(r!.elevation).toBe(122);
+	});
+
+	it('una risposta senza i campi neve non manda in errore il connettore', async () => {
+		// I modelli non coprono tutti le stesse variabili, e Open-Meteo omette
+		// la chiave invece di riempirla di null.
+		const senzaNeve: any = openMeteoResponse();
+		delete senzaNeve.hourly.snowfall;
+		delete senzaNeve.hourly.snow_depth;
+		delete senzaNeve.hourly.freezing_level_height;
+		delete senzaNeve.hourly.soil_temperature_0cm;
+		delete senzaNeve.daily.snowfall_sum;
+		delete senzaNeve.elevation;
+		mock.onGet(/open-meteo\.com/).reply(200, senzaNeve);
+
+		const r = await fetchFromOpenMeteo(LAT, LON);
+
+		expect(r).not.toBeNull();
+		expect(r!.elevation).toBeNull();
+		expect(r!.hourly![0]!.snowfall_cm).toBeNull();
+		expect(r!.hourly![0]!.snow_depth_cm).toBeNull();
+		expect(r!.hourly![0]!.freezing_level).toBeNull();
+		expect(r!.hourly![0]!.soil_temperature).toBeNull();
+		expect(r!.daily![0]!.snowfall_cm).toBeNull();
+	});
+});

@@ -123,7 +123,7 @@ jest.mock('../../connectors/openmeteoEnsemble', () => ({
 	),
 }));
 
-import { getSmartForecast } from '../../engine/smartEngine';
+import { FORECAST_SCHEMA_VERSION, getSmartForecast } from '../../engine/smartEngine';
 
 // ------------------------------------------------------------------- helpers
 
@@ -528,7 +528,7 @@ describe('cache', () => {
 	it('restituisce il full_data in cache quando lo schema coincide', async () => {
 		cachedRow = {
 			full_data: {
-				schema_version: 8,
+				schema_version: FORECAST_SCHEMA_VERSION,
 				current: { temperature: 11.1 },
 				sources_used: ['cached-source'],
 				alerts: [],
@@ -543,7 +543,7 @@ describe('cache', () => {
 
 	it('non fa uscire schema_version dall API', async () => {
 		cachedRow = {
-			full_data: { schema_version: 8, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+			full_data: { schema_version: FORECAST_SCHEMA_VERSION, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
 		};
 
 		const r = await getSmartForecast(LAT, LON);
@@ -850,5 +850,173 @@ describe('forma della risposta', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r.astronomy.moon_illumination).toBe(72);
+	});
+});
+
+describe('neve e gelate', () => {
+	/**
+	 * Ore a partire da adesso, in UTC.
+	 *
+	 * L'engine scarta gli slot precedenti all'ora corrente locale: una finestra
+	 * costruita su una data fissa verrebbe buttata via tutta, e il test
+	 * passerebbe o fallirebbe a seconda del giorno in cui gira.
+	 */
+	const oreDaAdesso = (count: number, over: Record<string, any> = {}) => {
+		const base = new Date();
+		base.setUTCMinutes(0, 0, 0);
+		return Array.from({ length: count }, (_, i) => ({
+			time: new Date(base.getTime() + i * 3600_000).toISOString().slice(0, 16),
+			temp: 5,
+			precipitation_prob: 10,
+			condition_code: '71',
+			condition_text: 'Snow',
+			...over,
+		}));
+	};
+
+	it('espone il riquadro neve quando c è qualcosa da dire', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: -1,
+			elevation: 1800,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(12, {
+				temp: -3,
+				freezing_level: 1200,
+				snowfall_cm: 1.5,
+				snow_depth_cm: 40,
+				precipitation_mm: 1.2,
+			}),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.snow).toBeDefined();
+		expect(r.snow.elevation).toBe(1800);
+		expect(r.snow.snow_line).toBe(900);
+		expect(r.snow.phase).toBe('snow');
+		expect(r.snow.snow_depth_cm).toBe(40);
+		expect(r.snow.snowfall_cm).toBeCloseTo(18, 1);
+		expect(r.snow.frost.level).toBe('severe');
+		// Nessun modello ha portato la temperatura del suolo: si ripiega sui
+		// due metri, e il blocco lo dichiara invece di lasciarlo intendere.
+		expect(r.snow.frost.source).toBe('air');
+	});
+
+	it('usa la temperatura del suolo per le gelate quando c è', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 3,
+			elevation: 122,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(12, { temp: 2, soil_temperature: -2, freezing_level: 2400 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.snow.frost.source).toBe('soil');
+		expect(r.snow.frost.min_temp).toBe(-2);
+		expect(r.snow.frost.level).toBe('likely');
+	});
+
+	it('a luglio in pianura il riquadro non compare affatto', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 31,
+			elevation: 122,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(12, { temp: 29, freezing_level: 4300, snowfall_cm: 0, snow_depth_cm: 0 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('snow');
+	});
+
+	it('media la quota fra i modelli, che non concordano sull orografia', async () => {
+		// Celle di griglia diverse danno altitudini diverse per lo stesso punto.
+		activeModels = [MODELLI[0]!, MODELLI[4]!];
+		sourceResponses['open-meteo:icon_d2'] = forecast('open-meteo:icon_d2', {
+			temp: 0,
+			elevation: 1000,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(6, { temp: 0, freezing_level: 1500 }),
+		});
+		sourceResponses['open-meteo:gfs'] = forecast('open-meteo:gfs', {
+			temp: 0,
+			elevation: 1400,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(6, { temp: 0, freezing_level: 1500 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// (1000*1.2 + 1400*0.9) / 2.1 = 1171.4 → arrotondata al metro.
+		expect(r.snow.elevation).toBe(1171);
+	});
+
+	it('una sola fonte che prevede neve non fa comparire una nevicata', async () => {
+		// Stesso gate dei millimetri: tre modelli su quattro dicono asciutto.
+		activeModels = MODELLI.slice(0, 4);
+		const asciutto = { temp: -2, freezing_level: 1200, snowfall_cm: 0, precipitation_mm: 0 };
+		for (const m of MODELLI.slice(0, 3)) {
+			sourceResponses[m.sourceId] = forecast(m.sourceId, {
+				temp: -2,
+				elevation: 1800,
+				utc_offset_seconds: 0,
+				hourly: oreDaAdesso(6, asciutto),
+			});
+		}
+		sourceResponses['open-meteo:meteofrance'] = forecast('open-meteo:meteofrance', {
+			temp: -2,
+			elevation: 1800,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(6, { ...asciutto, snowfall_cm: 4 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// Il riquadro resta, per le gelate; la nevicata no.
+		expect(r.snow.snowfall_cm).toBe(0);
+		expect(r.snow.frost.level).toBe('likely');
+	});
+
+	it('porta i centimetri di neve anche sul giornaliero', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: -1,
+			daily: [
+				{
+					date: '2026-01-15',
+					temp_max: 0,
+					temp_min: -5,
+					precipitation_prob: 90,
+					condition_code: '71',
+					condition_text: 'Snow',
+					precipitation_mm: 9,
+					snowfall_cm: 12,
+				},
+			],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.daily[0].snowfall_cm).toBe(12);
+	});
+
+	it('le fonti senza dati di neve non impediscono il calcolo', async () => {
+		// Solo Open-Meteo espone zero termico e manto: le altre contribuiscono
+		// alla temperatura e basta.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: -1,
+			elevation: 1800,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(6, { temp: -2, freezing_level: 1200, precipitation_mm: 1 }),
+		});
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: -1,
+			hourly: oreDaAdesso(6, { temp: -2 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.snow.phase).toBe('snow');
+		expect(r.snow.snow_line).toBe(900);
 	});
 });

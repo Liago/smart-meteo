@@ -78,6 +78,10 @@ struct ForecastResponse: Codable {
     let confidence: ConfidenceIndex?
     /// Pollini per specie: presenti solo dove il modello CAMS copre (Europa).
     let pollen: [PollenReading]?
+    /// Neve e gelate nelle prossime 24 ore. Il backend manda il blocco solo
+    /// quando c'è qualcosa da segnalare, quindi la sua sola presenza basta a
+    /// decidere se mostrare il riquadro.
+    let snow: SnowOutlook?
     /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
     /// copre il dataset `forecastNextHour` (Italia inclusa).
     let forecastNextHour: ForecastNextHour?
@@ -93,6 +97,7 @@ struct ForecastResponse: Codable {
         case alerts
         case confidence
         case pollen
+        case snow
         case forecastNextHour
     }
 }
@@ -164,6 +169,8 @@ struct DailyForecast: Codable, Identifiable {
     /// mm totali previsti per il giorno. Opzionale: manca sulle risposte in
     /// cache scritte prima dell'introduzione del campo.
     let precipitationMm: Double?
+    /// cm di neve fresca previsti per il giorno.
+    let snowfallCm: Double?
 
     enum CodingKeys: String, CodingKey {
         case date
@@ -175,6 +182,7 @@ struct DailyForecast: Codable, Identifiable {
         case conditionText = "condition_text"
         case uvIndexMax = "uv_index_max"
         case precipitationMm = "precipitation_mm"
+        case snowfallCm = "snowfall_cm"
     }
 }
 
@@ -199,6 +207,14 @@ struct HourlyForecast: Codable, Identifiable {
     /// Raffica in m/s, come `windSpeed`.
     let windGust: Double?
     let uvIndex: Double?
+    /// Neve fresca dell'ora in cm (non equivalente in acqua).
+    let snowfallCm: Double?
+    /// Manto nevoso al suolo, in cm.
+    let snowDepthCm: Double?
+    /// Quota dello zero termico, in metri.
+    let freezingLevel: Double?
+    /// Temperatura della superficie del suolo, °C: è lì che si forma la brina.
+    let soilTemperature: Double?
 
     enum CodingKeys: String, CodingKey {
         case time
@@ -214,6 +230,10 @@ struct HourlyForecast: Codable, Identifiable {
         case windDirection = "wind_direction"
         case windGust = "wind_gust"
         case uvIndex = "uv_index"
+        case snowfallCm = "snowfall_cm"
+        case snowDepthCm = "snow_depth_cm"
+        case freezingLevel = "freezing_level"
+        case soilTemperature = "soil_temperature"
     }
 }
 
@@ -276,6 +296,58 @@ struct PollenReading: Codable, Identifiable {
         case species, label, value, level
         case dailyMax = "daily_max"
         case dailyLevel = "daily_level"
+    }
+}
+
+// MARK: - Neve e gelate
+
+/// Rischio gelate nelle prossime 24 ore.
+struct FrostOutlook: Codable {
+    /// "none" | "possible" | "likely" | "severe"
+    let level: String
+    /// Temperatura minima prevista nella finestra, °C.
+    let minTemp: Double?
+    /// Slot orario del minimo, nella stessa chiave locale degli hourly.
+    let at: String?
+    /// "soil" | "air": se la minima è quella della superficie o quella dei due
+    /// metri. Cambia il significato della frase, e il backend usa soglie
+    /// diverse per le due.
+    let source: String
+
+    enum CodingKeys: String, CodingKey {
+        case level
+        case minTemp = "min_temp"
+        case at
+        case source
+    }
+}
+
+/// Neve e gelate nelle prossime 24 ore.
+///
+/// La quota dello zero termico da sola è un dato da bollettino: quello che
+/// serve sapere è se a *casa propria* verrà giù neve o acqua. `elevation` è la
+/// quota del punto di griglia dichiarata da Open-Meteo, ed è lei a rendere
+/// leggibile `snowLine`.
+struct SnowOutlook: Codable {
+    /// Quota della località secondo i modelli, in metri.
+    let elevation: Double?
+    /// Quota neve più bassa prevista nella finestra, in metri.
+    let snowLine: Double?
+    /// "snow" | "sleet" | "rain"; nil se non è prevista precipitazione.
+    let phase: String?
+    /// Manto nevoso presente adesso, in cm.
+    let snowDepthCm: Double?
+    /// Neve fresca attesa nella finestra, in cm.
+    let snowfallCm: Double?
+    let frost: FrostOutlook
+
+    enum CodingKeys: String, CodingKey {
+        case elevation
+        case snowLine = "snow_line"
+        case phase
+        case snowDepthCm = "snow_depth_cm"
+        case snowfallCm = "snowfall_cm"
+        case frost
     }
 }
 

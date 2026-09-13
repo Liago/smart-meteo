@@ -88,12 +88,22 @@ const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 
 const CURRENT_PARAMS =
 	'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,cloud_cover,visibility,dew_point_2m';
-// NB: `precipitation` include già l'equivalente in acqua della neve;
-// aggiungere anche `snowfall` (in cm) porterebbe a un doppio conteggio.
+// NB: `precipitation` include già l'equivalente in acqua della neve, quindi
+// `snowfall` non va sommato a quello: nel livello `current` l'intensità resta
+// `precipitation` e basta, o si conterebbe due volte la stessa neve.
+//
+// Sull'orario `snowfall` e `snow_depth` servono invece a dire *che cosa* cade e
+// quanto ce n'è già a terra — centimetri di neve, non equivalente in acqua — e
+// `freezing_level_height` è la quota dello zero termico da cui si ricava la
+// quota neve. Nessuno dei tre entra nel calcolo dei millimetri.
+//
+// `soil_temperature_0cm` è la temperatura della superficie: è lì che si forma
+// la brina, non a due metri da terra, dove le stazioni misurano e dove nelle
+// notti serene fa qualche grado in più.
 const HOURLY_PARAMS =
-	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index';
+	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm';
 const DAILY_PARAMS =
-	'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max';
+	'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,snowfall_sum,sunrise,sunset,uv_index_max';
 
 /**
  * Costruisce l'oggetto unificato da una risposta Open-Meteo.
@@ -118,6 +128,7 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 		condition_text: `Code ${daily.weather_code[index]}`,
 		uv_index_max: daily.uv_index_max?.[index] ?? null,
 		precipitation_mm: daily.precipitation_sum?.[index] ?? null,
+		snowfall_cm: daily.snowfall_sum?.[index] ?? null,
 	}));
 
 	// Map hourly data (from current time onwards)
@@ -143,6 +154,16 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 			wind_gust: hourly.wind_gusts_10m?.[realIndex] != null ? Number((hourly.wind_gusts_10m[realIndex] / 3.6).toFixed(2)) : null, // km/h → m/s
 			uv_index: hourly.uv_index?.[realIndex] ?? null,
 			precipitation_mm: hourly.precipitation?.[realIndex] ?? null,
+			snowfall_cm: hourly.snowfall?.[realIndex] ?? null,
+			// Open-Meteo dà il manto in METRI, a differenza della neve fresca
+			// che è già in centimetri: senza questa conversione 0.4 m di neve
+			// diventerebbero "0.4 cm".
+			snow_depth_cm:
+				hourly.snow_depth?.[realIndex] != null
+					? Number((hourly.snow_depth[realIndex] * 100).toFixed(1))
+					: null,
+			freezing_level: hourly.freezing_level_height?.[realIndex] ?? null,
+			soil_temperature: hourly.soil_temperature_0cm?.[realIndex] ?? null,
 		};
 	});
 
@@ -179,6 +200,9 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 		// Con timezone:'auto' Open-Meteo restituisce l'offset locale: lo Smart Engine
 		// lo usa per allineare gli slot orari delle fonti che rispondono in UTC.
 		utc_offset_seconds: data.utc_offset_seconds ?? null,
+		// Quota del punto di griglia, in metri: è quella che rende leggibile la
+		// quota neve ("nevica a casa tua" invece di "zero termico a 1500 m").
+		elevation: data.elevation ?? null,
 		daily: dailyForecasts,
 		hourly: hourlyForecasts,
 		astronomy: astronomy

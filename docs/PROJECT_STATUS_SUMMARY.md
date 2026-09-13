@@ -115,10 +115,13 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6D — Nuove feature utente (2026-09-13, 1 punto su 5)
+### Fase 6D — Nuove feature utente (2026-09-13, 2 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
 - **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
-- ⏳ Restano: quota neve e gelate, indice temporali, radar, allerte su soglie personali
+- **Quota neve, manto e gelate**: `freezing_level_height`, `snowfall`, `snow_depth` e `soil_temperature_0cm` dalla chiamata Open-Meteo che già facevamo. La quota neve è lo zero termico meno 300 m (il fiocco scende oltre l'isoterma raffreddando l'aria) e viene mostrata **accanto alla quota della località**, che Open-Meteo dichiara: «quota neve 900 m, sei a 1800 m» è una risposta, «zero termico a 1500 m» un dato da bollettino
+- **Gelate giudicate sul suolo**, non a due metri: la brina si forma sulla superficie, e il blocco dichiara quale delle due misure ha usato perché «minima al suolo -1°» e «minima -1°» sono due notti diverse
+- **Il riquadro neve compare solo quando c'è qualcosa da dire**: senza manto, neve prevista o rischio gelate il backend omette il blocco, invece di lasciare un riquadro vuoto per otto mesi l'anno
+- ⏳ Restano: indice temporali, radar, allerte su soglie personali
 
 ### Fase 6C — Qualità della previsione (2026-09-12, completata)
 - **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
@@ -178,17 +181,17 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 137 test (7 suite) | Restano i 3 hook → TODO_TESTING §4 |
-| Frontend web E2E (Playwright) | ✅ 25 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **229 test in 11 suite** (utils, 9 connettori, engine, route con supertest) | Fase 6B |
+| Frontend web unit test | ✅ 168 test (9 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 32 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **395 test in 18 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
 
 > **La Fase 6B ha prodotto anche cinque ritrovamenti**: tre bug di unità sul vento
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
-> (entrambi documentati da test, in carico alla 6C).
-> **Prossimo blocco: Fase 6C** della `GAP_ANALYSIS_2026-09.md`.
+> (entrambi documentati da test, risolti nella 6C).
+> **Prossimo blocco: Fase 6D punti 16-18** della `GAP_ANALYSIS_2026-09.md`.
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -228,7 +231,7 @@ Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`
 | 15 | `/api/alerts/poll` aperto senza `CRON_SECRET` | 🟠 | ✅ Risolto in 6C |
 | 16 | `raw_forecasts` archivia solo i valori correnti: si misura il nowcast, non il +24h | 🟠 | ⏳ richiede una modifica di schema |
 | 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Fase 6D |
-| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E |
+| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E — i cm di neve oggi vengono dai soli modelli Open-Meteo |
 | 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |
 
 ## 4. Migliorie Future

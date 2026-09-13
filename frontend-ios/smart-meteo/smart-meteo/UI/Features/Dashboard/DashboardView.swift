@@ -186,6 +186,13 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                             }
 
+                            // Neve e gelate: presente solo quando il backend
+                            // ha qualcosa da segnalare.
+                            if let snow = forecast.snow {
+                                SnowPanelView(snow: snow)
+                                    .padding(.horizontal)
+                            }
+
                             // Current Weather
                             CurrentWeatherView(current: forecast.current, today: forecast.daily?.first, astronomy: forecast.astronomy)
                             

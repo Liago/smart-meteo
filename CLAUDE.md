@@ -21,6 +21,8 @@ smart-meteo/
 │   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
 │   │   ├── openmeteoEnsemble.ts # Ensemble members -> temperature p10/p50/p90 band
 │   │   ├── openmeteoAirQuality.ts # European AQI, pollutants and CAMS pollen
+│   │   │                          # (openmeteo.ts also carries snow depth,
+│   │   │                          #  snowfall, freezing level and soil temp)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
 │   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 4)
@@ -43,6 +45,7 @@ smart-meteo/
 │   │   ├── precipitation.ts    # mm aggregation (wet-fraction gate)
 │   │   ├── wind.ts             # Circular mean for direction, max for gusts
 │   │   ├── consensus.ts        # Source agreement -> confidence score
+│   │   ├── snow.ts             # Snow line, snow phase, frost risk
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
 │   ├── app.ts                  # Express app setup (CORS, routes)
@@ -63,6 +66,8 @@ smart-meteo/
 │   │   ├── WeatherAlerts.tsx    # Alert banners + header badge
 │   │   ├── DayNarrative.tsx     # Discursive day summary by time band
 │   │   ├── AirQualitySummary.tsx / AirQualityPanel.tsx # AQI tile + pollutant modal
+│   │   ├── PollenPanel.tsx      # Pollen species, daily peak
+│   │   ├── SnowPanel.tsx        # Snow line vs altitude, snow depth, frost
 │   │   ├── HourlyDetail.tsx     # Hourly metric modal (precip/wind/humidity/UV/...)
 │   │   ├── WeatherEffects.tsx   # Particle layers for the dynamic background
 │   │   ├── ui/Modal.tsx, ui/MetricSelect.tsx # Shared primitives
@@ -216,10 +221,10 @@ cd frontend-web && npm run build
 
 ## Testing
 
-- Web tests are in `frontend-web/__tests__/` (7 suites: api, components, weather-utils,
-  air-quality, narrative, hourly-detail, next-hour), `npm test` from the repo root
+- Web tests are in `frontend-web/__tests__/` (9 suites: api, components, weather-utils,
+  air-quality, narrative, hourly-detail, next-hour, pollen, snow), `npm test` from the repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **229 tests in 11 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **395 tests in 18 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -227,7 +232,7 @@ cd frontend-web && npm run build
 - `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
   per-connector test would not catch a unit mismatch, since each one is self-consistent
 - `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
-- E2E: `cd frontend-web && npm run test:e2e` - 25 scenarios × 2 viewports (Playwright).
+- E2E: `cd frontend-web && npm run test:e2e` - 32 scenarios × 2 viewports (Playwright).
   The backend API is never contacted: every scenario starts from a known response built
   in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
   downloaded. `e2e/` is excluded from Jest
@@ -237,7 +242,7 @@ cd frontend-web && npm run build
 
 - **Weather connectors** implement a common interface in `backend/connectors/` - each normalizes provider-specific data into a unified `UnifiedForecast` format defined in `backend/types.ts` and `backend/utils/formatter.ts`
 - **Smart engine** (`backend/engine/smartEngine.ts`) fetches from up to 9 sources in parallel, aggregates using weighted averaging, and caches results for 30 minutes
-- **Cache invalidation by shape**: `FORECAST_SCHEMA_VERSION` is stored inside `full_data`; a cached row with a different version is ignored and regenerated. Bump it whenever response fields are added or renamed
+- **Cache invalidation by shape**: `FORECAST_SCHEMA_VERSION` is stored inside `full_data`; a cached row with a different version is ignored and regenerated. Bump it whenever response fields are added or renamed. It is exported so the engine tests read it rather than copying the number
 - **Open-Meteo multi-model**: Open-Meteo is a free frontend over national weather services' models, not a model of its own. It is queried **one model at a time** (`&models=`), so ICON-D2, ICON-EU, ECMWF IFS, Météo-France and GFS enter the aggregation as five independent sources (`open-meteo:icon_d2` …), giving more statistical diversity than several commercial providers that rebrand the same GFS/ECMWF. The models **replace** the `open-meteo` (`best_match`) source rather than joining it: `best_match` is a blend of the same models, so using both would double-count. Switch off with `OPENMETEO_MODELS=off`, or narrow it with a comma-separated list of model ids
 - **Source weights** range from 0 (Weatherstack, disabled) through 0.8 (Meteostat) to 1.2 (Tomorrow.io, WeatherKit, ICON-D2), stored in the `SOURCE_WEIGHTS` constant (model weights live next to each model in `connectors/openmeteo.ts`), then scaled at runtime by `1 / (1 + MAE)` from the `source_accuracy` table
 - **The MAE is measured against observations**, not against the consensus of the other sources. Until Phase 6C it was the deviation from the aggregate, which rewarded conformity and penalised a source that was right while the others were wrong. `services/observations.ts` gets the observed temperatures from Open-Meteo Archive (ERA5, free, no key) with Meteostat as a fallback; each comparison is a row in `accuracy_samples`, and the MAE is **recomputed** over a 30-day sliding window instead of being updated as a never-decaying cumulative average. A source needs 20 samples before its MAE moves its weight
@@ -245,6 +250,9 @@ cd frontend-web && npm run build
 - **Meteostat is not a forecast source**: it reports observations, sometimes hours old, and they used to land in the average of the *current* temperature. It now has weight 0 and serves as ground truth for the accuracy job
 - **Air quality has two sources now**: WeatherAPI (EPA index 1-6 and pollutants) and Open-Meteo Air Quality (European AQI, same pollutants, plus pollen). They are merged rather than chosen between - while WeatherAPI was the only one, an outage left the dashboard with no AQI at all. WeatherAPI keeps precedence on each pollutant: those are the values users have seen for months, and the two sources do not use the same unit for carbon monoxide
 - **Pollen thresholds are per species** (`connectors/openmeteoAirQuality.ts`): 30 grains/m³ of grass is a heavy day for an allergy sufferer, the same 30 of olive is nothing. A single threshold would mislabel half the species. The panel shows the **daily peak**, not the current hour: people decide in the morning whether to go out. Pollen is modelled in Europe only - outside it the fields come back null and the block is omitted rather than shown as zero
+- **The snow line is not the freezing level**: a snowflake keeps falling past the 0 °C isotherm, cooling the air around it, and reaches the ground 200-400 m lower — `backend/utils/snow.ts` subtracts 300 m, the conventional value for moderate precipitation. The number is only useful **next to the location's own altitude**, which Open-Meteo declares as `elevation` alongside the forecast: "snow line 900 m, you are at 1800 m" is an answer, "freezing level 1500 m" is a bulletin reading. Within 150 m of the line the phase is reported as sleet rather than guessed
+- **Frost is judged on the ground when the data is there**: frost forms on the surface, not at the 2 m where stations measure — `soil_temperature_0cm` uses the physical threshold (0 °C), the 2 m fallback a compensated one (+3 °C, because on clear nights the surface radiates and stays 3-4 degrees below the air). The block declares which one it used, and both clients write it out
+- **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
@@ -276,10 +284,12 @@ cd frontend-web && npm run build
 ```typescript
 // Frontend types (frontend-web/lib/types.ts)
 ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/gust/label), precipitation_prob, dew_point, aqi, pressure, condition
-DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text
-HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band)
+DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text, snowfall_cm
+HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], forecastNextHour
+ForecastResponse   // location, generated_at, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, forecastNextHour
+SnowOutlook        // elevation, snow_line, phase ('snow'|'sleet'|'rain'), snow_depth_cm, snowfall_cm, frost
+FrostOutlook       // level ('none'|'possible'|'likely'|'severe'), min_temp, at, source ('soil'|'air')
 WeatherSource      // id, name, weight, active, description, lastError, lastResponseMs
 WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | 'unknown'
 ```
