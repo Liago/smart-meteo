@@ -38,6 +38,16 @@ export interface HourlyForecast {
 	freezing_level?: number | null;
 	/** Temperatura della superficie del suolo, °C: è lì che si forma la brina. */
 	soil_temperature?: number | null;
+	/** Energia potenziale convettiva disponibile, J/kg. */
+	cape?: number | null;
+	/** Lifted index, °C: negativo = instabile. */
+	lifted_index?: number | null;
+	/** Inibizione convettiva, J/kg: il coperchio sull'energia disponibile. */
+	convective_inhibition?: number | null;
+	/** Indice 0-100 di rischio temporali, derivato dai tre qui sopra. */
+	storm_index?: number | null;
+	/** Probabilità di tuono in %, da WorldWeatherOnline. */
+	thunder_prob?: number | null;
 }
 
 /**

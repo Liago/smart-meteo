@@ -78,6 +78,9 @@ export function openMeteoResponse(overrides?: { current?: Overrides }) {
 			snow_depth: [0.12, 0.14], // METRI: l'API non usa i centimetri qui
 			freezing_level_height: [1500, 1420],
 			soil_temperature_0cm: [21.4, 22.1],
+			cape: [1000, 2500],
+			lifted_index: [-3, -6],
+			convective_inhibition: [-10, -12],
 		},
 	};
 }
@@ -444,6 +447,7 @@ export function wwoResponse(overrides?: Overrides) {
 							WindGustKmph: String(GUST_KMH),
 							uvIndex: '5',
 							precipMM: '0.0',
+							chanceofthunder: '35',
 						},
 					],
 				},

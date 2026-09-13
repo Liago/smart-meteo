@@ -14,6 +14,7 @@ import { fetchOWMAlerts } from '../connectors/openweathermap';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { aggregateSnowfallCm, buildSnowOutlook } from '../utils/snow';
+import { stormIndex } from '../utils/storm';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
 import { weightedMean, weightedVote } from '../utils/aggregate';
@@ -45,12 +46,14 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   8 → european_aqi su air_quality e blocco pollen
  *   9 → blocco snow (quota neve, manto, gelate), snowfall_cm su daily/hourly
  *       e soil_temperature sugli slot orari
+ *  10 → indici convettivi (cape, lifted_index, storm_index, thunder_prob)
+ *       sugli slot orari
  *
  * Esportata perché i test la usino invece di ricopiarne il numero: una copia
  * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
  * modifica non c'entra niente.
  */
-export const FORECAST_SCHEMA_VERSION = 9;
+export const FORECAST_SCHEMA_VERSION = 10;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -464,6 +467,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		snow_depth_cm: Weighted[];
 		freezing_levels: Weighted[];
 		soil_temperatures: Weighted[];
+		capes: Weighted[];
+		lifted_indices: Weighted[];
+		cins: Weighted[];
+		thunder_probs: Weighted[];
 	}>();
 	validForecasts.forEach(f => {
 		if (f.hourly && Array.isArray(f.hourly)) {
@@ -471,7 +478,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			f.hourly.forEach(h => {
 				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [] });
+					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [], capes: [], lifted_indices: [], cins: [], thunder_probs: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push({ val: h.temp, weight: sourceWeight });
@@ -494,6 +501,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				if (h.snow_depth_cm != null) entry.snow_depth_cm.push({ val: h.snow_depth_cm, weight: sourceWeight });
 				if (h.freezing_level != null) entry.freezing_levels.push({ val: h.freezing_level, weight: sourceWeight });
 				if (h.soil_temperature != null) entry.soil_temperatures.push({ val: h.soil_temperature, weight: sourceWeight });
+				// Indici convettivi: li portano i modelli Open-Meteo, la
+				// probabilità di tuono la sola WorldWeatherOnline.
+				if (h.cape != null) entry.capes.push({ val: h.cape, weight: sourceWeight });
+				if (h.lifted_index != null) entry.lifted_indices.push({ val: h.lifted_index, weight: sourceWeight });
+				if (h.convective_inhibition != null) entry.cins.push({ val: h.convective_inhibition, weight: sourceWeight });
+				if (h.thunder_prob != null) entry.thunder_probs.push({ val: h.thunder_prob, weight: sourceWeight });
 				entry.codes.push({ code: h.condition_code, weight: sourceWeight });
 			});
 		}
@@ -503,6 +516,21 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([time, data]) => {
 			const bestCode = weightedVote(data.codes);
+
+			// L'indice temporali si calcola UNA volta sugli indici già mediati,
+			// non mediando gli indici delle singole fonti: la funzione non è
+			// lineare, e le due strade danno risultati diversi. Mediare prima
+			// tiene il calcolo coerente con ogni altro campo aggregato, dove il
+			// consenso fra le fonti viene prima della derivazione.
+			const cape = weightedMean(data.capes);
+			const liftedIndex = weightedMean(data.lifted_indices);
+			const cin = weightedMean(data.cins);
+			const storm = stormIndex({
+				cape,
+				lifted_index: liftedIndex,
+				convective_inhibition: cin,
+			});
+
 			return {
 				time,
 				temp: weightedMean(data.temps) ?? 0,
@@ -522,6 +550,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				...(data.snow_depth_cm.length > 0 && { snow_depth_cm: weightedMean(data.snow_depth_cm) }),
 				...(data.freezing_levels.length > 0 && { freezing_level: weightedMean(data.freezing_levels) }),
 				...(data.soil_temperatures.length > 0 && { soil_temperature: weightedMean(data.soil_temperatures) }),
+				...(cape != null && { cape }),
+				...(liftedIndex != null && { lifted_index: liftedIndex }),
+				...(storm != null && { storm_index: storm }),
+				...(data.thunder_probs.length > 0 && { thunder_prob: weightedMean(data.thunder_probs) }),
 			};
 		});
 

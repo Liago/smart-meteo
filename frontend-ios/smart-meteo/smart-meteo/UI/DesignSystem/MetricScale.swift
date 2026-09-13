@@ -8,6 +8,7 @@ import SwiftUI
 /// metrica significa aggiungere un caso, non toccare la view.
 enum HourlyMetric: String, CaseIterable, Identifiable {
     case precipitation
+    case storm
     case wind
     case humidity
     case feelsLike
@@ -18,6 +19,7 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .precipitation: return "Precipitazioni"
+        case .storm: return "Temporali"
         case .wind: return "Vento"
         case .humidity: return "Umidità"
         case .feelsLike: return "Percepita"
@@ -28,6 +30,7 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .precipitation: return "drop.fill"
+        case .storm: return "cloud.bolt.fill"
         case .wind: return "wind"
         case .humidity: return "humidity.fill"
         case .feelsLike: return "thermometer.medium"
@@ -38,6 +41,10 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
     var sections: [MetricSection] {
         switch self {
         case .precipitation: return [.precipitationMm, .precipitationProbability]
+        // Due sezioni come per le precipitazioni: gli indici convettivi dicono
+        // quanta energia c'è, la probabilità di tuono quanto è probabile che si
+        // scarichi. Due domande diverse, da fonti diverse.
+        case .storm: return [.storm, .thunderProbability]
         case .wind: return [.wind]
         case .humidity: return [.humidity]
         case .feelsLike: return [.feelsLike]
@@ -261,6 +268,69 @@ extension MetricSection {
 
     // MARK: - Indice UV
 
+    // MARK: - Temporali
+
+    static let storm = MetricSection(
+        id: "storm",
+        height: 160,
+        valueOf: { $0.stormIndex },
+        secondaryOf: nil,
+        colorOf: { StormScale.classify($0).color },
+        // L'asse resta 0-100 anche con valori bassi: un indice è una
+        // percentuale, non una quantità, e un dominio che si adatta al massimo
+        // del giorno farebbe sembrare grave un 12.
+        domain: { _ in 0...100 },
+        gridValues: { _ in [StormScale.Threshold.weak, StormScale.Threshold.moderate, StormScale.Threshold.strong] },
+        gridLabel: { _ in nil },
+        bandValues: { _ in
+            [
+                StormScale.Threshold.weak / 2,
+                (StormScale.Threshold.weak + StormScale.Threshold.moderate) / 2,
+                (StormScale.Threshold.moderate + StormScale.Threshold.strong) / 2,
+                (StormScale.Threshold.strong + 100) / 2
+            ]
+        },
+        bandLabel: { StormScale.classify($0).label },
+        headline: { h in
+            guard let h else { return "Dato non disponibile" }
+            guard let index = h.stormIndex else { return "—" }
+            return StormScale.classify(index).label
+        },
+        caption: { h in
+            guard let h, let index = h.stormIndex else { return "" }
+            // Il CAPE in chiaro accanto all'indice: chi sa leggerlo ha il
+            // numero, chi non lo sa ha l'etichetta, e nessuno dei due deve
+            // fidarsi a scatola chiusa di un punteggio senza unità di misura.
+            var parts = ["Indice \(Int(index.rounded()))/100"]
+            if let cape = h.cape {
+                parts.append("CAPE \(Int(cape.rounded())) J/kg")
+            }
+            return parts.joined(separator: " · ")
+        },
+        emptyMessage: "Indici convettivi non disponibili per questa località",
+        flatMessage: "Nessuna instabilità prevista"
+    )
+
+    static let thunderProbability = MetricSection(
+        id: "thunder_prob",
+        height: 110,
+        valueOf: { $0.thunderProb },
+        secondaryOf: nil,
+        colorOf: { _ in Color(hex: "C4B5FD") },
+        domain: { _ in 0...100 },
+        gridValues: { _ in [50, 100] },
+        gridLabel: { "\(Int($0))%" },
+        bandValues: { _ in [] },
+        bandLabel: { _ in "" },
+        headline: { h in
+            guard let value = h?.thunderProb else { return "—%" }
+            return "\(Int(value.rounded()))%"
+        },
+        caption: { _ in "Probabilità di tuono" },
+        emptyMessage: "Probabilità di tuono non disponibile per questa località",
+        flatMessage: nil
+    )
+
     static let uv = MetricSection(
         id: "uv",
         height: 160,
@@ -336,6 +406,49 @@ enum WindScale {
 }
 
 /// Fasce dell'indice UV secondo l'OMS.
+/// Fasce dell'indice di rischio temporali, 0-100.
+///
+/// Le soglie sono quelle di `backend/utils/storm.ts`: qui non si rifà il
+/// calcolo, si colora e si nomina quello che il backend ha già prodotto.
+enum StormScale {
+    case none
+    case weak
+    case moderate
+    case strong
+
+    enum Threshold {
+        static let weak: Double = 25
+        static let moderate: Double = 50
+        static let strong: Double = 75
+    }
+
+    static func classify(_ index: Double?) -> StormScale {
+        guard let index, index.isFinite else { return .none }
+        if index >= Threshold.strong { return .strong }
+        if index >= Threshold.moderate { return .moderate }
+        if index >= Threshold.weak { return .weak }
+        return .none
+    }
+
+    var label: String {
+        switch self {
+        case .none: return "Assente"
+        case .weak: return "Debole"
+        case .moderate: return "Moderato"
+        case .strong: return "Forte"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .none: return Color(hex: "22C55E")
+        case .weak: return Color(hex: "F97316")
+        case .moderate: return Color(hex: "EF4444")
+        case .strong: return Color(hex: "A855F7")
+        }
+    }
+}
+
 enum UVScale {
     case low
     case moderate

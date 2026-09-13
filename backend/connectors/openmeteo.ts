@@ -100,8 +100,12 @@ const CURRENT_PARAMS =
 // `soil_temperature_0cm` è la temperatura della superficie: è lì che si forma
 // la brina, non a due metri da terra, dove le stazioni misurano e dove nelle
 // notti serene fa qualche grado in più.
+//
+// `cape`, `lifted_index` e `convective_inhibition` sono gli indici convettivi:
+// il rischio temporali si deduceva dal solo `weather_code`, che è una
+// fotografia e non una misura (`utils/storm.ts`).
 const HOURLY_PARAMS =
-	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm';
+	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition';
 const DAILY_PARAMS =
 	'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,snowfall_sum,sunrise,sunset,uv_index_max';
 
@@ -164,6 +168,9 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 					: null,
 			freezing_level: hourly.freezing_level_height?.[realIndex] ?? null,
 			soil_temperature: hourly.soil_temperature_0cm?.[realIndex] ?? null,
+			cape: hourly.cape?.[realIndex] ?? null,
+			lifted_index: hourly.lifted_index?.[realIndex] ?? null,
+			convective_inhibition: hourly.convective_inhibition?.[realIndex] ?? null,
 		};
 	});
 

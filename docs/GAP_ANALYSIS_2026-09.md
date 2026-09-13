@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (2 punti su 5) · 6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (3 punti su 5) · 6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -416,14 +416,16 @@ solo con cache giornaliera aggressiva.
 Sinergia importante: è **lo stesso dato osservato** che serve per §3.3 e §3.4. Un solo intervento
 risolve il ruolo di Meteostat, dà accuratezza reale alle fonti e produce una feature visibile.
 
-#### 5.8 Temporali: indici convettivi (Open-Meteo)
+#### 5.8 Temporali: indici convettivi (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6D)
 
-`cape`, `lifted_index`, `convective_inhibition`, più `chanceofthunder` (WWO). Oggi il rischio
-temporale si deduce solo dal `condition_code`: un indice orario 0-100 è molto più informativo, e
-in Italia d'estate è la domanda del giorno.
+`cape`, `lifted_index` e `convective_inhibition` da Open-Meteo, `chanceofthunder` da WWO — che
+era già nella risposta e non veniva letto. Il rischio temporale si deduceva dal solo
+`condition_code`, che è una fotografia («rovescio temporalesco») e non una misura: sotto la
+stessa etichetta metteva il tuono isolato di fine pomeriggio e la supercella.
 
-**Effort:** basso (parametri + scala, riusa il registry metriche già esistente in
-`lib/metrics.ts` / `MetricScale.swift`). **Impatto:** medio-alto.
+Implementata in `backend/utils/storm.ts` (indice 0-100) e come metrica «Temporali» del registry
+orario, in `lib/metrics.ts` e `MetricScale.swift`. Le decisioni sono nel registro, §7 → Fase 6D
+punto 3.
 
 #### 5.9 Radiazione solare e resa fotovoltaica (Open-Meteo)
 
@@ -534,7 +536,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 |---|-----------|--------|:-----:|
 | 14 | Connettore Open-Meteo Air Quality: pollini + AQI multi-fonte | §3.6, §5.1 | ✅ |
 | 15 | Quota neve, neve al suolo, rischio gelate | §5.2 | ✅ |
-| 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 | ⏳ |
+| 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 | ✅ |
 | 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 | ⏳ |
 | 18 | Allerte su soglie personali | §5.15 | ⏳ |
 
@@ -772,7 +774,7 @@ consenso`):
 **Verifiche finali:** 326 test backend (16 suite), 137 web (7 suite), 27 scenari E2E × 2
 viewport, typecheck pulito su entrambi i lati, lint web a 2 errori preesistenti.
 
-### Fase 6D — in corso (2 punti su 5 al 2026-09-13)
+### Fase 6D — in corso (3 punti su 5 al 2026-09-13)
 
 #### 1. Qualità dell'aria a due fonti e pollini
 
@@ -843,10 +845,53 @@ resta in 6E.
 **Verifiche:** 395 test backend (18 suite), 168 web (9 suite), 32 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
+#### 3. Indice temporali dagli indici convettivi
+
+Chiude §5.8. Commit `feat(6D): indice temporali da CAPE e lifted index`.
+
+`cape`, `lifted_index` e `convective_inhibition` sull'orario Open-Meteo, più `chanceofthunder`
+da WorldWeatherOnline — che era già nella risposta e nessuno leggeva. `backend/utils/storm.ts`
+ne ricava un indice 0-100, esposto come `storm_index` sugli slot orari; la nuova metrica
+«Temporali» del registry lo mostra su web e iOS. Schema di cache alla versione 10.
+
+**Decisioni**
+
+- **Un indice, non il CAPE nudo.** «1800 J/kg» non dice niente a chi apre l'app: la scala 0-100
+  con quattro fasce nominate sì. Il CAPE resta però scritto nella didascalia — chi sa leggerlo
+  ha il numero, chi non lo sa ha la parola, e nessuno dei due deve fidarsi a scatola chiusa di
+  un punteggio senza unità di misura.
+- **CAPE e lifted index si mediano.** Misurano la stessa instabilità da due direzioni — energia
+  integrata sulla colonna contro differenza di temperatura a 500 hPa — e la media smorza lo
+  scarto di un singolo campo del modello senza appiattire il segnale. Con uno solo dei due si
+  usa quello: non tutti i modelli espongono entrambi.
+- **La CIN smorza ma non azzera.** L'inibizione convettiva è il coperchio: l'energia può esserci
+  e restare inutilizzata. Ma il coperchio si rompe — riscaldamento pomeridiano, sollevamento
+  orografico, un fronte che passa — e dichiarare «nessun rischio» su una giornata con 3000 J/kg
+  inibiti sarebbe il tipo di previsione che fa male a chi va in montagna: lo smorzamento si
+  ferma a 0.3.
+- **Si usa il valore assoluto della CIN**: i modelli non concordano sul segno (per alcuni è
+  un'energia che manca, quindi negativa), e senza il modulo metà delle fonti non verrebbe
+  smorzata affatto.
+- **L'indice si calcola una volta sola, sugli indici già mediati fra le fonti.** La funzione non
+  è lineare, quindi mediare gli indici delle singole fonti darebbe un numero diverso: con CAPE 0
+  e 4000 il primo ordine dà 65, il secondo 48. Mediare prima tiene il calcolo coerente con ogni
+  altro campo aggregato, dove il consenso viene prima della derivazione.
+- **La probabilità di tuono è una seconda sezione, non un ingrediente dell'indice.** Gli indici
+  convettivi dicono quanta energia c'è, `chanceofthunder` quanto è probabile che si scarichi:
+  sono due domande diverse, da fonti diverse, e mescolarle in un solo numero ne perderebbe una.
+- **Senza indici la metrica lo dichiara** invece di disegnare barre a zero: uno zero direbbe
+  «nessun temporale», la verità è «non lo sappiamo».
+
+**Limite dichiarato:** il rischio è quello *termodinamico*. Manca la cinematica — wind shear,
+storm relative helicity — che distingue il temporale isolato da quello organizzato. Open-Meteo
+non espone quei campi sull'endpoint forecast, quindi non è un rinvio ma un limite del dato.
+
+**Verifiche:** 419 test backend (19 suite), 181 web (10 suite), 34 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
 ### Prossimo blocco
 
-**Fase 6D, punti 16-18**: indice temporali da CAPE (§5.8), radar (§5.5), allerte su soglie
-personali (§5.15).
+**Fase 6D, punti 17-18**: radar (§5.5), allerte su soglie personali (§5.15).
 
 Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
 della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i

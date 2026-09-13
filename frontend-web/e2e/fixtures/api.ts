@@ -31,6 +31,15 @@ function buildHourly(date: string, over: Record<number, Record<string, unknown>>
 		wind_gust: 6,
 		uv_index: h > 8 && h < 18 ? 5 : 0,
 		precipitation_mm: 0,
+		// Indici convettivi costanti su tutta la giornata, non con il picco
+		// pomeridiano dei temporali veri: sul giorno corrente la vista apre
+		// sull'ora in corso, e un profilo variabile legherebbe l'esito del test
+		// all'ora in cui gira. Che l'ora attiva sia quella di picco è verificato
+		// dai test Jest, dove il tempo è sotto controllo.
+		cape: 1800,
+		lifted_index: -4,
+		storm_index: 63,
+		thunder_prob: 55,
 		// Banda di incertezza: si allarga con l'ora, come fa un ensemble reale
 		// man mano che l'orizzonte si allontana.
 		temp_p10: 20 + (h % 6) - 1 - h * 0.08,
@@ -67,6 +76,8 @@ export interface ForecastOptions {
 	alerts?: unknown[];
 	/** Rimuove i pollini, come fuori dalla copertura del modello CAMS. */
 	withoutPollen?: boolean;
+	/** Rimuove gli indici convettivi, come quando i modelli non li espongono. */
+	withoutStorm?: boolean;
 	/**
 	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
 	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
@@ -132,9 +143,13 @@ export function buildForecast(options: ForecastOptions = {}) {
 			uv_index_max: 6,
 			precipitation_mm: offset === 2 ? 8.4 : 0,
 		})),
-		hourly: [...buildHourly(today), ...buildHourly(isoDate(1))].map((h) =>
-			options.withoutBand ? { ...h, temp_p10: undefined, temp_p90: undefined } : h
-		),
+		hourly: [...buildHourly(today), ...buildHourly(isoDate(1))]
+			.map((h) => (options.withoutBand ? { ...h, temp_p10: undefined, temp_p90: undefined } : h))
+			.map((h) =>
+				options.withoutStorm
+					? { ...h, cape: undefined, lifted_index: undefined, storm_index: undefined, thunder_prob: undefined }
+					: h
+			),
 		astronomy: {
 			sunrise: `${today}T06:52:00`,
 			sunset: `${today}T19:44:00`,

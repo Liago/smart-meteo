@@ -115,13 +115,15 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6D — Nuove feature utente (2026-09-13, 2 punti su 5)
+### Fase 6D — Nuove feature utente (2026-09-13, 3 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
 - **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
 - **Quota neve, manto e gelate**: `freezing_level_height`, `snowfall`, `snow_depth` e `soil_temperature_0cm` dalla chiamata Open-Meteo che già facevamo. La quota neve è lo zero termico meno 300 m (il fiocco scende oltre l'isoterma raffreddando l'aria) e viene mostrata **accanto alla quota della località**, che Open-Meteo dichiara: «quota neve 900 m, sei a 1800 m» è una risposta, «zero termico a 1500 m» un dato da bollettino
 - **Gelate giudicate sul suolo**, non a due metri: la brina si forma sulla superficie, e il blocco dichiara quale delle due misure ha usato perché «minima al suolo -1°» e «minima -1°» sono due notti diverse
 - **Il riquadro neve compare solo quando c'è qualcosa da dire**: senza manto, neve prevista o rischio gelate il backend omette il blocco, invece di lasciare un riquadro vuoto per otto mesi l'anno
-- ⏳ Restano: indice temporali, radar, allerte su soglie personali
+- **Indice temporali 0-100** da CAPE, lifted index e inibizione convettiva (`backend/utils/storm.ts`), più la probabilità di tuono di WorldWeatherOnline che era già nella risposta e nessuno leggeva. Nuova metrica «Temporali» nel registry orario di web e iOS: il rischio si deduceva dal solo `condition_code`, che è una fotografia e non una misura
+- **La CIN smorza ma non azzera**: il coperchio si rompe (riscaldamento pomeridiano, orografia, un fronte), e dichiarare «nessun rischio» su 3000 J/kg inibiti è il tipo di previsione che fa male a chi va in montagna
+- ⏳ Restano: radar, allerte su soglie personali
 
 ### Fase 6C — Qualità della previsione (2026-09-12, completata)
 - **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
@@ -181,9 +183,9 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 168 test (9 suite) | Restano i 3 hook → TODO_TESTING §4 |
-| Frontend web E2E (Playwright) | ✅ 32 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **395 test in 18 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
+| Frontend web unit test | ✅ 181 test (10 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 34 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **419 test in 19 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
 
@@ -191,7 +193,7 @@
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
 > (entrambi documentati da test, risolti nella 6C).
-> **Prossimo blocco: Fase 6D punti 16-18** della `GAP_ANALYSIS_2026-09.md`.
+> **Prossimo blocco: Fase 6D punti 17-18** della `GAP_ANALYSIS_2026-09.md`.
 
 ### 3.4 Database ✅ VERIFICATO
 

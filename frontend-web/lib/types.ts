@@ -88,6 +88,17 @@ export interface HourlyForecast {
 	freezing_level?: number | null;
 	/** Temperatura della superficie del suolo, °C. */
 	soil_temperature?: number | null;
+	/** Energia potenziale convettiva disponibile, J/kg. */
+	cape?: number | null;
+	/** Lifted index, °C: negativo = instabile. */
+	lifted_index?: number | null;
+	/**
+	 * Indice 0-100 di rischio temporali, derivato dagli indici convettivi.
+	 * Presente solo dove i modelli li espongono.
+	 */
+	storm_index?: number | null;
+	/** Probabilità di tuono in %, da WorldWeatherOnline. */
+	thunder_prob?: number | null;
 }
 
 export interface AstronomyData {

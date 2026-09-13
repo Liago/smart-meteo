@@ -230,10 +230,42 @@ test.describe('dettaglio orario', () => {
 		await expect(page.getByRole('dialog')).toBeVisible();
 
 		// Il selettore è un button con aria-haspopup="listbox": aprendolo si
-		// devono vedere le cinque metriche del registry.
+		// devono vedere le metriche del registry.
 		const selettore = page.getByRole('dialog').getByRole('button', { expanded: false }).first();
 		await selettore.click();
-		await expect(page.getByRole('option')).toHaveCount(5);
+		await expect(page.getByRole('option')).toHaveCount(6);
+	});
+
+	test('la metrica temporali mostra indice, CAPE e probabilità di tuono', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
+		await page.getByText('80%').first().click();
+		await expect(page.getByRole('dialog')).toBeVisible();
+
+		const selettore = page.getByRole('dialog').getByRole('button', { expanded: false }).first();
+		await selettore.click();
+		await page.getByRole('option', { name: 'Temporali' }).click();
+
+		await expect(page.getByText(/Indice 63\/100/)).toBeVisible();
+		await expect(page.getByText(/CAPE 1800 J\/kg/)).toBeVisible();
+		await expect(page.getByText('Probabilità di tuono')).toBeVisible();
+	});
+
+	test('senza indici convettivi la metrica lo dichiara invece di disegnare zero', async ({ page }) => {
+		// Uno zero direbbe «nessun temporale», la verità è «non lo sappiamo».
+		await mockApi(page, { withoutStorm: true });
+		await page.goto('/');
+
+		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
+		await page.getByText('80%').first().click();
+
+		const selettore = page.getByRole('dialog').getByRole('button', { expanded: false }).first();
+		await selettore.click();
+		await page.getByRole('option', { name: 'Temporali' }).click();
+
+		await expect(page.getByText(/Indici convettivi non disponibili/)).toBeVisible();
 	});
 
 	test('il modale si chiude con Escape', async ({ page }) => {

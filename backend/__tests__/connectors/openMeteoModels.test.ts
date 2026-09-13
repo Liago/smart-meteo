@@ -173,6 +173,10 @@ describe('campi neve e quota', () => {
 			expect(hourly).toContain('snow_depth');
 			// La brina si forma sulla superficie, non a due metri da terra.
 			expect(hourly).toContain('soil_temperature_0cm');
+			// Il rischio temporali si deduceva dal solo weather_code.
+			expect(hourly).toContain('cape');
+			expect(hourly).toContain('lifted_index');
+			expect(hourly).toContain('convective_inhibition');
 			expect(String(config.params.daily)).toContain('snowfall_sum');
 			return [200, openMeteoResponse()];
 		});
@@ -199,6 +203,8 @@ describe('campi neve e quota', () => {
 		expect(r!.hourly![1]!.snowfall_cm).toBe(0.8);
 		expect(r!.hourly![0]!.freezing_level).toBe(1500);
 		expect(r!.hourly![0]!.soil_temperature).toBe(21.4);
+		expect(r!.hourly![0]!.cape).toBe(1000);
+		expect(r!.hourly![0]!.lifted_index).toBe(-3);
 		expect(r!.daily![1]!.snowfall_cm).toBe(1.5);
 	});
 
@@ -218,6 +224,9 @@ describe('campi neve e quota', () => {
 		delete senzaNeve.hourly.snow_depth;
 		delete senzaNeve.hourly.freezing_level_height;
 		delete senzaNeve.hourly.soil_temperature_0cm;
+		delete senzaNeve.hourly.cape;
+		delete senzaNeve.hourly.lifted_index;
+		delete senzaNeve.hourly.convective_inhibition;
 		delete senzaNeve.daily.snowfall_sum;
 		delete senzaNeve.elevation;
 		mock.onGet(/open-meteo\.com/).reply(200, senzaNeve);
@@ -230,6 +239,8 @@ describe('campi neve e quota', () => {
 		expect(r!.hourly![0]!.snow_depth_cm).toBeNull();
 		expect(r!.hourly![0]!.freezing_level).toBeNull();
 		expect(r!.hourly![0]!.soil_temperature).toBeNull();
+		expect(r!.hourly![0]!.cape).toBeNull();
+		expect(r!.hourly![0]!.lifted_index).toBeNull();
 		expect(r!.daily![0]!.snowfall_cm).toBeNull();
 	});
 });

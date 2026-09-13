@@ -353,6 +353,23 @@ describe('world weather online', () => {
 		expect(f.astronomy!.moon_phase).toBe('Waxing Gibbous');
 	});
 
+	it('è l unica fonte della probabilità di tuono', async () => {
+		// Gli indici convettivi di Open-Meteo dicono quanta energia c'è, questa
+		// quanto è probabile che si scarichi: sono due cose diverse.
+		mock.onGet(/worldweatheronline/).reply(200, wwoResponse());
+		const f = (await fetchFromWWO(LAT, LON))!;
+		expect(f.hourly![0]!.thunder_prob).toBe(35);
+	});
+
+	it('una risposta senza chanceofthunder non manda in errore il connettore', async () => {
+		const senzaTuono: any = wwoResponse();
+		delete senzaTuono.data.weather[0].hourly[0].chanceofthunder;
+		mock.onGet(/worldweatheronline/).reply(200, senzaTuono);
+
+		const f = (await fetchFromWWO(LAT, LON))!;
+		expect(f.hourly![0]!.thunder_prob).toBeNull();
+	});
+
 	it('senza chiave API restituisce null', async () => {
 		delete process.env.WORLDWEATHER_KEY;
 		await expect(fetchFromWWO(LAT, LON)).resolves.toBeNull();

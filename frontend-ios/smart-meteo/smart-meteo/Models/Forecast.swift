@@ -215,6 +215,15 @@ struct HourlyForecast: Codable, Identifiable {
     let freezingLevel: Double?
     /// Temperatura della superficie del suolo, °C: è lì che si forma la brina.
     let soilTemperature: Double?
+    /// Energia potenziale convettiva disponibile, J/kg.
+    let cape: Double?
+    /// Lifted index, °C: negativo = instabile.
+    let liftedIndex: Double?
+    /// Indice 0-100 di rischio temporali, calcolato dal backend a partire dagli
+    /// indici convettivi. Presente solo dove i modelli li espongono.
+    let stormIndex: Double?
+    /// Probabilità di tuono in %, da WorldWeatherOnline.
+    let thunderProb: Double?
 
     enum CodingKeys: String, CodingKey {
         case time
@@ -234,6 +243,10 @@ struct HourlyForecast: Codable, Identifiable {
         case snowDepthCm = "snow_depth_cm"
         case freezingLevel = "freezing_level"
         case soilTemperature = "soil_temperature"
+        case cape
+        case liftedIndex = "lifted_index"
+        case stormIndex = "storm_index"
+        case thunderProb = "thunder_prob"
     }
 }
 

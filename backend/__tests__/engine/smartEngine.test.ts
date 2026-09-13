@@ -1020,3 +1020,92 @@ describe('neve e gelate', () => {
 		expect(r.snow.snow_line).toBe(900);
 	});
 });
+
+describe('indici convettivi', () => {
+	const ora = (time: string, over: Record<string, any> = {}) => ({
+		time,
+		temp: 28,
+		precipitation_prob: 40,
+		condition_code: '95',
+		condition_text: 'Thunderstorm',
+		...over,
+	});
+
+	it('calcola l indice temporali dagli indici aggregati', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00', { cape: 1000, lifted_index: -6, convective_inhibition: -5 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		const slot = r.hourly[0];
+		expect(slot.cape).toBe(1000);
+		expect(slot.lifted_index).toBe(-6);
+		// CAPE 1000 → 50, LI -6 → 75, media 62.5 → 63.
+		expect(slot.storm_index).toBe(63);
+	});
+
+	it('media prima gli indici, poi calcola una volta sola', async () => {
+		// La funzione non è lineare: mediare i due indici finali darebbe un
+		// numero diverso. Si media come ogni altro campo, e si deriva dopo.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00', { cape: 0 })],
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00', { cape: 4000 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		// CAPE medio pesato (0*1.1 + 4000*1.0)/2.1 = 1904.8, che sulla spezzata
+		// fra 1000 (50) e 2500 (75) dà 65. Mediando invece i due indici finali
+		// (0 e 100, con gli stessi pesi) si otterrebbe 48: sono due numeri
+		// diversi, ed è la ragione per cui l'ordine delle operazioni conta.
+		expect(r.hourly[0].cape).toBeCloseTo(1904.8, 0);
+		expect(r.hourly[0].storm_index).toBe(65);
+	});
+
+	it('porta la probabilità di tuono, che viene da una fonte sola', async () => {
+		sourceResponses['worldweatheronline'] = forecast('worldweatheronline', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00', { thunder_prob: 65 })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].thunder_prob).toBe(65);
+		// Senza indici convettivi non si inventa un indice.
+		expect(r.hourly[0]).not.toHaveProperty('storm_index');
+	});
+
+	it('una fonte senza indici convettivi non azzera quelli delle altre', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00', { cape: 2500 })],
+		});
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 28,
+			hourly: [ora('2026-07-14T15:00')],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].cape).toBe(2500);
+		expect(r.hourly[0].storm_index).toBe(75);
+	});
+
+	it('un inverno senza indici lascia gli slot senza il campo', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 4,
+			hourly: [ora('2026-01-14T15:00', { condition_code: '3' })],
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0]).not.toHaveProperty('cape');
+		expect(r.hourly[0]).not.toHaveProperty('storm_index');
+	});
+});

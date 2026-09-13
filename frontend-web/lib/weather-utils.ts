@@ -251,6 +251,28 @@ export const UV_THRESHOLDS = {
 	extreme: 11,
 } as const;
 
+/**
+ * Fasce dell'indice di rischio temporali, 0-100.
+ *
+ * Le soglie sono quelle di `backend/utils/storm.ts`: qui servono solo a
+ * colorare e a nominare quello che il backend ha già calcolato.
+ */
+export const STORM_THRESHOLDS = {
+	weak: 25,
+	moderate: 50,
+	strong: 75,
+} as const;
+
+export function getStormScale(
+	index: number | null | undefined
+): { label: string; color: string } {
+	if (index == null || isNaN(index)) return { label: '—', color: 'rgba(8,42,77,0.18)' };
+	if (index >= STORM_THRESHOLDS.strong) return { label: 'Forte', color: '#A855F7' };
+	if (index >= STORM_THRESHOLDS.moderate) return { label: 'Moderato', color: '#EF4444' };
+	if (index >= STORM_THRESHOLDS.weak) return { label: 'Debole', color: '#F97316' };
+	return { label: 'Assente', color: '#4ADE80' };
+}
+
 export function getUvScale(uv: number | null | undefined): { label: string; color: string } {
 	if (uv == null || isNaN(uv)) return { label: '—', color: 'rgba(8,42,77,0.18)' };
 	if (uv >= UV_THRESHOLDS.extreme) return { label: 'Estremo', color: '#A855F7' };

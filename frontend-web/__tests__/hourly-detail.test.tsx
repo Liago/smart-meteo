@@ -4,7 +4,7 @@ import HourlyDetail from '@/components/HourlyDetail';
 import Modal from '@/components/ui/Modal';
 import MetricSelect from '@/components/ui/MetricSelect';
 import type { HourlyForecast, DailyForecast } from '@/lib/types';
-import type { MetricId } from '@/lib/metrics';
+import { METRICS, METRIC_ORDER, type MetricId } from '@/lib/metrics';
 
 jest.mock('framer-motion');
 
@@ -200,6 +200,17 @@ describe('HourlyDetail — le altre metriche', () => {
 });
 
 describe('MetricSelect', () => {
+  it('mostra tutte le metriche del registry, senza voci orfane', () => {
+    // Aggiungere una voce a METRIC_ORDER senza la sua MetricSpec (o viceversa)
+    // romperebbe la dropdown a runtime e non alla compilazione.
+    expect(new Set(METRIC_ORDER).size).toBe(METRIC_ORDER.length);
+    for (const id of METRIC_ORDER) {
+      expect(METRICS[id]).toBeDefined();
+      expect(METRICS[id].sections.length).toBeGreaterThan(0);
+    }
+    expect(Object.keys(METRICS).sort()).toEqual([...METRIC_ORDER].sort());
+  });
+
   it('shows the current metric and opens the listbox on click', async () => {
     const user = userEvent.setup();
     render(<MetricSelect value="precipitation" onChange={jest.fn()} />);
@@ -210,7 +221,9 @@ describe('MetricSelect', () => {
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const listbox = screen.getByRole('listbox');
-    expect(within(listbox).getAllByRole('option')).toHaveLength(5);
+    // Il conteggio si legge dal registry invece di essere ricopiato: una
+    // metrica in più non deve far fallire un test che non la riguarda.
+    expect(within(listbox).getAllByRole('option')).toHaveLength(METRIC_ORDER.length);
   });
 
   it('reports the picked metric and closes', async () => {
@@ -241,12 +254,16 @@ describe('MetricSelect', () => {
     const onChange = jest.fn();
     render(<MetricSelect value="precipitation" onChange={onChange} />);
 
+    // La seconda voce del registry, qualunque essa sia: il test verifica la
+    // navigazione da tastiera, non l'ordine della dropdown.
+    const seconda = METRIC_ORDER[1]!;
+
     screen.getByRole('button', { name: /Precipitazioni/ }).focus();
     await user.keyboard('{ArrowDown}');   // apre evidenziando la voce corrente
-    await user.keyboard('{ArrowDown}');   // → Vento
+    await user.keyboard('{ArrowDown}');   // → voce successiva
     await user.keyboard('{Enter}');
 
-    expect(onChange).toHaveBeenCalledWith('wind');
+    expect(onChange).toHaveBeenCalledWith(seconda);
   });
 
   it('closes on Escape without letting the dialog behind it close too', async () => {

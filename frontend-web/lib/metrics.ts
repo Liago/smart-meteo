@@ -1,14 +1,16 @@
 import type { ComponentType } from 'react';
-import { CloudRain, Droplets, Sun, Thermometer, Wind } from 'lucide-react';
+import { CloudLightning, CloudRain, Droplets, Sun, Thermometer, Wind } from 'lucide-react';
 import type { HourlyForecast } from './types';
 import {
 	MS_TO_KMH,
 	PRECIP_THRESHOLDS,
+	STORM_THRESHOLDS,
 	UV_THRESHOLDS,
 	WIND_THRESHOLDS,
 	formatPrecipMm,
 	getHumidityColor,
 	getPrecipIntensity,
+	getStormScale,
 	getTempColor,
 	getUvScale,
 	getWMOWeatherInfo,
@@ -25,10 +27,10 @@ import {
  * aggiungere una voce a `METRICS`, non toccare il componente.
  */
 
-export type MetricId = 'precipitation' | 'wind' | 'humidity' | 'feels_like' | 'uv';
+export type MetricId = 'precipitation' | 'wind' | 'humidity' | 'feels_like' | 'uv' | 'storm';
 
 /** Ordine di comparsa nella dropdown. */
-export const METRIC_ORDER: MetricId[] = ['precipitation', 'wind', 'humidity', 'feels_like', 'uv'];
+export const METRIC_ORDER: MetricId[] = ['precipitation', 'storm', 'wind', 'humidity', 'feels_like', 'uv'];
 
 export interface MetricDomain {
 	min: number;
@@ -270,6 +272,70 @@ const uvSection: MetricSection = {
 	flatMessage: 'Nessuna radiazione UV prevista',
 };
 
+// --- Temporali ---
+
+/**
+ * Il valore è l'indice 0-100 che il backend ricava da CAPE, lifted index e
+ * inibizione convettiva (`backend/utils/storm.ts`). Qui non si rifà il calcolo:
+ * si mostra, perché la scala vive accanto ai dati che la giustificano e non
+ * accanto alle barre che la disegnano.
+ */
+const stormSection: MetricSection = {
+	id: 'storm',
+	height: 150,
+	valueOf: (h) => h.storm_index,
+	colorOf: (v) => getStormScale(v).color,
+	domain: () => ({ min: 0, max: 100 }),
+	gridLines: () => [
+		{ value: STORM_THRESHOLDS.weak },
+		{ value: STORM_THRESHOLDS.moderate },
+		{ value: STORM_THRESHOLDS.strong },
+	],
+	bands: () => [
+		{ from: 0, to: STORM_THRESHOLDS.weak, label: 'Assente' },
+		{ from: STORM_THRESHOLDS.weak, to: STORM_THRESHOLDS.moderate, label: 'Debole' },
+		{ from: STORM_THRESHOLDS.moderate, to: STORM_THRESHOLDS.strong, label: 'Moderato' },
+		{ from: STORM_THRESHOLDS.strong, to: Infinity, label: 'Forte' },
+	],
+	headline: (h) => {
+		if (!h) return 'Dato non disponibile';
+		return h.storm_index != null ? getStormScale(h.storm_index).label : '—';
+	},
+	caption: (h) => {
+		if (!h || h.storm_index == null) return '';
+		// Il CAPE in chiaro accanto all'indice: chi sa leggerlo ha il numero,
+		// chi non lo sa ha l'etichetta, e nessuno dei due deve fidarsi a scatola
+		// chiusa di un punteggio senza unità di misura.
+		const parts = [`Indice ${Math.round(h.storm_index)}/100`];
+		if (h.cape != null) parts.push(`CAPE ${Math.round(h.cape)} J/kg`);
+		return parts.join(' · ');
+	},
+	headlineClassName: 'text-[#082a4d]',
+	captionClassName: 'text-[#00619b]',
+	ariaLabel: 'Indice orario di rischio temporali',
+	emptyMessage: 'Indici convettivi non disponibili per questa località',
+	flatMessage: 'Nessuna instabilità prevista',
+};
+
+const thunderProbSection: MetricSection = {
+	id: 'thunder_prob',
+	height: 100,
+	valueOf: (h) => h.thunder_prob,
+	colorOf: () => 'rgba(196,181,253,0.85)',
+	domain: () => ({ min: 0, max: 100 }),
+	gridLines: () => [
+		{ value: 50, label: '50%' },
+		{ value: 100, label: '100%' },
+	],
+	bands: () => [],
+	headline: (h) => (h?.thunder_prob != null ? `${Math.round(h.thunder_prob)}%` : '—%'),
+	caption: () => 'Probabilità di tuono',
+	headlineClassName: 'text-[#00619b]',
+	captionClassName: 'text-[#62798a]',
+	ariaLabel: 'Probabilità oraria di tuono',
+	emptyMessage: 'Probabilità di tuono non disponibile per questa località',
+};
+
 export const METRICS: Record<MetricId, MetricSpec> = {
 	precipitation: {
 		id: 'precipitation',
@@ -300,5 +366,14 @@ export const METRICS: Record<MetricId, MetricSpec> = {
 		label: 'Indice UV',
 		icon: Sun,
 		sections: [uvSection],
+	},
+	// Due sezioni come per le precipitazioni: gli indici convettivi dicono
+	// quanta energia c'è, la probabilità di tuono quanto è probabile che si
+	// scarichi. Sono due domande diverse e vengono da fonti diverse.
+	storm: {
+		id: 'storm',
+		label: 'Temporali',
+		icon: CloudLightning,
+		sections: [stormSection, thunderProbSection],
 	},
 };
