@@ -88,6 +88,14 @@ export interface HourlyForecast {
 	freezing_level?: number | null;
 	/** Temperatura della superficie del suolo, °C. */
 	soil_temperature?: number | null;
+	/** Temperatura dello strato 0-7 cm, °C: è lì che germinano i semi. */
+	soil_temperature_root?: number | null;
+	/** Contenuto d'acqua volumetrico dello strato 0-7 cm, m³/m³. */
+	soil_moisture?: number | null;
+	/** Evapotraspirazione di riferimento FAO dell'ora, mm. */
+	evapotranspiration?: number | null;
+	/** Deficit di pressione di vapore, kPa. */
+	vapour_pressure_deficit?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */
@@ -189,6 +197,35 @@ export interface SnowOutlook {
 	frost: FrostOutlook;
 }
 
+/** Quanto è umido lo strato 0-7 cm del terreno. */
+export type SoilMoistureLevel = 'very_dry' | 'dry' | 'adequate' | 'wet';
+
+/** Che cosa fare dell'annaffiatoio. */
+export type IrrigationAdvice = 'rain_expected' | 'water_now' | 'water_soon' | 'not_needed';
+
+/**
+ * Orto e giardino nelle prossime 24 ore.
+ *
+ * A differenza di `snow`, il backend manda questo blocco anche quando è tutto
+ * tranquillo: «non serve innaffiare» è una risposta, e chi ha un orto la cerca.
+ */
+export interface GardenOutlook {
+	/** Umidità volumetrica attuale dello strato 0-7 cm, m³/m³. */
+	soil_moisture: number | null;
+	moisture_level: SoilMoistureLevel | null;
+	/** Temperatura media dello strato radicale nella finestra, °C. */
+	soil_temperature: number | null;
+	/** Evapotraspirazione attesa nella finestra, mm. */
+	evapotranspiration_mm: number | null;
+	/** Pioggia attesa nella finestra, mm. */
+	rain_mm: number | null;
+	/** Evapotraspirazione meno pioggia: positivo = il terreno perde acqua. */
+	water_balance_mm: number | null;
+	advice: IrrigationAdvice;
+	/** Se lo strato radicale è abbastanza caldo per seminare. */
+	sowing_ok: boolean | null;
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -228,6 +265,8 @@ export interface ForecastResponse {
 	pollen?: PollenReading[];
 	/** Neve e gelate: presente solo quando c'è qualcosa da segnalare. */
 	snow?: SnowOutlook;
+	/** Orto: presente ovunque Open-Meteo dia i dati agronomici. */
+	garden?: GardenOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

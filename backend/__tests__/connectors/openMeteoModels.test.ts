@@ -177,6 +177,10 @@ describe('campi neve e quota', () => {
 			expect(hourly).toContain('cape');
 			expect(hourly).toContain('lifted_index');
 			expect(hourly).toContain('convective_inhibition');
+			// Dati agronomici: senza, il riquadro orto sparisce in silenzio.
+			expect(hourly).toContain('soil_moisture_0_to_7cm');
+			expect(hourly).toContain('et0_fao_evapotranspiration');
+			expect(hourly).toContain('soil_temperature_0_to_7cm');
 			expect(String(config.params.daily)).toContain('snowfall_sum');
 			return [200, openMeteoResponse()];
 		});
@@ -205,6 +209,12 @@ describe('campi neve e quota', () => {
 		expect(r!.hourly![0]!.soil_temperature).toBe(21.4);
 		expect(r!.hourly![0]!.cape).toBe(1000);
 		expect(r!.hourly![0]!.lifted_index).toBe(-3);
+		// Due suoli diversi: la superficie decide la brina, lo strato 0-7 cm
+		// decide se un seme germina.
+		expect(r!.hourly![0]!.soil_temperature).toBe(21.4);
+		expect(r!.hourly![0]!.soil_temperature_root).toBe(19.8);
+		expect(r!.hourly![0]!.soil_moisture).toBe(0.252);
+		expect(r!.hourly![0]!.evapotranspiration).toBe(0.18);
 		expect(r!.daily![1]!.snowfall_cm).toBe(1.5);
 	});
 
@@ -227,6 +237,9 @@ describe('campi neve e quota', () => {
 		delete senzaNeve.hourly.cape;
 		delete senzaNeve.hourly.lifted_index;
 		delete senzaNeve.hourly.convective_inhibition;
+		delete senzaNeve.hourly.soil_moisture_0_to_7cm;
+		delete senzaNeve.hourly.et0_fao_evapotranspiration;
+		delete senzaNeve.hourly.soil_temperature_0_to_7cm;
 		delete senzaNeve.daily.snowfall_sum;
 		delete senzaNeve.elevation;
 		mock.onGet(/open-meteo\.com/).reply(200, senzaNeve);
@@ -241,6 +254,8 @@ describe('campi neve e quota', () => {
 		expect(r!.hourly![0]!.soil_temperature).toBeNull();
 		expect(r!.hourly![0]!.cape).toBeNull();
 		expect(r!.hourly![0]!.lifted_index).toBeNull();
+		expect(r!.hourly![0]!.soil_moisture).toBeNull();
+		expect(r!.hourly![0]!.evapotranspiration).toBeNull();
 		expect(r!.daily![0]!.snowfall_cm).toBeNull();
 	});
 });

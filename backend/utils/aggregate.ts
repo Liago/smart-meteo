@@ -26,12 +26,17 @@ function usable(items: WeightedValue[] | undefined): WeightedValue[] {
 }
 
 /**
- * Media pesata, arrotondata a un decimale.
+ * Media pesata, arrotondata a un decimale per default.
+ *
+ * Il decimale basta per gradi, millimetri e percentuali, che sono quasi tutte le
+ * grandezze aggregate. Non basta per quelle che vivono fra 0 e 1: l'umidità
+ * volumetrica del suolo, in m³/m³, passerebbe da 0.25 a 0.3 e da 0.06 a 0.1,
+ * cioè da «molto secco» ad «asciutto». Per quelle si passa `decimals`.
  *
  * @returns null quando non c'è nessun valore utilizzabile, così il chiamante
  *          può omettere la chiave invece di emettere uno zero inventato.
  */
-export function weightedMean(items: WeightedValue[]): number | null {
+export function weightedMean(items: WeightedValue[], decimals = 1): number | null {
 	const valid = usable(items);
 	if (valid.length === 0) return null;
 
@@ -43,7 +48,7 @@ export function weightedMean(items: WeightedValue[]): number | null {
 	}
 	if (totalWeight === 0) return null;
 
-	return Number((weightedSum / totalWeight).toFixed(1));
+	return Number((weightedSum / totalWeight).toFixed(decimals));
 }
 
 export interface WeightedCode {

@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E in corso: chiuse le tre asimmetrie dichiarate.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 4 punti su 9.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -442,11 +442,15 @@ punto 3.
 dell'impianto inserita dall'utente si stima la produzione giornaliera in kWh: pubblico piccolo ma
 molto fedele, e in Italia il fotovoltaico domestico è diffusissimo.
 
-#### 5.10 Giardino e agricoltura (Open-Meteo)
+#### 5.10 Giardino e agricoltura (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6E)
 
-`soil_temperature_0_to_7cm`, `soil_moisture_0_to_7cm`, `et0_fao_evapotranspiration`,
-`vapour_pressure_deficit`. Prodotto: "devo innaffiare?", rischio gelata tardiva (abbiamo già dew
-point), finestra di semina.
+`soil_temperature_0_to_7cm`, `soil_moisture_0_to_7cm`, `et0_fao_evapotranspiration` e
+`vapour_pressure_deficit`, sullo stesso endpoint che già interroghiamo. Prodotto: «devo
+innaffiare?» e finestra di semina. Il rischio gelata tardiva era già coperto dal riquadro neve
+(§5.2), che giudica sulla temperatura della superficie.
+
+Implementata in `backend/utils/garden.ts` (blocco `garden`), `GardenPanel.tsx` e
+`GardenPanelView.swift`. Le decisioni sono nel registro, §7 → Fase 6E punto 4.
 
 #### 5.11 Mare (Open-Meteo Marine + WeatherAPI)
 
@@ -561,7 +565,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 21 | Banda di incertezza sul grafico orario iOS | §5.3.2 | ✅ |
 | 22 | Mare e maree | §5.11 | ⏳ |
 | 23 | Radiazione solare e resa fotovoltaica | §5.9 | ⏳ |
-| 24 | Giardino e suolo | §5.10 | ⏳ |
+| 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
 | 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
 | 26 | Alba/tramonto e cielo notturno | §5.12 | ⏳ |
 | 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
@@ -968,7 +972,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (3 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (4 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1030,9 +1034,63 @@ lasciato indietro, parentesi bilanciate, idiomi coerenti con il deployment targe
 **Verifiche:** 478 test backend (22 suite), 181 web (10 suite), 34 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
+#### 4. Orto e giardino: devo innaffiare?
+
+Chiude §5.10. Commit `feat(6E): orto e giardino, devo innaffiare?`.
+
+Quattro campi agronomici dalla chiamata Open-Meteo che già facevamo. Il blocco `garden` risponde
+a una domanda che il meteo normale non copre: non «che tempo fa» ma «devo prendere
+l'annaffiatoio stasera». Schema di cache alla versione 12.
+
+**Decisioni**
+
+- **La pioggia ha la precedenza su tutto.** Se nelle 24 ore arrivano almeno 5 mm il consiglio è
+  «non innaffiare», anche su terreno molto secco — ed è proprio il caso in cui un utente
+  sbaglierebbe da solo, perché guarda la terra asciutta e prende l'annaffiatoio senza sapere che
+  fra tre ore arriva un temporale.
+- **Il consiglio mostra sempre il proprio motivo.** «Il terreno perde 4,8 mm più di quanti ne
+  riceve» si può contestare; un consiglio nudo è un oracolo, e nessuno si fida di un oracolo
+  sull'orto.
+- **Le soglie di umidità dipendono dal tipo di suolo, e l'API non lo dichiara.** La capacità di
+  campo di una sabbia sta intorno a 0.15 m³/m³, quella di un'argilla arriva a 0.40: le soglie
+  usate sono quelle di un terreno franco, il più diffuso negli orti, e per questo accanto al
+  giudizio compare **sempre il numero grezzo** — chi conosce il proprio terreno può correggere.
+  Mostrato come percentuale di volume: «25% vol.» lo capisce chiunque, «0,25 m³/m³» quasi nessuno.
+- **Due temperature del suolo, non una.** `soil_temperature_0cm` è la superficie, dove si forma
+  la brina (§5.2); `soil_temperature_0_to_7cm` è lo strato delle radici, che decide se un seme
+  germina. Due domande diverse e due campi diversi.
+- **La temperatura di semina è una media sulla finestra**, non il minimo né il picco: un seme non
+  reagisce all'ora più fredda della notte, ma nemmeno a quella più calda del pomeriggio.
+- **L'umidità è uno stato, l'evapotraspirazione un accumulo.** La prima si legge adesso, la
+  seconda si somma: sommando 24 ore di 0.25 m³/m³ si otterrebbe 6, che non è un'umidità.
+- **Senza evapotraspirazione non si calcola il bilancio.** Sarebbe la pioggia col segno meno, che
+  non dice niente sul consumo del terreno.
+- **`weightedMean` ha guadagnato una precisione configurabile.** Arrotondava sempre a un
+  decimale: sull'umidità volumetrica, che vive fra 0 e 1, 0.25 sarebbe diventato 0.3 e 0.06
+  sarebbe diventato 0.1 — cioè da «molto secco» ad «asciutto».
+- **Questo riquadro non si omette quando è tutto tranquillo**, a differenza di quello sulla neve.
+  Non è un'incoerenza: il riquadro neve sarebbe stato *vuoto* — niente manto, niente nevicata,
+  nessuna gelata — per otto mesi l'anno, mentre «non serve innaffiare» è una risposta piena, ed è
+  quella che chi ha un orto va a cercare la sera.
+
+**Verifiche:** 504 test backend (23 suite), 196 web (11 suite), 37 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti. Un fallimento isolato
+su `search.spec.ts` non si è ripresentato né in isolamento né alla riesecuzione completa: flake,
+non regressione.
+
+**Limite dichiarato:** come le tre voci precedenti, `GardenPanelView.swift` non è compilata né
+testata — manca la toolchain Swift e mancano i test iOS (punto 27).
+
+### Audit Lighthouse: ancora bloccato
+
+Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
+Figtree da `fonts.googleapis.com`, che la policy di rete dell'ambiente nega. Senza build di
+produzione non c'è nulla su cui far girare Lighthouse. In sviluppo l'app funziona (Next ripiega
+sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere impedita.
+
 ### Prossimo blocco
 
-**Fase 6E, punti 22-27**: mare e maree, fotovoltaico, giardino, indici lifestyle, alba/tramonto,
+**Fase 6E, punti 22-23 e 25-27**: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto,
 test iOS e audit Lighthouse.
 **Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
 

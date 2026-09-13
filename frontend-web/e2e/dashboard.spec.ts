@@ -218,6 +218,46 @@ test.describe('neve e gelate', () => {
 	});
 });
 
+test.describe('orto e giardino', () => {
+	test('mostra il consiglio, il motivo e il dato grezzo del terreno', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Orto e giardino')).toBeVisible();
+		await expect(page.getByText('Da innaffiare entro un giorno o due')).toBeVisible();
+		// Il perché accanto al consiglio: senza, è un oracolo.
+		await expect(page.getByText(/perde 4,8 mm/)).toBeVisible();
+		await expect(page.getByText('25% vol.')).toBeVisible();
+	});
+
+	test('con la pioggia in arrivo dice di non innaffiare', async ({ page }) => {
+		await mockApi(page, {
+			garden: {
+				soil_moisture: 0.08,
+				moisture_level: 'very_dry',
+				soil_temperature: 15,
+				evapotranspiration_mm: 3.2,
+				rain_mm: 14,
+				water_balance_mm: -10.8,
+				advice: 'rain_expected',
+				sowing_ok: true,
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Non innaffiare: ci pensa la pioggia')).toBeVisible();
+		await expect(page.getByText(/Attesi 14,0 mm/)).toBeVisible();
+	});
+
+	test('senza dati agronomici il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { garden: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Orto e giardino')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

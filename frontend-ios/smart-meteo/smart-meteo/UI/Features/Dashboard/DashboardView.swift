@@ -208,6 +208,14 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                             }
 
+                            // Orto: presente ovunque Open-Meteo dia i dati
+                            // agronomici, anche quando non serve innaffiare —
+                            // quella è la risposta che si cerca.
+                            if let garden = forecast.garden {
+                                GardenPanelView(garden: garden)
+                                    .padding(.horizontal)
+                            }
+
                             // Pollini: solo dove il modello CAMS copre.
                             if let pollen = forecast.pollen, !pollen.isEmpty {
                                 PollenPanelView(pollen: pollen)

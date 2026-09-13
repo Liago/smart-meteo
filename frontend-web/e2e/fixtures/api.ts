@@ -78,6 +78,8 @@ export interface ForecastOptions {
 	withoutPollen?: boolean;
 	/** Rimuove gli indici convettivi, come quando i modelli non li espongono. */
 	withoutStorm?: boolean;
+	/** Blocco orto. Presente per default: Open-Meteo dà i dati agronomici ovunque. */
+	garden?: Record<string, unknown> | null;
 	/**
 	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
 	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
@@ -171,6 +173,19 @@ export function buildForecast(options: ForecastOptions = {}) {
 
 	if (options.snow) {
 		forecast.snow = options.snow;
+	}
+
+	if (options.garden !== null) {
+		forecast.garden = options.garden ?? {
+			soil_moisture: 0.252,
+			moisture_level: 'adequate',
+			soil_temperature: 18,
+			evapotranspiration_mm: 4.8,
+			rain_mm: 0,
+			water_balance_mm: 4.8,
+			advice: 'water_soon',
+			sowing_ok: true,
+		};
 	}
 
 	if (!options.withoutNextHour) {

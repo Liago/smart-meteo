@@ -38,6 +38,14 @@ export interface HourlyForecast {
 	freezing_level?: number | null;
 	/** Temperatura della superficie del suolo, °C: è lì che si forma la brina. */
 	soil_temperature?: number | null;
+	/** Temperatura dello strato 0-7 cm, °C: è lì che germinano i semi. */
+	soil_temperature_root?: number | null;
+	/** Contenuto d'acqua volumetrico dello strato 0-7 cm, m³/m³. */
+	soil_moisture?: number | null;
+	/** Evapotraspirazione di riferimento FAO dell'ora, mm. */
+	evapotranspiration?: number | null;
+	/** Deficit di pressione di vapore, kPa: quanta "sete" ha l'aria. */
+	vapour_pressure_deficit?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */

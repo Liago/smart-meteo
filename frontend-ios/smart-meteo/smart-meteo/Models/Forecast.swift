@@ -86,6 +86,8 @@ struct ForecastResponse: Codable {
     /// quando c'è qualcosa da segnalare, quindi la sua sola presenza basta a
     /// decidere se mostrare il riquadro.
     let snow: SnowOutlook?
+    /// Orto: presente ovunque Open-Meteo dia i dati agronomici.
+    let garden: GardenOutlook?
     /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
     /// copre il dataset `forecastNextHour` (Italia inclusa).
     let forecastNextHour: ForecastNextHour?
@@ -103,6 +105,7 @@ struct ForecastResponse: Codable {
         case confidence
         case pollen
         case snow
+        case garden
         case forecastNextHour
     }
 }
@@ -225,6 +228,14 @@ struct HourlyForecast: Codable, Identifiable {
     let freezingLevel: Double?
     /// Temperatura della superficie del suolo, °C: è lì che si forma la brina.
     let soilTemperature: Double?
+    /// Temperatura dello strato 0-7 cm, °C: è lì che germinano i semi.
+    let soilTemperatureRoot: Double?
+    /// Contenuto d'acqua volumetrico dello strato 0-7 cm, m³/m³.
+    let soilMoisture: Double?
+    /// Evapotraspirazione di riferimento FAO dell'ora, mm.
+    let evapotranspiration: Double?
+    /// Deficit di pressione di vapore, kPa.
+    let vapourPressureDeficit: Double?
     /// Energia potenziale convettiva disponibile, J/kg.
     let cape: Double?
     /// Lifted index, °C: negativo = instabile.
@@ -255,6 +266,10 @@ struct HourlyForecast: Codable, Identifiable {
         case snowDepthCm = "snow_depth_cm"
         case freezingLevel = "freezing_level"
         case soilTemperature = "soil_temperature"
+        case soilTemperatureRoot = "soil_temperature_root"
+        case soilMoisture = "soil_moisture"
+        case evapotranspiration
+        case vapourPressureDeficit = "vapour_pressure_deficit"
         case cape
         case liftedIndex = "lifted_index"
         case stormIndex = "storm_index"
@@ -373,6 +388,43 @@ struct SnowOutlook: Codable {
         case snowDepthCm = "snow_depth_cm"
         case snowfallCm = "snowfall_cm"
         case frost
+    }
+}
+
+// MARK: - Orto e giardino
+
+/// Orto e giardino nelle prossime 24 ore.
+///
+/// A differenza di `SnowOutlook`, il backend manda questo blocco anche quando è
+/// tutto tranquillo: «non serve innaffiare» è una risposta, ed è quella che chi
+/// ha un orto va a cercare la sera.
+struct GardenOutlook: Codable {
+    /// Umidità volumetrica attuale dello strato 0-7 cm, m³/m³.
+    let soilMoisture: Double?
+    /// "very_dry" | "dry" | "adequate" | "wet"
+    let moistureLevel: String?
+    /// Temperatura media dello strato radicale nella finestra, °C.
+    let soilTemperature: Double?
+    /// Evapotraspirazione attesa nella finestra, mm.
+    let evapotranspirationMm: Double?
+    /// Pioggia attesa nella finestra, mm.
+    let rainMm: Double?
+    /// Evapotraspirazione meno pioggia: positivo = il terreno perde acqua.
+    let waterBalanceMm: Double?
+    /// "rain_expected" | "water_now" | "water_soon" | "not_needed"
+    let advice: String
+    /// Se lo strato radicale è abbastanza caldo per seminare.
+    let sowingOk: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case soilMoisture = "soil_moisture"
+        case moistureLevel = "moisture_level"
+        case soilTemperature = "soil_temperature"
+        case evapotranspirationMm = "evapotranspiration_mm"
+        case rainMm = "rain_mm"
+        case waterBalanceMm = "water_balance_mm"
+        case advice
+        case sowingOk = "sowing_ok"
     }
 }
 

@@ -104,8 +104,13 @@ const CURRENT_PARAMS =
 // `cape`, `lifted_index` e `convective_inhibition` sono gli indici convettivi:
 // il rischio temporali si deduceva dal solo `weather_code`, che è una
 // fotografia e non una misura (`utils/storm.ts`).
+//
+// Gli ultimi quattro servono all'orto (`utils/garden.ts`). Attenzione ai due
+// suoli: `soil_temperature_0cm` è la SUPERFICIE, dove si forma la brina;
+// `soil_temperature_0_to_7cm` è lo strato delle radici, che è quello che decide
+// se un seme germina. Sono due domande diverse e due campi diversi.
 const HOURLY_PARAMS =
-	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition';
+	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm,et0_fao_evapotranspiration,vapour_pressure_deficit';
 const DAILY_PARAMS =
 	'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,snowfall_sum,sunrise,sunset,uv_index_max';
 
@@ -168,6 +173,10 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 					: null,
 			freezing_level: hourly.freezing_level_height?.[realIndex] ?? null,
 			soil_temperature: hourly.soil_temperature_0cm?.[realIndex] ?? null,
+			soil_temperature_root: hourly.soil_temperature_0_to_7cm?.[realIndex] ?? null,
+			soil_moisture: hourly.soil_moisture_0_to_7cm?.[realIndex] ?? null,
+			evapotranspiration: hourly.et0_fao_evapotranspiration?.[realIndex] ?? null,
+			vapour_pressure_deficit: hourly.vapour_pressure_deficit?.[realIndex] ?? null,
 			cape: hourly.cape?.[realIndex] ?? null,
 			lifted_index: hourly.lifted_index?.[realIndex] ?? null,
 			convective_inhibition: hourly.convective_inhibition?.[realIndex] ?? null,

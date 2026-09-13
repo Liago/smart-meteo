@@ -1109,3 +1109,85 @@ describe('indici convettivi', () => {
 		expect(r.hourly[0]).not.toHaveProperty('storm_index');
 	});
 });
+
+describe('orto e suolo', () => {
+	const oraOrto = (time: string, over: Record<string, any> = {}) => ({
+		time,
+		temp: 22,
+		precipitation_prob: 10,
+		condition_code: '1',
+		condition_text: 'Sereno',
+		...over,
+	});
+
+	/** Ore a partire da adesso, come per la neve: l'engine scarta il passato. */
+	const oreDaAdesso = (count: number, over: Record<string, any> = {}) => {
+		const base = new Date();
+		base.setUTCMinutes(0, 0, 0);
+		return Array.from({ length: count }, (_, i) =>
+			oraOrto(new Date(base.getTime() + i * 3600_000).toISOString().slice(0, 16), over)
+		);
+	};
+
+	it('espone il riquadro orto con bilancio idrico e consiglio', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 22,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(24, {
+				soil_moisture: 0.06,
+				soil_temperature_root: 18,
+				evapotranspiration: 0.2,
+				precipitation_mm: 0,
+			}),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.garden).toBeDefined();
+		expect(r.garden.moisture_level).toBe('very_dry');
+		expect(r.garden.evapotranspiration_mm).toBeCloseTo(4.8, 1);
+		expect(r.garden.advice).toBe('water_now');
+		expect(r.garden.sowing_ok).toBe(true);
+	});
+
+	it('non arrotonda l umidità del suolo a un decimale', async () => {
+		// 0.252 m³/m³ diventerebbe 0.3, cioè da «adeguato» a un passo dal
+		// «bagnato»: su una scala che vive fra 0 e 1 un decimale è troppo poco.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 22,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(12, { soil_moisture: 0.252, evapotranspiration: 0.1 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.hourly[0].soil_moisture).toBeCloseTo(0.252, 3);
+		expect(r.garden.soil_moisture).toBeCloseTo(0.252, 3);
+	});
+
+	it('«non serve innaffiare» resta un riquadro, non un blocco assente', async () => {
+		// A differenza della neve, qui il caso tranquillo è la risposta cercata.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 22,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(24, { soil_moisture: 0.28, evapotranspiration: 0.05 }),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.garden).toBeDefined();
+		expect(r.garden.advice).toBe('not_needed');
+	});
+
+	it('senza dati agronomici il blocco non compare', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 22,
+			utc_offset_seconds: 0,
+			hourly: oreDaAdesso(12),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('garden');
+	});
+});

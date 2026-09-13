@@ -115,12 +115,14 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6E — Nicchie e rifiniture (2026-09-13, 3 punti su 9)
+### Fase 6E — Nicchie e rifiniture (2026-09-13, 4 punti su 9)
 - **Neve multi-fonte da WeatherKit**: `snowfallAmount` e `snowfallIntensity`, che Apple dà in **millimetri di manto** — una lunghezza, non l'equivalente in acqua. Senza la divisione per dieci, 40 mm sarebbero comparsi come «40 cm». Chiude il limite dichiarato al punto 15, dove i centimetri venivano dai soli modelli Open-Meteo
 - **Le due funzioni di fetch WeatherKit unificate**: erano due blocchi copiati, già divergenti sull'arrotondamento del vento, e un campo aggiunto a uno solo sarebbe comparso o sparito a seconda di quale l'engine avesse chiamato
 - **Pannello fonti su iOS** con l'indice di consenso e i pollini: chiude l'asimmetria dichiarata dalla Fase 6A, dove iOS non mostrava nemmeno `sources_used`
 - **Banda di incertezza sul grafico orario iOS**: chiude l'asimmetria dichiarata dalla Fase 6C. Il modello Swift non aveva nemmeno i campi
-- ⏳ Restano: mare e maree, fotovoltaico, giardino, indici lifestyle, alba/tramonto, test iOS e audit Lighthouse
+- **Orto e giardino**: umidità del suolo, evapotraspirazione FAO e temperatura dello strato radicale da Open-Meteo rispondono a «devo innaffiare stasera?» e alla finestra di semina. **La pioggia ha la precedenza su tutto**: con almeno 5 mm attesi il consiglio è «non innaffiare» anche su terreno molto secco — ed è proprio il caso in cui si sbaglierebbe da soli
+- **Il consiglio mostra sempre il proprio motivo** e il numero grezzo dell'umidità: le soglie dipendono dal tipo di terreno, che l'API non dichiara, quindi chi conosce il proprio suolo deve poter correggere il giudizio
+- ⏳ Restano: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto, test iOS e audit Lighthouse (quest'ultimo **bloccato**: `next build` non scarica i font Google, host negato dalla rete dell'ambiente)
 
 ### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
@@ -193,17 +195,17 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 181 test (10 suite) | Restano i 3 hook → TODO_TESTING §4 |
-| Frontend web E2E (Playwright) | ✅ 34 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **478 test in 22 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
+| Frontend web unit test | ✅ 196 test (11 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 37 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **504 test in 23 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
-| Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
+| Lighthouse performance audit | ❌ Non eseguibile in sviluppo | `next build` fallisce: `next/font` non raggiunge Google Fonts. Da fare in CI |
 
 > **La Fase 6B ha prodotto anche cinque ritrovamenti**: tre bug di unità sul vento
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
 > (entrambi documentati da test, risolti nella 6C).
-> **Prossimo blocco: Fase 6E punti 22-27** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
+> **Prossimo blocco: Fase 6E punti 22-23 e 25-27** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
 
 ### 3.4 Database ✅ VERIFICATO
 

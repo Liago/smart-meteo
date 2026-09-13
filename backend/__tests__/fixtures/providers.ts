@@ -81,6 +81,10 @@ export function openMeteoResponse(overrides?: { current?: Overrides }) {
 			cape: [1000, 2500],
 			lifted_index: [-3, -6],
 			convective_inhibition: [-10, -12],
+			soil_temperature_0_to_7cm: [19.8, 20.2],
+			soil_moisture_0_to_7cm: [0.252, 0.248], // m³/m³
+			et0_fao_evapotranspiration: [0.18, 0.21],
+			vapour_pressure_deficit: [1.2, 1.35],
 		},
 	};
 }
