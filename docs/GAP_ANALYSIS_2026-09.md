@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 4 punti su 9.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 5 punti su 9.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -435,12 +435,17 @@ Implementata in `backend/utils/storm.ts` (indice 0-100) e come metrica «Tempora
 orario, in `lib/metrics.ts` e `MetricScale.swift`. Le decisioni sono nel registro, §7 → Fase 6D
 punto 3.
 
-#### 5.9 Radiazione solare e resa fotovoltaica (Open-Meteo)
+#### 5.9 Radiazione solare e resa fotovoltaica (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6E)
 
-`shortwave_radiation`, `direct_normal_irradiance`, `diffuse_radiation`,
-`global_tilted_irradiance` (con `tilt` e `azimuth`!), `sunshine_duration`. Con la potenza
-dell'impianto inserita dall'utente si stima la produzione giornaliera in kWh: pubblico piccolo ma
-molto fedele, e in Italia il fotovoltaico domestico è diffusissimo.
+`global_tilted_irradiance` (con `tilt` e `azimuth` come parametri **costanti** della query),
+`shortwave_radiation` come ripiego e `sunshine_duration`, sullo stesso endpoint che già
+interroghiamo. Il backend dà la resa **specifica** in kWh/kWp; la potenza dell'impianto la mette
+l'utente nel client.
+
+Implementata in `backend/utils/solar.ts` (blocco `solar`) e `SolarPanel.tsx`. Le decisioni sono
+nel registro, §7 → Fase 6E punto 5. `direct_normal_irradiance` e `diffuse_radiation` non sono
+stati richiesti: servirebbero solo per una trasposizione sul piano calcolata da noi, che è
+esattamente ciò che Open-Meteo fa già con `global_tilted_irradiance`.
 
 #### 5.10 Giardino e agricoltura (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6E)
 
@@ -564,7 +569,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 20 | Pannello fonti su iOS (consenso + pollini) | §3.5 | ✅ |
 | 21 | Banda di incertezza sul grafico orario iOS | §5.3.2 | ✅ |
 | 22 | Mare e maree | §5.11 | ⏳ |
-| 23 | Radiazione solare e resa fotovoltaica | §5.9 | ⏳ |
+| 23 | Radiazione solare e resa fotovoltaica | §5.9 | ✅ |
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
 | 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
 | 26 | Alba/tramonto e cielo notturno | §5.12 | ⏳ |
@@ -972,7 +977,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (4 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (5 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1081,6 +1086,55 @@ non regressione.
 **Limite dichiarato:** come le tre voci precedenti, `GardenPanelView.swift` non è compilata né
 testata — manca la toolchain Swift e mancano i test iOS (punto 27).
 
+#### 5. Radiazione solare e resa fotovoltaica
+
+Chiude §5.9. Commit `feat(6E): radiazione solare e resa fotovoltaica`.
+
+In Italia il fotovoltaico domestico è diffusissimo, e chi ce l'ha non chiede «c'è il sole» ma
+«quanto produco domani». Schema di cache alla versione 13.
+
+**Decisioni**
+
+- **Il backend calcola la resa specifica, non i kWh.** kWh per kWp è la grandezza fisica,
+  indipendente dalla taglia dell'impianto; moltiplicarla per i kWp dell'utente è una
+  moltiplicazione e sta nel client. Se la potenza entrasse nel backend, la risposta smetterebbe
+  di essere la stessa per tutti quelli sulla stessa località e la cache a 30 minuti — condivisa —
+  si frammenterebbe per utente. La potenza vive in `localStorage` e non tocca mai il server.
+- **Inclinazione e orientamento sono costanti della query, non preferenze.** Per lo stesso motivo:
+  con il tetto di ciascuno, la chiamata a Open-Meteo diventerebbe diversa per ogni utente. Trenta
+  gradi esposti a sud sono l'impianto domestico tipico italiano, lo scarto su un tetto diverso è
+  di pochi punti percentuali, e la cache condivisa vale di più.
+- **La trasposizione sul piano la fa Open-Meteo, non noi.** `global_tilted_irradiance` è la
+  radiazione sul piano dei pannelli già calcolata dalla fonte: ricavarla da DNI e DHI con un
+  modello di trasposizione scritto qui sarebbe codice di astronomia che non possiamo validare
+  contro dati reali, e un errore resterebbe silenzioso.
+- **C'è un ripiego esplicito sul piano orizzontale.** Se Open-Meteo cambiasse il nome del campo o
+  rifiutasse i parametri del piano, la stima degraderebbe invece di sparire — e il piano
+  effettivamente ricevuto viaggia fino all'utente, perché su orizzontale un impianto inclinato
+  produce di più d'inverno e tacerlo renderebbe la stima ingannevole invece che approssimata.
+- **Le assunzioni sono sempre scritte a schermo**: inclinazione e perdite di impianto. Chi ha un
+  impianto sa la propria inclinazione e ha diritto di sapere quale abbiamo supposto noi; un
+  numero di kWh senza di esse non è verificabile da nessuno.
+- **Un giorno con meno di 22 ore di dati non viene riportato.** La giornata in corso è già
+  cominciata: darne il totale sarebbe una sottostima travestita da previsione.
+- **`useSyncExternalStore` invece di `useEffect`.** `localStorage` è uno store esterno al React
+  tree: leggerlo in un effetto e riversarlo in `setState` è il pattern che React sconsiglia (e
+  che il lint del progetto segnala già in due punti); così non si disallinea nemmeno
+  l'idratazione, perché sul server lo store risponde `null`.
+
+**Ritrovamento:** il test che verifica i parametri della query ha scoperto che `tilt` e `azimuth`
+non venivano inviati affatto — una sostituzione sul file non aveva agganciato per via
+dell'indentazione. Senza quel test, `global_tilted_irradiance` sarebbe silenziosamente tornato
+orizzontale, con una stima sbagliata di circa il 15% e nessun sintomo visibile.
+
+**Limite dichiarato:** solo backend e web. La versione iOS richiede un campo per la potenza
+dell'impianto nelle impostazioni, e aggiungere una quinta schermata Swift non verificata sopra le
+quattro già scritte è la cosa che ho segnalato di non voler fare prima di un passaggio su
+simulatore.
+
+**Verifiche:** 524 test backend (24 suite), 214 web (12 suite), 40 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1090,8 +1144,9 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 
 ### Prossimo blocco
 
-**Fase 6E, punti 22-23 e 25-27**: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto,
-test iOS e audit Lighthouse.
+**Fase 6E, punti 22 e 25-27**: mare e maree, indici lifestyle, alba/tramonto, test iOS e audit
+Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
+schermate non compilate: un passaggio su simulatore viene prima.
 **Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
 
 Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica

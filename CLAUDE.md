@@ -25,7 +25,7 @@ smart-meteo/
 │   │   │                          #  snowfall, freezing level and soil temp)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
-│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 12)
+│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 13)
 │   ├── middleware/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
@@ -49,6 +49,7 @@ smart-meteo/
 │   │   ├── snow.ts             # Snow line, snow phase, frost risk
 │   │   ├── storm.ts            # CAPE + lifted index -> 0-100 storm risk
 │   │   ├── garden.ts           # Soil moisture + ET0 -> irrigation advice
+│   │   ├── solar.ts            # Irradiance -> PV specific yield (kWh/kWp)
 │   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
@@ -73,6 +74,7 @@ smart-meteo/
 │   │   ├── PollenPanel.tsx      # Pollen species, daily peak
 │   │   ├── SnowPanel.tsx        # Snow line vs altitude, snow depth, frost
 │   │   ├── GardenPanel.tsx      # Soil moisture, water balance, sowing window
+│   │   ├── SolarPanel.tsx       # PV yield per day, plant size in localStorage
 │   │   ├── HourlyDetail.tsx     # Hourly metric modal (precip/wind/humidity/UV/...)
 │   │   ├── WeatherEffects.tsx   # Particle layers for the dynamic background
 │   │   ├── ui/Modal.tsx, ui/MetricSelect.tsx # Shared primitives
@@ -234,11 +236,11 @@ cd frontend-web && npm run build
 
 ## Testing
 
-- Web tests are in `frontend-web/__tests__/` (11 suites: api, components, weather-utils,
-  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden), `npm test`
-  from the repo root
+- Web tests are in `frontend-web/__tests__/` (12 suites: api, components, weather-utils,
+  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar),
+  `npm test` from the repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **504 tests in 23 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **524 tests in 24 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -246,7 +248,7 @@ cd frontend-web && npm run build
 - `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
   per-connector test would not catch a unit mismatch, since each one is self-consistent
 - `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
-- E2E: `cd frontend-web && npm run test:e2e` - 37 scenarios × 2 viewports (Playwright).
+- E2E: `cd frontend-web && npm run test:e2e` - 40 scenarios × 2 viewports (Playwright).
   The backend API is never contacted: every scenario starts from a known response built
   in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
   downloaded. `e2e/` is excluded from Jest
@@ -277,6 +279,7 @@ cd frontend-web && npm run build
 - **Rain outranks everything in the irrigation advice** (`backend/utils/garden.ts`): with 5 mm or more expected in the window the answer is "don't water", even on very dry soil — that is precisely the case a user gets wrong alone, looking at dry earth and reaching for the watering can without knowing a storm is three hours out. The advice always shows its own reason ("the soil loses 4.8 mm more than it receives"): advice without a reason is an oracle, and nobody trusts an oracle about their garden
 - **Soil moisture thresholds depend on soil type and the API does not declare it**: field capacity runs ~0.15 m³/m³ for sand and ~0.40 for clay, so the thresholds are a loam's and the raw number is always shown next to the verdict — as percent of volume, because "25% vol." reads and "0.25 m³/m³" does not. Note the **two** soil temperatures: `soil_temperature_0cm` is the surface, where frost forms; `soil_temperature_0_to_7cm` is the root zone, which decides whether a seed germinates
 - **`weightedMean` takes a precision argument**: it rounded to one decimal, which on volumetric soil moisture turned 0.25 into 0.3 and 0.06 into 0.1 — from "very dry" to merely "dry". Quantities living between 0 and 1 pass their own `decimals`
+- **The PV backend returns specific yield (kWh/kWp), never kWh**: plant size is the user's datum, lives in `localStorage` and never reaches the server — if it did, the 30-minute forecast cache would fragment per user instead of serving everyone at that location. For the same reason **tilt and azimuth are constants of the query, not preferences**: 30° facing south is the typical Italian domestic array, the error on a different roof is a few percent, and the shared cache is worth more. The transposition onto the panel plane is done by Open-Meteo (`global_tilted_irradiance`), not by us — deriving it from DNI/DHI would be unvalidatable astronomy code whose errors stay silent. There is an explicit fallback to the horizontal plane, and **which plane was actually used travels to the user**, because a tilted array out-produces a horizontal estimate in winter
 - **The garden block is NOT omitted when all is calm**, unlike the snow one. Not an inconsistency: the snow panel would have been *empty* — no depth, no snowfall, no frost — for eight months a year, whereas "no need to water" is a full answer, and the one someone with a garden goes looking for in the evening
 - **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
@@ -311,10 +314,11 @@ cd frontend-web && npm run build
 // Frontend types (frontend-web/lib/types.ts)
 ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/gust/label), precipitation_prob, dew_point, aqi, pressure, condition
 DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text, snowfall_cm
-HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, soil_temperature_root, soil_moisture, evapotranspiration, cape, lifted_index, storm_index, thunder_prob
+HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, soil_temperature_root, soil_moisture, evapotranspiration, solar_irradiance, sunshine_duration, cape, lifted_index, storm_index, thunder_prob
 AlertRule          // id, metric, comparator ('above'|'below'), threshold, horizon_hours, enabled
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, forecastNextHour
+ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, solar, forecastNextHour
+SolarOutlook       // plane ('tilted'|'horizontal'), tilt_deg, azimuth_deg, performance_ratio, days[{date, kwh_per_kwp, sunshine_hours, peak_w}]
 GardenOutlook      // soil_moisture, moisture_level, soil_temperature, evapotranspiration_mm, rain_mm, water_balance_mm, advice, sowing_ok
 SnowOutlook        // elevation, snow_line, phase ('snow'|'sleet'|'rain'), snow_depth_cm, snowfall_cm, frost
 FrostOutlook       // level ('none'|'possible'|'likely'|'severe'), min_temp, at, source ('soil'|'air')
@@ -324,6 +328,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Photovoltaic yield** (backend + web): `global_tilted_irradiance` (with constant `tilt`/`azimuth` query params), `shortwave_radiation` as fallback and `sunshine_duration`, turned into a per-day specific yield in kWh/kWp by `backend/utils/solar.ts`. `SolarPanel.tsx` multiplies by the plant size the user stores locally. **Web only:** the iOS version needs a settings field for plant size, and that waits on a simulator pass over the Swift views already written.
 - **Garden and soil** (backend + web + iOS): `soil_moisture_0_to_7cm`, `et0_fao_evapotranspiration`, `soil_temperature_0_to_7cm` and `vapour_pressure_deficit` from the Open-Meteo call we already made, turned into a `garden` block that answers "do I need to water tonight?" and "is the soil warm enough to sow?". Rendered by `GardenPanel.tsx` / `GardenPanelView.swift`.
 - **iOS parity, three declared debts closed** (6E): `SourcesIndicatorView.swift` brings the sources list and the consensus index to iOS (declared open since Phase 6A — iOS showed neither), `PollenPanelView.swift` the pollen panel, and `HourlyForecastView`'s chart finally draws the ensemble band (declared open since 6C; the Swift model did not even carry `temp_p10`/`temp_p90`). The band interpolates at the sunrise/sunset markers, includes the percentiles in the Y scale, and stops where the ensemble's coverage does. **None of it is compiled or tested here**: there is no Swift toolchain in this environment and the project still has no iOS tests.
 - **Personal threshold alerts** (backend + iOS): seven metrics — min, max, gusts, rain, snow, storm index, European AQI — with a threshold and horizon the user picks. Migration **024** (`alert_rules`, `alert_rule_hits`), four endpoints under `/api/alerts/rules`, evaluation hooked into the 15-minute poller already in production, and an "Avvisi personali" screen on iOS. **iOS only:** rules hang off an APNs device token and the web has no push, so a web screen would configure alerts that never arrive — it needs the still-open Web Push decision.

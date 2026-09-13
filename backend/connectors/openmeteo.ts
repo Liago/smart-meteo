@@ -105,12 +105,35 @@ const CURRENT_PARAMS =
 // il rischio temporali si deduceva dal solo `weather_code`, che è una
 // fotografia e non una misura (`utils/storm.ts`).
 //
-// Gli ultimi quattro servono all'orto (`utils/garden.ts`). Attenzione ai due
-// suoli: `soil_temperature_0cm` è la SUPERFICIE, dove si forma la brina;
+// Quattro servono all'orto (`utils/garden.ts`). Attenzione ai due suoli:
+// `soil_temperature_0cm` è la SUPERFICIE, dove si forma la brina;
 // `soil_temperature_0_to_7cm` è lo strato delle radici, che è quello che decide
 // se un seme germina. Sono due domande diverse e due campi diversi.
+//
+// Gli ultimi tre servono al fotovoltaico (`utils/solar.ts`).
+// `global_tilted_irradiance` è la radiazione sul piano dei pannelli, calcolata
+// da Open-Meteo con l'inclinazione e l'orientamento che passiamo in query;
+// `shortwave_radiation` è quella sul piano orizzontale, e resta come ripiego se
+// il primo non arriva.
 const HOURLY_PARAMS =
-	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm,et0_fao_evapotranspiration,vapour_pressure_deficit';
+	'temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,visibility,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,snowfall,snow_depth,freezing_level_height,soil_temperature_0cm,cape,lifted_index,convective_inhibition,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm,et0_fao_evapotranspiration,vapour_pressure_deficit,shortwave_radiation,global_tilted_irradiance,sunshine_duration';
+/**
+ * Piano dei pannelli per `global_tilted_irradiance`.
+ *
+ * Sono **costanti**, non parametri dell'utente, e la scelta è deliberata: con
+ * l'inclinazione di ciascun impianto la chiamata diventerebbe diversa per ogni
+ * utente, e la cache della previsione — condivisa da tutti quelli sulla stessa
+ * località per 30 minuti — si frammenterebbe. Trenta gradi esposti a sud sono
+ * l'impianto domestico tipico in Italia; lo scarto rispetto a un tetto diverso
+ * è di pochi punti percentuali, la cache condivisa vale di più.
+ *
+ * Convenzione Open-Meteo per l'azimut: 0 = sud, -90 = est, 90 = ovest.
+ */
+export const SOLAR_TILT_DEG = 30;
+export const SOLAR_AZIMUTH_DEG = 0;
+
+const SOLAR_PLANE_PARAMS = { tilt: SOLAR_TILT_DEG, azimuth: SOLAR_AZIMUTH_DEG };
+
 const DAILY_PARAMS =
 	'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,snowfall_sum,sunrise,sunset,uv_index_max';
 
@@ -177,6 +200,14 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 			soil_moisture: hourly.soil_moisture_0_to_7cm?.[realIndex] ?? null,
 			evapotranspiration: hourly.et0_fao_evapotranspiration?.[realIndex] ?? null,
 			vapour_pressure_deficit: hourly.vapour_pressure_deficit?.[realIndex] ?? null,
+			// Preferisce il piano dei pannelli all'orizzontale. Il ripiego non è
+			// teorico: se Open-Meteo cambiasse il nome del campo o rifiutasse i
+			// parametri del piano, la stima degraderebbe invece di sparire.
+			solar_irradiance:
+				hourly.global_tilted_irradiance?.[realIndex] ??
+				hourly.shortwave_radiation?.[realIndex] ??
+				null,
+			sunshine_duration: hourly.sunshine_duration?.[realIndex] ?? null,
 			cape: hourly.cape?.[realIndex] ?? null,
 			lifted_index: hourly.lifted_index?.[realIndex] ?? null,
 			convective_inhibition: hourly.convective_inhibition?.[realIndex] ?? null,
@@ -219,6 +250,9 @@ function buildForecast(data: any, lat: number, lon: number, sourceId: string): U
 		// Quota del punto di griglia, in metri: è quella che rende leggibile la
 		// quota neve ("nevica a casa tua" invece di "zero termico a 1500 m").
 		elevation: data.elevation ?? null,
+		// Su quale piano è misurata la radiazione che abbiamo ricevuto: cambia
+		// il significato della stima di produzione, e va dichiarato all'utente.
+		solar_plane: hourly?.global_tilted_irradiance ? 'tilted' : (hourly?.shortwave_radiation ? 'horizontal' : null),
 		daily: dailyForecasts,
 		hourly: hourlyForecasts,
 		astronomy: astronomy
@@ -242,6 +276,7 @@ export async function fetchFromOpenMeteo(lat: number, lon: number): Promise<Unif
 				hourly: HOURLY_PARAMS,
 				daily: DAILY_PARAMS,
 				timezone: 'auto',
+				...SOLAR_PLANE_PARAMS,
 			},
 		});
 		return buildForecast(response.data, lat, lon, 'open-meteo');
@@ -270,6 +305,7 @@ export async function fetchFromOpenMeteoModel(
 				hourly: HOURLY_PARAMS,
 				daily: DAILY_PARAMS,
 				timezone: 'auto',
+				...SOLAR_PLANE_PARAMS,
 				models: model.id,
 			},
 		});

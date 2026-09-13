@@ -96,6 +96,10 @@ export interface HourlyForecast {
 	evapotranspiration?: number | null;
 	/** Deficit di pressione di vapore, kPa. */
 	vapour_pressure_deficit?: number | null;
+	/** Radiazione solare media dell'ora, W/m². */
+	solar_irradiance?: number | null;
+	/** Secondi di sole pieno nell'ora. */
+	sunshine_duration?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */
@@ -226,6 +230,38 @@ export interface GardenOutlook {
 	sowing_ok: boolean | null;
 }
 
+/** Su quale piano è misurata la radiazione ricevuta. */
+export type SolarPlane = 'tilted' | 'horizontal';
+
+export interface SolarDay {
+	/** Data locale, YYYY-MM-DD. */
+	date: string;
+	/** Resa specifica del giorno, kWh per kWp installato. */
+	kwh_per_kwp: number;
+	/** Ore di sole pieno, quando la fonte le dichiara. */
+	sunshine_hours: number | null;
+	/** Picco di irraggiamento del giorno, W/m². */
+	peak_w: number;
+}
+
+/**
+ * Resa fotovoltaica prevista.
+ *
+ * Il backend dà la resa **specifica**, in kWh per kWp: è la grandezza fisica,
+ * indipendente dalla taglia dell'impianto. Moltiplicarla per i kWp dell'utente
+ * è una moltiplicazione e sta qui, così la risposta in cache resta la stessa
+ * per tutti quelli sulla stessa località.
+ */
+export interface SolarOutlook {
+	plane: SolarPlane;
+	/** Inclinazione e orientamento assunti, gradi (azimut: 0 = sud). */
+	tilt_deg: number;
+	azimuth_deg: number;
+	/** Rapporto di prestazione usato nella stima. */
+	performance_ratio: number;
+	days: SolarDay[];
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -267,6 +303,8 @@ export interface ForecastResponse {
 	snow?: SnowOutlook;
 	/** Orto: presente ovunque Open-Meteo dia i dati agronomici. */
 	garden?: GardenOutlook;
+	/** Fotovoltaico: resa specifica per giorno. */
+	solar?: SolarOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

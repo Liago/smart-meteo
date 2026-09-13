@@ -78,6 +78,10 @@ jest.mock('../../connectors/openmeteo', () => ({
 	),
 	activeOpenMeteoModels: jest.fn(() => activeModels),
 	OPENMETEO_MODELS: MODELLI,
+	// Il piano dei pannelli è una costante del connettore, non un dato: senza
+	// riesportarla il blocco solar arriverebbe con tilt e azimut undefined.
+	SOLAR_TILT_DEG: 30,
+	SOLAR_AZIMUTH_DEG: 0,
 }));
 jest.mock('../../connectors/accuweather', () => ({ fetchFromAccuWeather: jest.fn(async () => sourceResponses['accuweather'] ?? null) }));
 jest.mock('../../connectors/worldweatheronline', () => ({ fetchFromWWO: jest.fn(async () => sourceResponses['worldweatheronline'] ?? null) }));
@@ -1189,5 +1193,83 @@ describe('orto e suolo', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r).not.toHaveProperty('garden');
+	});
+});
+
+describe('fotovoltaico', () => {
+	/** Una giornata piena di irraggiamento, a partire da domani. */
+	const giornataSolare = (picco: number) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+		return Array.from({ length: 24 }, (_, h) => {
+			const fromNoon = Math.abs(h - 12);
+			const value = fromNoon > 6 ? 0 : Math.round(picco * (1 - fromNoon / 6));
+			return {
+				time: `${date}T${String(h).padStart(2, '0')}:00`,
+				temp: 24,
+				precipitation_prob: 0,
+				condition_code: '0',
+				condition_text: 'Sereno',
+				solar_irradiance: value,
+				sunshine_duration: value > 100 ? 3600 : 0,
+			};
+		});
+	};
+
+	it('espone la resa specifica per giorno, non i watt grezzi', async () => {
+		// kWh per kWp è la grandezza indipendente dalla taglia dell'impianto:
+		// la moltiplicazione per i kWp dell'utente sta nel client, così la
+		// risposta in cache resta la stessa per tutti.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			solar_plane: 'tilted',
+			hourly: giornataSolare(900),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.solar).toBeDefined();
+		expect(r.solar.days).toHaveLength(1);
+		expect(r.solar.days[0].kwh_per_kwp).toBeGreaterThan(3);
+		expect(r.solar.plane).toBe('tilted');
+		expect(r.solar.tilt_deg).toBe(30);
+	});
+
+	it('senza il piano dichiarato non produce una stima', async () => {
+		// Non sapere su che piano è misurata la radiazione rende il numero
+		// privo di significato.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			hourly: giornataSolare(900),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('solar');
+	});
+
+	it('una fonte senza radiazione non azzera quella delle altre', async () => {
+		const senzaSole = giornataSolare(900).map((h) => ({
+			...h,
+			solar_irradiance: undefined,
+			sunshine_duration: undefined,
+		}));
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			solar_plane: 'tilted',
+			hourly: giornataSolare(900),
+		});
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 24,
+			hourly: senzaSole,
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.solar.days[0].kwh_per_kwp).toBeGreaterThan(3);
 	});
 });

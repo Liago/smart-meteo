@@ -80,6 +80,8 @@ export interface ForecastOptions {
 	withoutStorm?: boolean;
 	/** Blocco orto. Presente per default: Open-Meteo dà i dati agronomici ovunque. */
 	garden?: Record<string, unknown> | null;
+	/** Blocco fotovoltaico. Presente per default. */
+	solar?: Record<string, unknown> | null;
 	/**
 	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
 	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
@@ -185,6 +187,19 @@ export function buildForecast(options: ForecastOptions = {}) {
 			water_balance_mm: 4.8,
 			advice: 'water_soon',
 			sowing_ok: true,
+		};
+	}
+
+	if (options.solar !== null) {
+		forecast.solar = options.solar ?? {
+			plane: 'tilted',
+			tilt_deg: 30,
+			azimuth_deg: 0,
+			performance_ratio: 0.75,
+			days: [
+				{ date: isoDate(1), kwh_per_kwp: 5.2, sunshine_hours: 11, peak_w: 890 },
+				{ date: isoDate(2), kwh_per_kwp: 2.6, sunshine_hours: 4, peak_w: 430 },
+			],
 		};
 	}
 

@@ -258,6 +258,46 @@ test.describe('orto e giardino', () => {
 	});
 });
 
+test.describe('fotovoltaico', () => {
+	test('senza impianto impostato mostra la resa specifica', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fotovoltaico')).toBeVisible();
+		await expect(page.getByText('Imposta impianto')).toBeVisible();
+		await expect(page.getByText('5,20 kWh/kWp').first()).toBeVisible();
+		// Le assunzioni vanno sempre scritte: senza, il numero non è
+		// verificabile da chi conosce il proprio tetto.
+		await expect(page.getByText(/30° esposti a sud/)).toBeVisible();
+	});
+
+	test('salvata la potenza, i kWh compaiono e restano al ricaricamento', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await page.getByText('Imposta impianto').click();
+		await page.getByLabel('Potenza impianto').fill('3');
+		// `exact`: nell'header c'è già un «Salva nei preferiti».
+		await page.getByRole('button', { name: 'Salva', exact: true }).click();
+
+		// 5,2 kWh/kWp × 3 kWp
+		await expect(page.getByText('15,6 kWh').first()).toBeVisible();
+
+		// La potenza vive in localStorage: deve sopravvivere al ricaricamento
+		// senza aver mai toccato il backend.
+		await page.reload();
+		await expect(page.getByText('15,6 kWh').first()).toBeVisible();
+	});
+
+	test('senza dati di radiazione il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { solar: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Fotovoltaico')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);
