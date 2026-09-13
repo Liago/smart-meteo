@@ -149,6 +149,25 @@ test.describe('banda di incertezza', () => {
 	});
 });
 
+test.describe('pollini', () => {
+	test('mostra le specie con la più rilevante in cima', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Pollini')).toBeVisible();
+		await expect(page.getByText(/Oggi soprattutto graminacee/i)).toBeVisible();
+		await expect(page.getByText('Molto alto')).toBeVisible();
+	});
+
+	test('fuori dalla copertura del modello il pannello non compare', async ({ page }) => {
+		await mockApi(page, { withoutPollen: true });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Pollini')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

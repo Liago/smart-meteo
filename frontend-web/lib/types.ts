@@ -27,6 +27,25 @@ export interface AirQualityDetail {
 	o3: number | null;
 	co: number | null;
 	so2: number | null;
+	/**
+	 * Indice europeo (0-100+), da Open-Meteo. Scala diversa da quella EPA 1-6:
+	 * convivono perché dicono cose diverse.
+	 */
+	european_aqi?: number | null;
+}
+
+/** Livello pollinico, secondo le soglie della singola specie. */
+export type PollenLevel = 'none' | 'low' | 'moderate' | 'high' | 'very_high';
+
+export interface PollenReading {
+	species: string;
+	label: string;
+	/** Granuli/m³ nell'ora corrente. */
+	value: number | null;
+	/** Massimo previsto in giornata. */
+	daily_max: number | null;
+	level: PollenLevel;
+	daily_level: PollenLevel;
 }
 
 export interface DailyForecast {
@@ -135,6 +154,8 @@ export interface ForecastResponse {
 	sources_used: string[];
 	current: ForecastCurrent;
 	confidence?: ConfidenceIndex | null;
+	/** Pollini: presenti solo dove il modello CAMS copre, cioè in Europa. */
+	pollen?: PollenReading[];
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

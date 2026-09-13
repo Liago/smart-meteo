@@ -108,6 +108,13 @@ jest.mock('../../connectors/weatherkit', () => ({
 /** Banda restituita dall'ensemble: vuota per default. */
 let ensembleBands: { time: string; p10: number; p50: number; p90: number; members: number }[] = [];
 
+/** Risultato del connettore qualità dell'aria: assente per default. */
+let airQualityResult: any = null;
+
+jest.mock('../../connectors/openmeteoAirQuality', () => ({
+	fetchAirQuality: jest.fn(async () => airQualityResult),
+}));
+
 jest.mock('../../connectors/openmeteoEnsemble', () => ({
 	fetchTemperatureBand: jest.fn(async () =>
 		ensembleBands.length > 0
@@ -139,6 +146,7 @@ beforeEach(() => {
 	sourceResponses = {};
 	activeModels = [];
 	ensembleBands = [];
+	airQualityResult = null;
 });
 
 // --------------------------------------------------------------------- tests
@@ -520,7 +528,7 @@ describe('cache', () => {
 	it('restituisce il full_data in cache quando lo schema coincide', async () => {
 		cachedRow = {
 			full_data: {
-				schema_version: 7,
+				schema_version: 8,
 				current: { temperature: 11.1 },
 				sources_used: ['cached-source'],
 				alerts: [],
@@ -535,7 +543,7 @@ describe('cache', () => {
 
 	it('non fa uscire schema_version dall API', async () => {
 		cachedRow = {
-			full_data: { schema_version: 7, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
+			full_data: { schema_version: 8, current: { temperature: 11.1 }, sources_used: [], alerts: [] },
 		};
 
 		const r = await getSmartForecast(LAT, LON);
@@ -732,12 +740,79 @@ describe('forma della risposta', () => {
 		expect(r.current.air_quality.pm2_5).toBe(12);
 	});
 
-	it('air_quality è null quando WeatherAPI non risponde', async () => {
+	it('air_quality è null quando non risponde nessuna delle due fonti', async () => {
 		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
 
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r.current.air_quality).toBeNull();
+	});
+
+	it('Open-Meteo copre l AQI quando WeatherAPI non risponde', async () => {
+		// Finché WeatherAPI era l'unica fonte, un suo errore lasciava la
+		// dashboard senza qualità dell'aria.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		airQualityResult = {
+			european_aqi: 42,
+			pm2_5: 11,
+			pm10: 19,
+			no2: 14,
+			o3: 58,
+			so2: 3,
+			co: 205,
+			pollen: null,
+		};
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.air_quality.pm2_5).toBe(11);
+		expect(r.current.air_quality.european_aqi).toBe(42);
+		expect(r.current.air_quality.aqi_us_epa).toBeNull();
+	});
+
+	it('WeatherAPI ha la precedenza sugli inquinanti, Open-Meteo aggiunge l indice europeo', async () => {
+		// Le due fonti non usano la stessa unità per il monossido di carbonio:
+		// mescolarle darebbe numeri incoerenti con quelli mostrati da mesi.
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			air_quality: { aqi_us_epa: 2, pm2_5: 12, pm10: 20, no2: 15, o3: 40, co: 200, so2: 5 },
+		});
+		airQualityResult = {
+			european_aqi: 42,
+			pm2_5: 99,
+			pm10: 99,
+			no2: 99,
+			o3: 99,
+			so2: 99,
+			co: 99,
+			pollen: null,
+		};
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.air_quality.pm2_5).toBe(12);
+		expect(r.current.air_quality.co).toBe(200);
+		expect(r.current.air_quality.aqi_us_epa).toBe(2);
+		expect(r.current.air_quality.european_aqi).toBe(42);
+	});
+
+	it('i pollini compaiono solo dove il modello li copre', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const senza = await getSmartForecast(LAT, LON);
+		expect(senza).not.toHaveProperty('pollen');
+
+		airQualityResult = {
+			european_aqi: 42,
+			pm2_5: 11, pm10: 19, no2: 14, o3: 58, so2: 3, co: 205,
+			pollen: [
+				{ species: 'grass', label: 'Graminacee', value: 8, daily_max: 60, level: 'moderate', daily_level: 'very_high' },
+			],
+		};
+
+		const con = await getSmartForecast(LAT, LON);
+		expect(con.pollen).toHaveLength(1);
+		expect(con.pollen[0].label).toBe('Graminacee');
 	});
 
 	it('preferisce la fonte astronomica che porta anche i dati lunari', async () => {

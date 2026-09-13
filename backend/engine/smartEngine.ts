@@ -1,6 +1,7 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
 import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS } from '../connectors/openmeteo';
 import { fetchTemperatureBand } from '../connectors/openmeteoEnsemble';
+import { fetchAirQuality } from '../connectors/openmeteoAirQuality';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -40,8 +41,9 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *   6 → i modelli Open-Meteo entrano come fonti distinte: sources_used cambia
  *       forma e i valori aggregati con essa
  *   7 → banda di incertezza (temp_p10/temp_p90) sugli slot orari
+ *   8 → european_aqi su air_quality e blocco pollen
  */
-const FORECAST_SCHEMA_VERSION = 7;
+const FORECAST_SCHEMA_VERSION = 8;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -193,9 +195,10 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
-	// La banda di incertezza parte subito, in parallelo alle fonti: è un
-	// arricchimento e non deve allungare il percorso critico.
+	// Banda di incertezza e qualità dell'aria partono subito, in parallelo alle
+	// fonti: sono arricchimenti e non devono allungare il percorso critico.
 	const ensemblePromise = fetchTemperatureBand(lat, lon);
+	const airQualityPromise = fetchAirQuality(lat, lon);
 
 	// 3. Fetch from External & Load Accuracies
 	//
@@ -537,8 +540,30 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
-	// Find air_quality detail (only WeatherAPI provides this)
+	// Qualità dell'aria: WeatherAPI porta l'indice EPA e gli inquinanti,
+	// Open-Meteo l'indice europeo e i pollini. Si fondono invece di scegliere:
+	// finché WeatherAPI era l'unica fonte, un suo errore lasciava la dashboard
+	// senza AQI.
 	const sourceWithAirQuality = validForecasts.find(f => f.air_quality);
+	const openMeteoAir = await airQualityPromise;
+
+	const mergedAirQuality: AirQualityDetail | null = (() => {
+		const fromWeatherApi = sourceWithAirQuality?.air_quality;
+		if (!fromWeatherApi && !openMeteoAir) return null;
+		return {
+			aqi_us_epa: fromWeatherApi?.aqi_us_epa ?? null,
+			// Su ogni inquinante WeatherAPI ha la precedenza quando c'è: sono i
+			// valori che l'utente vede da mesi e le due fonti non usano la
+			// stessa unità per il monossido di carbonio.
+			pm2_5: fromWeatherApi?.pm2_5 ?? openMeteoAir?.pm2_5 ?? null,
+			pm10: fromWeatherApi?.pm10 ?? openMeteoAir?.pm10 ?? null,
+			no2: fromWeatherApi?.no2 ?? openMeteoAir?.no2 ?? null,
+			o3: fromWeatherApi?.o3 ?? openMeteoAir?.o3 ?? null,
+			co: fromWeatherApi?.co ?? openMeteoAir?.co ?? null,
+			so2: fromWeatherApi?.so2 ?? openMeteoAir?.so2 ?? null,
+			...(openMeteoAir?.european_aqi != null && { european_aqi: openMeteoAir.european_aqi }),
+		};
+	})();
 
 	const aggTemp = avg(aggregation.temp);
 	const aggHumidity = avg(aggregation.humidity);
@@ -577,9 +602,11 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			uv_index: avg(aggregation.uv_index),
 			visibility: avg(aggregation.visibility),
 			cloud_cover: aggCloudCover,
-			air_quality: sourceWithAirQuality?.air_quality ?? null,
+			air_quality: mergedAirQuality,
 		},
 		confidence: consensus,
+		// Pollini: solo dove il modello CAMS copre, cioè in Europa.
+		...(openMeteoAir?.pollen && { pollen: openMeteoAir.pollen }),
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,

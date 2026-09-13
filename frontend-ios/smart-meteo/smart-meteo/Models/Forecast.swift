@@ -76,6 +76,8 @@ struct ForecastResponse: Codable {
     /// Quanto le fonti sono d'accordo. Opzionale: manca sulle risposte in cache
     /// scritte prima della sua introduzione.
     let confidence: ConfidenceIndex?
+    /// Pollini per specie: presenti solo dove il modello CAMS copre (Europa).
+    let pollen: [PollenReading]?
     /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
     /// copre il dataset `forecastNextHour` (Italia inclusa).
     let forecastNextHour: ForecastNextHour?
@@ -90,6 +92,7 @@ struct ForecastResponse: Codable {
         case astronomy
         case alerts
         case confidence
+        case pollen
         case forecastNextHour
     }
 }
@@ -242,11 +245,37 @@ struct AirQualityDetail: Codable {
     let o3: Double?
     let co: Double?
     let so2: Double?
+    /// Indice europeo (0-100+), da Open-Meteo: scala diversa dall'EPA 1-6.
+    let europeanAqi: Double?
 
     enum CodingKeys: String, CodingKey {
         case aqiUsEpa = "aqi_us_epa"
         case pm25 = "pm2_5"
         case pm10, no2, o3, co, so2
+        case europeanAqi = "european_aqi"
+    }
+}
+
+// MARK: - Pollini
+
+/// Livello pollinico, secondo le soglie della singola specie: 30 granuli/m³ di
+/// graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa.
+struct PollenReading: Codable, Identifiable {
+    var id: String { species }
+    let species: String
+    let label: String
+    /// Granuli/m³ nell'ora corrente.
+    let value: Double?
+    /// Massimo previsto in giornata.
+    let dailyMax: Double?
+    /// "none" | "low" | "moderate" | "high" | "very_high"
+    let level: String
+    let dailyLevel: String
+
+    enum CodingKeys: String, CodingKey {
+        case species, label, value, level
+        case dailyMax = "daily_max"
+        case dailyLevel = "daily_level"
     }
 }
 

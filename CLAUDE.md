@@ -20,6 +20,7 @@ smart-meteo/
 │   │   ├── meteostat.ts        # Meteostat (weight: 0) - observations only, used as ground truth
 │   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
 │   │   ├── openmeteoEnsemble.ts # Ensemble members -> temperature p10/p50/p90 band
+│   │   ├── openmeteoAirQuality.ts # European AQI, pollutants and CAMS pollen
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
 │   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 4)
@@ -191,6 +192,7 @@ cd frontend-web && npm run build
 - Scheduled alert polling: `CRON_SECRET` (guards `POST /api/alerts/poll`; without it the endpoint answers 503 rather than staying open)
 - `OPENMETEO_MODELS` (optional): comma-separated model ids to narrow the Open-Meteo models, or `off` to fall back to the single `best_match` source
 - `OPENMETEO_ENSEMBLE` (optional): ensemble model for the uncertainty band (default `icon_eu`), or `off` to drop the band
+- Open-Meteo Air Quality needs no key either: it supplies the European AQI, the pollutants and the CAMS pollen species
 - Open-Meteo needs no key. There is **no** Meteomatics connector: it was in the
   original plan (`docs/IMPLEMENTATION_PLAN.md`) but was replaced by Open-Meteo,
   so `METEOMATICS_*` in `.env.example` is dead configuration.
@@ -241,6 +243,8 @@ cd frontend-web && npm run build
 - **The MAE is measured against observations**, not against the consensus of the other sources. Until Phase 6C it was the deviation from the aggregate, which rewarded conformity and penalised a source that was right while the others were wrong. `services/observations.ts` gets the observed temperatures from Open-Meteo Archive (ERA5, free, no key) with Meteostat as a fallback; each comparison is a row in `accuracy_samples`, and the MAE is **recomputed** over a 30-day sliding window instead of being updated as a never-decaying cumulative average. A source needs 20 samples before its MAE moves its weight
 - **What is verified is the nowcast**, not the +24h horizon: `raw_forecasts` stores each source's *current* values, not its forecast per horizon. Extending it needs a schema change - see `docs/GAP_ANALYSIS_2026-09.md` §3.4
 - **Meteostat is not a forecast source**: it reports observations, sometimes hours old, and they used to land in the average of the *current* temperature. It now has weight 0 and serves as ground truth for the accuracy job
+- **Air quality has two sources now**: WeatherAPI (EPA index 1-6 and pollutants) and Open-Meteo Air Quality (European AQI, same pollutants, plus pollen). They are merged rather than chosen between - while WeatherAPI was the only one, an outage left the dashboard with no AQI at all. WeatherAPI keeps precedence on each pollutant: those are the values users have seen for months, and the two sources do not use the same unit for carbon monoxide
+- **Pollen thresholds are per species** (`connectors/openmeteoAirQuality.ts`): 30 grains/m³ of grass is a heavy day for an allergy sufferer, the same 30 of olive is nothing. A single threshold would mislabel half the species. The panel shows the **daily peak**, not the current hour: people decide in the morning whether to go out. Pollen is modelled in Europe only - outside it the fields come back null and the block is omitted rather than shown as zero
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
@@ -275,7 +279,7 @@ ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/g
 DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text
 HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band)
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, sources_used, current, daily[], hourly[], astronomy
+ForecastResponse   // location, generated_at, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], forecastNextHour
 WeatherSource      // id, name, weight, active, description, lastError, lastResponseMs
 WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | 'unknown'
 ```

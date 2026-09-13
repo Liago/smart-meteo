@@ -63,6 +63,26 @@ export interface AirQualityDetail {
 	o3: number | null;
 	co: number | null;
 	so2: number | null;
+	/**
+	 * Indice europeo (0-100+), da Open-Meteo Air Quality. Scala diversa da
+	 * quella EPA 1-6: le due convivono perché dicono cose diverse e i lettori
+	 * italiani riconoscono la seconda.
+	 */
+	european_aqi?: number | null;
+}
+
+/** Livello pollinico, secondo le soglie della specie. */
+export type PollenLevel = 'none' | 'low' | 'moderate' | 'high' | 'very_high';
+
+export interface PollenReading {
+	species: string;
+	label: string;
+	/** Granuli/m³ nell'ora corrente. */
+	value: number | null;
+	/** Massimo previsto in giornata. */
+	daily_max: number | null;
+	level: PollenLevel;
+	daily_level: PollenLevel;
 }
 
 export interface UnifiedForecastData {

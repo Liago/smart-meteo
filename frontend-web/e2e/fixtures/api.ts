@@ -65,6 +65,8 @@ export interface ForecastOptions {
 	current?: Record<string, unknown>;
 	/** Allerte attive nella risposta forecast. */
 	alerts?: unknown[];
+	/** Rimuove i pollini, come fuori dalla copertura del modello CAMS. */
+	withoutPollen?: boolean;
 }
 
 export function buildForecast(options: ForecastOptions = {}) {
@@ -137,6 +139,14 @@ export function buildForecast(options: ForecastOptions = {}) {
 		},
 		alerts: options.alerts ?? [],
 	};
+
+	if (!options.withoutPollen) {
+		forecast.pollen = [
+			{ species: 'grass', label: 'Graminacee', value: 8, daily_max: 62, level: 'moderate', daily_level: 'very_high' },
+			{ species: 'olive', label: 'Olivo', value: 3, daily_max: 20, level: 'low', daily_level: 'moderate' },
+			{ species: 'birch', label: 'Betulla', value: 0, daily_max: 0, level: 'none', daily_level: 'none' },
+		];
+	}
 
 	if (!options.withoutNextHour) {
 		forecast.forecastNextHour = {
