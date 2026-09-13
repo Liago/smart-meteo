@@ -25,18 +25,19 @@ smart-meteo/
 │   │   │                          #  snowfall, freezing level and soil temp)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
-│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 10)
+│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 11)
 │   ├── middleware/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
 │   │   ├── sources.ts          # /api/sources
 │   │   ├── accuracy.ts         # /api/accuracy, /api/accuracy/recompute
-│   │   └── alerts.ts           # /api/alerts/* (subscribe, active, poll, health)
+│   │   └── alerts.ts           # /api/alerts/* (subscribe, active, poll, health, rules)
 │   ├── services/
 │   │   ├── supabase.ts         # Supabase client
 │   │   ├── apns.ts             # Apple push notifications
 │   │   ├── alertProcessor.ts   # Alert -> subscription matching, push, delivery log
 │   │   ├── alertPoller.ts      # Background alert polling by subscription cluster
+│   │   ├── ruleProcessor.ts    # Personal threshold rules -> push (claim-then-send)
 │   │   ├── observations.ts     # Ground truth: observed temperatures (ERA5 archive, Meteostat)
 │   │   └── accuracy.ts         # Source MAE vs OBSERVED data -> dynamic weights
 │   ├── utils/
@@ -47,6 +48,7 @@ smart-meteo/
 │   │   ├── consensus.ts        # Source agreement -> confidence score
 │   │   ├── snow.ts             # Snow line, snow phase, frost risk
 │   │   ├── storm.ts            # CAPE + lifted index -> 0-100 storm risk
+│   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
 │   ├── app.ts                  # Express app setup (CORS, routes)
@@ -141,6 +143,7 @@ smart-meteo/
 │               │       ├── GeneralSettingsView.swift
 │               │       ├── SourcesView.swift         # Toggle weather sources
 │               │       ├── FavoritesView.swift       # Saved locations
+│               │       ├── AlertRulesView.swift      # Personal threshold rules
 │               │       └── SidebarView.swift
 │               └── Onboarding/SplashView.swift
 │
@@ -148,7 +151,7 @@ smart-meteo/
 │   └── functions/
 │       └── api.ts              # serverless-http wrapper for Express
 ├── supabase/
-│   └── migrations/             # 23 migration files (001-023)
+│   └── migrations/             # 24 migration files (001-024)
 └── docs/                       # Implementation plans (PHASE_1-3, BACKEND_DB_INTEGRATION)
 ```
 
@@ -218,6 +221,9 @@ cd frontend-web && npm run build
 - `POST /api/accuracy/recompute` - Daily verification job, guarded by `X-Cron-Secret`
 - `GET /api/alerts/health` - APNs status, subscription count, 24h delivery stats
 - `POST /api/alerts/test-push` - Manual push test
+- `GET /api/alerts/rules/metrics` - Registry of thresholdable metrics (id, label, unit, allowed comparators)
+- `POST /api/alerts/rules/list` - A device's personal threshold rules (device token in the body, not the query string)
+- `POST /api/alerts/rules` / `PATCH /api/alerts/rules/:id` / `DELETE /api/alerts/rules/:id` - Rule CRUD, each gated on the device token
 
 ## Testing
 
@@ -225,7 +231,7 @@ cd frontend-web && npm run build
   air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm), `npm test` from the
   repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **419 tests in 19 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **475 tests in 22 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -255,6 +261,8 @@ cd frontend-web && npm run build
 - **Frost is judged on the ground when the data is there**: frost forms on the surface, not at the 2 m where stations measure — `soil_temperature_0cm` uses the physical threshold (0 °C), the 2 m fallback a compensated one (+3 °C, because on clear nights the surface radiates and stays 3-4 degrees below the air). The block declares which one it used, and both clients write it out
 - **The storm risk is an index, not raw CAPE**: "1800 J/kg" means nothing to a reader, a 0-100 scale with four named bands does — but the CAPE stays in the caption, so whoever can read it has the number and nobody has to trust a unitless score. `backend/utils/storm.ts` averages CAPE and lifted index (the same instability measured two ways), then damps by convective inhibition down to a **floor of 0.3, never to zero**: the cap breaks (afternoon heating, orographic lift, a passing front), and calling 3000 J/kg under a lid "no risk" is the kind of forecast that hurts someone in the mountains. The index is computed **once, on the already-averaged fields** — the function is non-linear, so averaging per-source indices instead gives a different number
 - **Thunder probability is a second chart section, not an ingredient**: the convective indices say how much energy is there, WWO's `chanceofthunder` how likely it is to discharge — two questions, two sources, and merging them into one number loses one of them
+- **Personal threshold rules are evaluated on the aggregated forecast**, the same one the app shows: evaluating on a raw source would produce notifications announcing 12 mm while the screen shows 3 — neither wrong, just two different sources, which is worse. The threshold is stored in the unit the user typed (km/h for wind, not m/s) and `backend/utils/alertRules.ts` converts on read. Millimetres **sum** over the window rather than taking the max, because "more than 10 mm tomorrow" is a total
+- **A rule belongs to the device, not the subscription**: `/alerts/subscribe` rewrites the subscription row on every significant move and cleans up leftovers, so a CASCADE foreign key would take the rules with it — the same incident migration 021 fixed for dedup. The dedup signature is `rule + day of the trigger`: the poller runs every 15 minutes, so without it four notifications an hour, and keyed on the rule id alone tonight's frost would mute tomorrow's. Rules live in their own table because `weather_alerts`' cooldown is per severity, where an AQI rule would silence a frost rule for six hours
 - **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
@@ -276,9 +284,9 @@ cd frontend-web && npm run build
 ## Database
 
 - Supabase (PostgreSQL) with schema in `backend/supabase_schema.sql`
-- 23 migrations in `supabase/migrations/` (001-023): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources, accuracy samples
-- The next free migration number is **024**
-- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `accuracy_samples`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`
+- 24 migrations in `supabase/migrations/` (001-024): extensions, tables, RLS policies, indexes, triggers, source seeds, `full_data` cache column, source accuracy, WeatherKit, push notifications, alert enhancement, delivery log, alert location, per-device dedup, Open-Meteo model sources, accuracy samples, personal alert rules
+- The next free migration number is **025**
+- Main tables: `sources`, `locations`, `raw_forecasts`, `smart_forecasts`, `profiles`, `source_accuracy`, `accuracy_samples`, `alert_subscriptions`, `weather_alerts`, `alert_delivery_log`, `alert_rules`, `alert_rule_hits`
 - `upsert_location` utility function for location management
 - Automatic `updated_at` triggers on all tables
 
@@ -290,7 +298,7 @@ ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/g
 DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text, snowfall_cm
 HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, cape, lifted_index, storm_index, thunder_prob
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, forecastNextHour
+ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, forecastNextHour
 SnowOutlook        // elevation, snow_line, phase ('snow'|'sleet'|'rain'), snow_depth_cm, snowfall_cm, frost
 FrostOutlook       // level ('none'|'possible'|'likely'|'severe'), min_temp, at, source ('soil'|'air')
 WeatherSource      // id, name, weight, active, description, lastError, lastResponseMs
@@ -299,6 +307,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Personal threshold alerts** (backend + iOS): seven metrics — min, max, gusts, rain, snow, storm index, European AQI — with a threshold and horizon the user picks. Migration **024** (`alert_rules`, `alert_rule_hits`), four endpoints under `/api/alerts/rules`, evaluation hooked into the 15-minute poller already in production, and an "Avvisi personali" screen on iOS. **iOS only:** rules hang off an APNs device token and the web has no push, so a web screen would configure alerts that never arrive — it needs the still-open Web Push decision.
 - **Storm risk index** (backend + web + iOS): `cape`, `lifted_index` and `convective_inhibition` from the Open-Meteo call we already made, plus WWO's `chanceofthunder`, which was in the response and nobody read. `backend/utils/storm.ts` turns them into a 0-100 `storm_index` on each hourly slot; the new "Temporali" entry in the metric registry (`lib/metrics.ts` / `MetricScale.swift`) draws it with a second section for the thunder probability. Until now the storm risk could only be inferred from `condition_code`, which is a snapshot rather than a measurement. **Limit:** the risk is thermodynamic only — wind shear and storm relative helicity, which separate an isolated cell from an organised one, are not on the Open-Meteo forecast endpoint.
 - **Snow line, snow depth and frost risk** (backend + web + iOS): `freezing_level_height`, `snowfall`, `snow_depth` and `soil_temperature_0cm` hourly, `snowfall_sum` daily, plus the grid point's `elevation` — again from the call we already made. `backend/utils/snow.ts` derives a `snow` block, rendered by `SnowPanel.tsx` / `SnowPanelView.swift`, which the backend omits entirely when there is nothing to report.
 - **Minute-by-minute nowcast** (backend + web + iOS): WeatherKit's `forecastNextHour` was already propagated by the engine but no client read it. `NextHourPrecipitation.tsx` / `NextHourPrecipitationView.swift` derive the headline from the minutes themselves ("inizia fra 12 minuti", "smette fra 20"), not from WeatherKit's `summary`, and require 3 consecutive dry minutes before announcing the rain has stopped. Dry hour renders as a single line, no chart.

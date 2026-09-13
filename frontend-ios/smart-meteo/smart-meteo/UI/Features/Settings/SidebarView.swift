@@ -60,6 +60,10 @@ struct SidebarView: View {
                         NavigationLink(destination: FavoritesView(isSidebarPresented: $isPresented)) {
                             SidebarRow(icon: "star.fill", title: "Località Preferite", subtitle: "Gestisci i tuoi luoghi salvati")
                         }
+
+                        NavigationLink(destination: AlertRulesView()) {
+                            SidebarRow(icon: "bell.badge", title: "Avvisi Personali", subtitle: "Soglie di gelo, vento, pioggia")
+                        }
                         
                         // Section: App
                         Text("APP")

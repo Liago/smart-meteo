@@ -48,12 +48,15 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *       e soil_temperature sugli slot orari
  *  10 → indici convettivi (cape, lifted_index, storm_index, thunder_prob)
  *       sugli slot orari
+ *  11 → utc_offset_seconds sulla risposta: gli slot orari sono in ora locale
+ *       della località, e senza l'offset nessun consumatore può sapere quale
+ *       di essi è "adesso"
  *
  * Esportata perché i test la usino invece di ricopiarne il numero: una copia
  * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
  * modifica non c'entra niente.
  */
-export const FORECAST_SCHEMA_VERSION = 10;
+export const FORECAST_SCHEMA_VERSION = 11;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -655,6 +658,11 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	const result = {
 		location: { lat, lon },
 		generated_at: new Date().toISOString(),
+		// Offset locale della località rispetto a UTC. Le chiavi di `hourly`
+		// sono in ora locale: senza questo campo chi consuma la risposta non
+		// può dire quale slot corrisponde a "adesso" — il poller delle regole
+		// scartava ore future per le località a ovest di Greenwich.
+		utc_offset_seconds: tzOffsetMs / 1000,
 		sources_used: validForecasts.map(f => f.source),
 		current: {
 			temperature: aggTemp,

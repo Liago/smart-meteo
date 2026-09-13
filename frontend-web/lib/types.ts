@@ -216,6 +216,12 @@ export interface ForecastResponse {
 	};
 	generated_at: string;
 	sources_used: string[];
+	/**
+	 * Offset locale della località rispetto a UTC, in secondi. Le chiavi di
+	 * `hourly` sono in ora locale: senza questo campo non si può dire quale
+	 * slot corrisponde ad "adesso" per una località in un altro fuso.
+	 */
+	utc_offset_seconds?: number;
 	current: ForecastCurrent;
 	confidence?: ConfidenceIndex | null;
 	/** Pollini: presenti solo dove il modello CAMS copre, cioè in Europa. */

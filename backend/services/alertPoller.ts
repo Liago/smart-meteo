@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 import { processWeatherAlerts } from './alertProcessor';
+import { processAlertRules } from './ruleProcessor';
+import { getSmartForecast } from '../engine/smartEngine';
 import { fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
@@ -11,10 +13,12 @@ import { aggregateAlerts } from '../utils/alertGeo';
  * Raggruppa le subscription per cluster geografico (~0.5° gradi).
  * Restituisce le coordinate centrali di ogni cluster.
  */
-async function getSubscriptionClusters(): Promise<{ lat: number; lon: number; count: number }[]> {
+async function getSubscriptionClusters(): Promise<
+	{ lat: number; lon: number; count: number; deviceTokens: string[] }[]
+> {
 	const { data, error } = await supabase
 		.from('alert_subscriptions')
-		.select('location_lat, location_lon')
+		.select('location_lat, location_lon, device_token')
 		.eq('enabled', true);
 
 	if (error || !data || data.length === 0) {
@@ -23,23 +27,30 @@ async function getSubscriptionClusters(): Promise<{ lat: number; lon: number; co
 	}
 
 	// Raggruppa per griglia ~0.5° (arrotondamento)
-	const clusterMap = new Map<string, { lats: number[]; lons: number[]; count: number }>();
+	const clusterMap = new Map<
+		string,
+		{ lats: number[]; lons: number[]; count: number; deviceTokens: Set<string> }
+	>();
 
 	for (const sub of data) {
 		const clusterKey = `${Math.round(sub.location_lat * 2) / 2}_${Math.round(sub.location_lon * 2) / 2}`;
 		if (!clusterMap.has(clusterKey)) {
-			clusterMap.set(clusterKey, { lats: [], lons: [], count: 0 });
+			clusterMap.set(clusterKey, { lats: [], lons: [], count: 0, deviceTokens: new Set() });
 		}
 		const cluster = clusterMap.get(clusterKey)!;
 		cluster.lats.push(sub.location_lat);
 		cluster.lons.push(sub.location_lon);
 		cluster.count++;
+		// I device del cluster servono alle regole personali: la previsione è
+		// una per zona, le soglie sono di ogni telefono.
+		if (sub.device_token) cluster.deviceTokens.add(sub.device_token);
 	}
 
 	return Array.from(clusterMap.values()).map(c => ({
 		lat: Number((c.lats.reduce((a, b) => a + b, 0) / c.lats.length).toFixed(4)),
 		lon: Number((c.lons.reduce((a, b) => a + b, 0) / c.lons.length).toFixed(4)),
 		count: c.count,
+		deviceTokens: Array.from(c.deviceTokens),
 	}));
 }
 
@@ -47,20 +58,28 @@ async function getSubscriptionClusters(): Promise<{ lat: number; lon: number; co
  * Job principale di polling: interroga tutte le location sottoscritte,
  * cerca allerte da tutte le fonti, le processa tramite la pipeline esistente.
  */
-export async function pollAlerts(): Promise<{ clusters: number; alertsFound: number; alertsProcessed: number }> {
+export async function pollAlerts(): Promise<{
+	clusters: number;
+	alertsFound: number;
+	alertsProcessed: number;
+	rulesTriggered: number;
+	rulesPushed: number;
+}> {
 	const logPrefix = '[AlertPoller]';
 	console.log(`${logPrefix} Starting alert polling job...`);
 
 	const clusters = await getSubscriptionClusters();
 	if (clusters.length === 0) {
 		console.log(`${logPrefix} No active subscriptions found, nothing to poll`);
-		return { clusters: 0, alertsFound: 0, alertsProcessed: 0 };
+		return { clusters: 0, alertsFound: 0, alertsProcessed: 0, rulesTriggered: 0, rulesPushed: 0 };
 	}
 
 	console.log(`${logPrefix} Found ${clusters.length} cluster(s) covering ${clusters.reduce((a, c) => a + c.count, 0)} subscription(s)`);
 
 	let totalFound = 0;
 	let totalProcessed = 0;
+	let rulesTriggered = 0;
+	let rulesPushed = 0;
 
 	for (const cluster of clusters) {
 		try {
@@ -94,8 +113,52 @@ export async function pollAlerts(): Promise<{ clusters: number; alertsFound: num
 		} catch (err: any) {
 			console.error(`${logPrefix} Error polling cluster ${cluster.lat},${cluster.lon}: ${err.message}`);
 		}
+
+		// Regole personali: valutate a parte dalle allerte governative, così un
+		// errore di un provider di allerte non impedisce l'avviso di gelata.
+		try {
+			const stats = await pollRulesForCluster(cluster);
+			rulesTriggered += stats.triggered;
+			rulesPushed += stats.pushed;
+		} catch (err: any) {
+			console.error(`${logPrefix} Errore sulle regole del cluster ${cluster.lat},${cluster.lon}: ${err.message}`);
+		}
 	}
 
-	console.log(`${logPrefix} Polling complete: ${clusters.length} clusters, ${totalFound} alerts found, ${totalProcessed} processed`);
-	return { clusters: clusters.length, alertsFound: totalFound, alertsProcessed: totalProcessed };
+	console.log(`${logPrefix} Polling complete: ${clusters.length} clusters, ${totalFound} alerts found, ${totalProcessed} processed, ${rulesTriggered} regole scattate (${rulesPushed} notificate)`);
+	return {
+		clusters: clusters.length,
+		alertsFound: totalFound,
+		alertsProcessed: totalProcessed,
+		rulesTriggered,
+		rulesPushed,
+	};
+}
+
+/**
+ * Valuta le regole di soglia dei device di un cluster.
+ *
+ * La previsione arriva da `getSmartForecast`, che è la stessa che serve l'app:
+ * valutare le soglie su una fonte grezza produrrebbe notifiche che annunciano
+ * 12 mm mentre lo schermo ne mostra 3. La chiamata è quasi sempre servita dalla
+ * cache a 30 minuti, visto che il poller gira ogni 15.
+ */
+async function pollRulesForCluster(cluster: {
+	lat: number;
+	lon: number;
+	deviceTokens: string[];
+}): Promise<{ triggered: number; pushed: number }> {
+	if (cluster.deviceTokens.length === 0) return { triggered: 0, pushed: 0 };
+
+	const forecast = await getSmartForecast(cluster.lat, cluster.lon);
+
+	// Le chiavi di `hourly` sono in ora LOCALE della località, non in UTC:
+	// confrontarle con l'ora UTC corrente scarterebbe ore future a ovest di
+	// Greenwich (alle 14 UTC in California sono le 6 del mattino, e la gelata
+	// delle 6 sparirebbe). L'offset lo dichiara la risposta stessa.
+	const offsetMs = (forecast?.utc_offset_seconds ?? 0) * 1000;
+	const fromTime = new Date(Date.now() + offsetMs).toISOString().slice(0, 13) + ':00';
+
+	const stats = await processAlertRules(cluster.deviceTokens, forecast, fromTime);
+	return { triggered: stats.hits, pushed: stats.pushSent };
 }

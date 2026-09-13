@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (3 punti su 5) · 6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (4 punti su 5, il radar resta aperto) · 6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -476,12 +476,16 @@ finestra scorrevole a 30 giorni. Esporre `GET /api/accuracy` e una pagina pubbli
 azzeccano le fonti a casa tua": è la promessa originale del progetto e nessun concorrente la
 mantiene.
 
-#### 5.15 Allerte su soglie personali
+#### 5.15 Allerte su soglie personali ⭐ ✅ IMPLEMENTATA (6D)
 
-Il sistema attuale notifica solo le allerte **governative**. Molto richiesto: soglie dell'utente
-("avvisami se scende sotto 0 °C", "se il vento supera 50 km/h", "se domani piove più di 10 mm",
-"se l'AQI supera 100"). Riusa integralmente `alert_subscriptions` + APNs + poller a 15 minuti già
-in produzione: è quasi solo configurazione e una tabella di regole.
+Il sistema notificava solo le allerte **governative**, che scattano su criteri di protezione
+civile: utili, ma non rispondono a «avvisami se stanotte gela», che è la domanda di chi ha un
+orto o una moto.
+
+Implementata in `backend/utils/alertRules.ts` (registro delle metriche + valutazione pura),
+`backend/services/ruleProcessor.ts` (prenotazione e push), migrazione 024 e schermata
+`AlertRulesView.swift`. Riusa per intero `alert_subscriptions`, APNs e il poller a 15 minuti.
+Le decisioni sono nel registro, §7 → Fase 6D punto 4.
 
 ---
 
@@ -537,8 +541,8 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 14 | Connettore Open-Meteo Air Quality: pollini + AQI multi-fonte | §3.6, §5.1 | ✅ |
 | 15 | Quota neve, neve al suolo, rischio gelate | §5.2 | ✅ |
 | 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 | ✅ |
-| 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 | ⏳ |
-| 18 | Allerte su soglie personali | §5.15 | ⏳ |
+| 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 | ⏳ **bloccato in sviluppo** |
+| 18 | Allerte su soglie personali | §5.15 | ✅ |
 
 ### 6.5 Fase 6E — Nicchie e rifiniture
 
@@ -774,7 +778,7 @@ consenso`):
 **Verifiche finali:** 326 test backend (16 suite), 137 web (7 suite), 27 scenari E2E × 2
 viewport, typecheck pulito su entrambi i lati, lint web a 2 errori preesistenti.
 
-### Fase 6D — in corso (3 punti su 5 al 2026-09-13)
+### Fase 6D — in corso (4 punti su 5 al 2026-09-13)
 
 #### 1. Qualità dell'aria a due fonti e pollini
 
@@ -889,9 +893,74 @@ non espone quei campi sull'endpoint forecast, quindi non è un rinvio ma un limi
 **Verifiche:** 419 test backend (19 suite), 181 web (10 suite), 34 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
+#### 4. Allerte su soglie personali
+
+Chiude §5.15. Commit `feat(6D): allerte su soglie personali`.
+
+Sette metriche — minima, massima, raffiche, pioggia, neve, rischio temporali, AQI europeo — su
+cui l'utente pone una soglia e un orizzonte. Migrazione **024** (`alert_rules`,
+`alert_rule_hits`), quattro endpoint sotto `/api/alerts/rules`, valutazione agganciata al poller
+esistente, schermata «Avvisi personali» su iOS. Schema di cache alla versione 11.
+
+**Decisioni**
+
+- **Le soglie si valutano sulla previsione aggregata**, la stessa che l'app mostra. Valutarle su
+  una fonte grezza produrrebbe notifiche che annunciano 12 mm mentre lo schermo ne mostra 3:
+  nessuna delle due sarebbe sbagliata, sarebbero due fonti diverse — il che è peggio.
+- **La soglia è nell'unità che l'utente scrive.** «50 km/h» si confronta in km/h, non nei m/s del
+  contratto interno: il registro converte in lettura. Senza, una soglia di 50 km/h non sarebbe
+  mai scattata.
+- **I millimetri si sommano, non si massimizzano.** «Se domani piove più di 10 mm» è un totale:
+  con il massimo orario, dieci ore da 9 mm non farebbero scattare niente. La somma non ha però
+  un'ora responsabile, e il messaggio non ne inventa una.
+- **La regola è legata al device, non alla subscription.** `/alerts/subscribe` riscrive la riga
+  a ogni spostamento significativo del telefono e ripulisce le registrazioni residue: con una FK
+  CASCADE le regole sparirebbero con esse. È lo stesso incidente che la migrazione 021 ha
+  risolto per la deduplica.
+- **La firma di deduplica è `regola + giorno dello scatto`.** Il poller gira ogni 15 minuti:
+  senza, quattro notifiche l'ora; con una firma legata al solo id della regola, la gelata di
+  stanotte zittirebbe quella di domani.
+- **Tabella separata da `weather_alerts`.** Là il cooldown è per severity: mettendoci anche
+  queste, una regola sull'AQI silenzierebbe per sei ore quella sulle gelate.
+- **Prenotazione prima della push**, come per le allerte governative, e *fail-closed*: se la
+  riga di deduplica non si scrive la notifica non parte. Una mancata è meglio di quattro l'ora.
+- **Un campo assente non vale come soglia non superata.** «Non lo sappiamo» non è «va tutto
+  bene», ma nemmeno un allarme: la regola semplicemente non scatta.
+- **Un token scaduto disabilita le regole, non le cancella**: se l'app viene reinstallata sullo
+  stesso telefono l'utente ritrova le sue soglie.
+- **La risposta espone ora `utc_offset_seconds`.** Le chiavi di `hourly` sono in ora locale
+  della località: il poller le confrontava con l'ora UTC e, a ovest di Greenwich, scartava ore
+  future — alle 14 UTC in California sono le 6 del mattino, e la gelata delle 6 spariva.
+
+**Limite dichiarato:** la feature è **solo iOS**. Le regole sono legate a un device token APNs,
+e il web non ha notifiche push: darebbe una schermata che configura avvisi che non arriverebbero
+mai. Portarla sul web richiede la decisione ancora aperta su Web Push (§6.6).
+
+**Verifiche:** 475 test backend (22 suite), 181 web (10 suite), 34 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+### Punto 17 — radar: bloccato, non rinviato
+
+Il radar (§5.5) **non è stato implementato**, e la ragione è verificabile: la policy di rete
+dell'ambiente di sviluppo nega l'accesso a `api.rainviewer.com`, `tilecache.rainviewer.com`,
+`tile.openweathermap.org` e `tile.openstreetmap.org` — tutti e quattro rispondono con un
+rifiuto del proxy. Non è quindi possibile né verificare il contratto dell'API RainViewer contro
+cui si scriverebbe il connettore, né vedere se una tile arriva a schermo.
+
+Scriverlo comunque significherebbe consegnare un connettore costruito su una forma di risposta
+ricordata a memoria e «testato» solo contro fixture inventate: la parte non verificabile è
+esattamente quella che decide se sullo schermo compare qualcosa. Il punto resta aperto con
+questa motivazione, non silenziosamente saltato.
+
+**Come sbloccarlo:** una sessione con quegli host raggiungibili, oppure il contratto reale di
+`weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
+frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
+
 ### Prossimo blocco
 
-**Fase 6D, punti 17-18**: radar (§5.5), allerte su soglie personali (§5.15).
+**Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
+**Fase 6E**: pannello fonti su iOS, banda di incertezza su iOS, mare e maree, fotovoltaico,
+giardino, indici lifestyle, alba/tramonto, residui WeatherKit, test iOS, audit Lighthouse.
 
 Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
 della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i

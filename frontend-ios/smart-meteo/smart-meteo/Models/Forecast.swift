@@ -68,6 +68,10 @@ struct ForecastResponse: Codable {
     let location: Coordinate
     let generatedAt: String
     let sourcesUsed: [String]
+    /// Offset locale della località rispetto a UTC, in secondi. Le chiavi di
+    /// `hourly` sono in ora locale: senza, non si può dire quale slot è "adesso"
+    /// per una località in un altro fuso.
+    let utcOffsetSeconds: Int?
     let current: ForecastCurrent
     let daily: [DailyForecast]?
     let hourly: [HourlyForecast]?
@@ -90,6 +94,7 @@ struct ForecastResponse: Codable {
         case location
         case generatedAt = "generated_at"
         case sourcesUsed = "sources_used"
+        case utcOffsetSeconds = "utc_offset_seconds"
         case current
         case daily
         case hourly

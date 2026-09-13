@@ -115,7 +115,7 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6D — Nuove feature utente (2026-09-13, 3 punti su 5)
+### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
 - **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
 - **Quota neve, manto e gelate**: `freezing_level_height`, `snowfall`, `snow_depth` e `soil_temperature_0cm` dalla chiamata Open-Meteo che già facevamo. La quota neve è lo zero termico meno 300 m (il fiocco scende oltre l'isoterma raffreddando l'aria) e viene mostrata **accanto alla quota della località**, che Open-Meteo dichiara: «quota neve 900 m, sei a 1800 m» è una risposta, «zero termico a 1500 m» un dato da bollettino
@@ -123,7 +123,10 @@
 - **Il riquadro neve compare solo quando c'è qualcosa da dire**: senza manto, neve prevista o rischio gelate il backend omette il blocco, invece di lasciare un riquadro vuoto per otto mesi l'anno
 - **Indice temporali 0-100** da CAPE, lifted index e inibizione convettiva (`backend/utils/storm.ts`), più la probabilità di tuono di WorldWeatherOnline che era già nella risposta e nessuno leggeva. Nuova metrica «Temporali» nel registry orario di web e iOS: il rischio si deduceva dal solo `condition_code`, che è una fotografia e non una misura
 - **La CIN smorza ma non azzera**: il coperchio si rompe (riscaldamento pomeridiano, orografia, un fronte), e dichiarare «nessun rischio» su 3000 J/kg inibiti è il tipo di previsione che fa male a chi va in montagna
-- ⏳ Restano: radar, allerte su soglie personali
+- **Allerte su soglie personali** (backend + iOS): sette metriche — minima, massima, raffiche, pioggia, neve, rischio temporali, AQI europeo — con soglia e orizzonte scelti dall'utente. Migrazione **024**, quattro endpoint sotto `/api/alerts/rules`, valutazione agganciata al poller a 15 minuti già in produzione, schermata «Avvisi personali» su iOS
+- **Le soglie si valutano sulla previsione aggregata**, la stessa che l'app mostra: valutarle su una fonte grezza darebbe notifiche che annunciano 12 mm mentre lo schermo ne mostra 3
+- **La regola è legata al device, non alla subscription**: `/alerts/subscribe` riscrive quella riga a ogni spostamento del telefono, e con una FK CASCADE le soglie sparirebbero con essa
+- ⏳ **Resta il radar (§5.5), bloccato in sviluppo**: la policy di rete dell'ambiente nega RainViewer, le tile OWM e OpenStreetMap, quindi il contratto dell'API non è verificabile. Motivazione estesa in `GAP_ANALYSIS_2026-09.md` → «Punto 17 — radar: bloccato, non rinviato»
 
 ### Fase 6C — Qualità della previsione (2026-09-12, completata)
 - **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
@@ -185,7 +188,7 @@
 |------|-------|:-----:|
 | Frontend web unit test | ✅ 181 test (10 suite) | Restano i 3 hook → TODO_TESTING §4 |
 | Frontend web E2E (Playwright) | ✅ 34 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **419 test in 19 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
+| Backend unit/integration test | ✅ **475 test in 22 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
 
@@ -193,7 +196,7 @@
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
 > (entrambi documentati da test, risolti nella 6C).
-> **Prossimo blocco: Fase 6D punti 17-18** della `GAP_ANALYSIS_2026-09.md`.
+> **Prossimo blocco: Fase 6E** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -232,7 +235,7 @@ Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`
 | 14 | Daily e hourly ignorano `SOURCE_WEIGHTS` | 🔴 | ✅ Risolto in 6C |
 | 15 | `/api/alerts/poll` aperto senza `CRON_SECRET` | 🟠 | ✅ Risolto in 6C |
 | 16 | `raw_forecasts` archivia solo i valori correnti: si misura il nowcast, non il +24h | 🟠 | ⏳ richiede una modifica di schema |
-| 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Fase 6D |
+| 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Bloccato: host delle tile irraggiungibili in sviluppo |
 | 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E — i cm di neve oggi vengono dai soli modelli Open-Meteo |
 | 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |
 

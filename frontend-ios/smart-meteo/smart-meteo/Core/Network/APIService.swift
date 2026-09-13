@@ -95,4 +95,98 @@ class APIService {
             throw APIError.requestFailed
         }
     }
+
+    // MARK: - Regole di soglia personali
+
+    /// Esegue una richiesta JSON verso l'API e decodifica la risposta.
+    ///
+    /// Le quattro chiamate sulle regole differiscono solo per metodo, percorso e
+    /// corpo: scriverle per esteso quattro volte moltiplicherebbe per quattro
+    /// anche la gestione degli errori.
+    private func send<T: Decodable>(
+        _ method: String,
+        path: String,
+        body: [String: Any]? = nil,
+        as type: T.Type
+    ) async throws -> T {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)\(path)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let body {
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.requestFailed
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Metriche disponibili, servite dal registro del backend.
+    func fetchAlertRuleMetrics() async throws -> [AlertRuleMetric] {
+        struct Response: Decodable { let metrics: [AlertRuleMetric] }
+        return try await send("GET", path: "/api/alerts/rules/metrics", as: Response.self).metrics
+    }
+
+    /// Regole del device.
+    ///
+    /// Il token viaggia nel corpo e non in query string: è il segreto che
+    /// autorizza la lettura, e una query string finisce nei log del proxy.
+    func fetchAlertRules(deviceToken: String) async throws -> [AlertRule] {
+        struct Response: Decodable { let rules: [AlertRule] }
+        return try await send(
+            "POST",
+            path: "/api/alerts/rules/list",
+            body: ["deviceToken": deviceToken],
+            as: Response.self
+        ).rules
+    }
+
+    func createAlertRule(
+        deviceToken: String,
+        metric: String,
+        comparator: String,
+        threshold: Double,
+        horizonHours: Int
+    ) async throws -> AlertRule {
+        struct Response: Decodable { let rule: AlertRule }
+        return try await send(
+            "POST",
+            path: "/api/alerts/rules",
+            body: [
+                "deviceToken": deviceToken,
+                "metric": metric,
+                "comparator": comparator,
+                "threshold": threshold,
+                "horizonHours": horizonHours
+            ],
+            as: Response.self
+        ).rule
+    }
+
+    func setAlertRuleEnabled(deviceToken: String, ruleId: String, enabled: Bool) async throws -> AlertRule {
+        struct Response: Decodable { let rule: AlertRule }
+        return try await send(
+            "PATCH",
+            path: "/api/alerts/rules/\(ruleId)",
+            body: ["deviceToken": deviceToken, "enabled": enabled],
+            as: Response.self
+        ).rule
+    }
+
+    func deleteAlertRule(deviceToken: String, ruleId: String) async throws {
+        struct Response: Decodable { let success: Bool }
+        _ = try await send(
+            "DELETE",
+            path: "/api/alerts/rules/\(ruleId)",
+            body: ["deviceToken": deviceToken],
+            as: Response.self
+        )
+    }
 }
