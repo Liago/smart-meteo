@@ -46,6 +46,24 @@ export interface HourlyForecast {
 	evapotranspiration?: number | null;
 	/** Deficit di pressione di vapore, kPa: quanta "sete" ha l'aria. */
 	vapour_pressure_deficit?: number | null;
+	/**
+	 * Radiazione solare media dell'ora, W/m². Sul piano dei pannelli quando la
+	 * fonte lo calcola, altrimenti sul piano orizzontale: `solar_plane` dice
+	 * quale dei due.
+	 */
+	solar_irradiance?: number | null;
+	/** Secondi di sole pieno nell'ora. */
+	sunshine_duration?: number | null;
+	/** Copertura nuvolosa totale dell'ora, %. */
+	cloud_cover?: number | null;
+	/**
+	 * Copertura per quota, %. Il tramonto spettacolare nasce da nuvole ALTE
+	 * illuminate con l'orizzonte libero: la copertura totale non distingue
+	 * quel caso da un cielo plumbeo.
+	 */
+	cloud_cover_low?: number | null;
+	cloud_cover_mid?: number | null;
+	cloud_cover_high?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */
@@ -146,6 +164,12 @@ export interface UnifiedForecastData {
 	 * (Open-Meteo). Serve a confrontare la quota neve con quella della località.
 	 */
 	elevation?: number | null;
+	/**
+	 * Piano su cui è misurata `solar_irradiance`: 'tilted' = quello dei
+	 * pannelli, 'horizontal' = il suolo. Cambia il significato della stima di
+	 * produzione, quindi viaggia fino all'utente.
+	 */
+	solar_plane?: 'tilted' | 'horizontal' | null;
 	raw_data?: any;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];

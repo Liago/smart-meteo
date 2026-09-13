@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 4 punti su 9.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 8 punti su 9 (resta solo l'audit, bloccato dall'ambiente).
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -404,15 +404,22 @@ Web con MapLibre/Leaflet, iOS con `MapKit` + overlay: colma §3.9 e un punto del
 
 ### Tier 2 — differenzianti, effort contenuto
 
-#### 5.6 Indici "lifestyle" (AccuWeather + Tomorrow.io)
+#### 5.6 Indici "lifestyle" ⭐ ✅ IMPLEMENTATA (6E) — **ma non come proposta qui**
 
-`GET /indices/v1/daily/1day/{locationKey}/{indexId}` — già nel piano free che usiamo. Decine di
-indici: corsa, escursionismo, ciclismo, zanzare, artrite, ritardi aerei, lavaggio auto, asma,
-raffreddore. Tomorrow.io aggiunge `fireIndex`, `roadRisk`, `grassGrowthPotential`.
-Prodotto: "Oggi è una buona giornata per…" — molto condivisibile, poco costoso.
+La proposta era di comprarli: `GET /indices/v1/daily/1day/{locationKey}/{indexId}` di AccuWeather,
+già nel piano free che usiamo, con decine di indici pronti (corsa, ciclismo, zanzare, lavaggio
+auto, asma), più `fireIndex` e `roadRisk` di Tomorrow.io.
 
-⚠️ Vincolo: AccuWeather free è 50 chiamate/giorno e ne consumiamo già 3 per forecast. Da valutare
-solo con cache giornaliera aggressiva.
+**Il conto non torna.** Su AccuWeather ogni indice è **una chiamata a sé**, il piano free dà 50
+chiamate al giorno e `connectors/accuweather.ts` ne consuma già 3 per ogni cache miss (geoposition
++ current + daily + hourly, con la locationKey in cache un'ora): circa 16 previsioni servibili al
+giorno. Tre indici le porterebbero a otto. Non è un limite che una cache più aggressiva aggira:
+è un budget che non c'è.
+
+Gli indici sono quindi **calcolati in casa**, da dati che aggreghiamo già — `backend/utils/activities.ts`,
+`components/ActivitiesPanel.tsx`. Costo zero, nessuna dipendenza nuova, e in più si può dire
+*perché* il punteggio è quello, cosa che un indice a scatola chiusa non permette. Le decisioni
+sono nel registro, §7 → Fase 6E punto 8.
 
 #### 5.7 Confronto con le normali climatiche (Meteostat + Open-Meteo Archive)
 
@@ -435,12 +442,17 @@ Implementata in `backend/utils/storm.ts` (indice 0-100) e come metrica «Tempora
 orario, in `lib/metrics.ts` e `MetricScale.swift`. Le decisioni sono nel registro, §7 → Fase 6D
 punto 3.
 
-#### 5.9 Radiazione solare e resa fotovoltaica (Open-Meteo)
+#### 5.9 Radiazione solare e resa fotovoltaica (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6E)
 
-`shortwave_radiation`, `direct_normal_irradiance`, `diffuse_radiation`,
-`global_tilted_irradiance` (con `tilt` e `azimuth`!), `sunshine_duration`. Con la potenza
-dell'impianto inserita dall'utente si stima la produzione giornaliera in kWh: pubblico piccolo ma
-molto fedele, e in Italia il fotovoltaico domestico è diffusissimo.
+`global_tilted_irradiance` (con `tilt` e `azimuth` come parametri **costanti** della query),
+`shortwave_radiation` come ripiego e `sunshine_duration`, sullo stesso endpoint che già
+interroghiamo. Il backend dà la resa **specifica** in kWh/kWp; la potenza dell'impianto la mette
+l'utente nel client.
+
+Implementata in `backend/utils/solar.ts` (blocco `solar`) e `SolarPanel.tsx`. Le decisioni sono
+nel registro, §7 → Fase 6E punto 5. `direct_normal_irradiance` e `diffuse_radiation` non sono
+stati richiesti: servirebbero solo per una trasposizione sul piano calcolata da noi, che è
+esattamente ciò che Open-Meteo fa già con `global_tilted_irradiance`.
 
 #### 5.10 Giardino e agricoltura (Open-Meteo) ⭐ ✅ IMPLEMENTATA (6E)
 
@@ -452,19 +464,28 @@ innaffiare?» e finestra di semina. Il rischio gelata tardiva era già coperto d
 Implementata in `backend/utils/garden.ts` (blocco `garden`), `GardenPanel.tsx` e
 `GardenPanelView.swift`. Le decisioni sono nel registro, §7 → Fase 6E punto 4.
 
-#### 5.11 Mare (Open-Meteo Marine + WeatherAPI)
+#### 5.11 Mare (Open-Meteo Marine) ⭐ ✅ IMPLEMENTATA (6E)
 
-`https://marine-api.open-meteo.com/v1/marine`: `wave_height`, `wave_direction`, `wave_period`,
-`swell_wave_height`, `sea_surface_temperature`. WeatherAPI `marine.json` aggiunge le **maree**.
-Da attivare solo per località costiere (test sulla distanza dal mare): temperatura dell'acqua e
-onde sono la prima domanda di chi va al mare.
+`https://marine-api.open-meteo.com/v1/marine`: onde, mare lungo e temperatura dell'acqua.
 
-#### 5.12 Alba/tramonto "spettacolari" e cielo notturno
+**Il test sulla distanza dal mare non serve**: il modello d'onda copre solo i punti di griglia
+sul mare, quindi nell'entroterra la chiamata fallisce o torna tutta nulla e il connettore
+restituisce `null`. La fonte stessa è il criterio di costa, ed è più accurata di qualunque soglia
+avremmo scelto noi.
 
-`cloud_cover_low/mid/high` separati (Open-Meteo) + visibilità: nuvole alte con cielo basso libero
-danno i tramonti migliori. Con `moon_illumination`, `moonrise`/`moonset` (già in casa, §3.2) e la
-copertura nuvolosa si costruisce un indice per l'osservazione astronomica. Feature "carina",
-effort molto basso, ottima per la condivisione.
+**Le maree restano fuori**: WeatherAPI le espone su `marine.json`, che non è nel piano gratuito
+che usiamo. Il pannello lo dichiara invece di lasciarlo intendere.
+
+Implementata in `connectors/openmeteoMarine.ts`, `utils/sea.ts` (blocco `sea`) e `SeaPanel.tsx`.
+Le decisioni sono nel registro, §7 → Fase 6E punto 7.
+
+#### 5.12 Alba/tramonto "spettacolari" e cielo notturno ⭐ ✅ IMPLEMENTATA (6E)
+
+`cloud_cover_low/mid/high` separati più la copertura totale oraria, dallo stesso endpoint
+Open-Meteo, uniti all'illuminazione lunare che avevamo già in casa (§3.2).
+
+Implementata in `backend/utils/sky.ts` (blocco `sky`) e `SkyPanel.tsx`. Le decisioni sono nel
+registro, §7 → Fase 6E punto 6.
 
 ### Tier 3 — ingegneria dei dati (invisibile, alto impatto sulla qualità)
 
@@ -563,11 +584,11 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 19 | Residui WeatherKit sulla neve: `snowfallAmount`, `snowfallIntensity` | §3.10 | ✅ |
 | 20 | Pannello fonti su iOS (consenso + pollini) | §3.5 | ✅ |
 | 21 | Banda di incertezza sul grafico orario iOS | §5.3.2 | ✅ |
-| 22 | Mare e maree | §5.11 | ⏳ |
-| 23 | Radiazione solare e resa fotovoltaica | §5.9 | ⏳ |
+| 22 | Mare: onde e temperatura dell'acqua | §5.11 | ✅ |
+| 23 | Radiazione solare e resa fotovoltaica | §5.9 | ✅ |
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
-| 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
-| 26 | Alba/tramonto e cielo notturno | §5.12 | ⏳ |
+| 25 | Indici lifestyle (calcolati in casa: il budget AccuWeather non regge) | §5.6 | ✅ |
+| 26 | Alba/tramonto e cielo notturno | §5.12 | ✅ |
 | 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
 
 ### 6.6 Decisione richiesta: notifiche email
@@ -972,7 +993,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (4 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (8 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1081,6 +1102,202 @@ non regressione.
 **Limite dichiarato:** come le tre voci precedenti, `GardenPanelView.swift` non è compilata né
 testata — manca la toolchain Swift e mancano i test iOS (punto 27).
 
+#### 5. Radiazione solare e resa fotovoltaica
+
+Chiude §5.9. Commit `feat(6E): radiazione solare e resa fotovoltaica`.
+
+In Italia il fotovoltaico domestico è diffusissimo, e chi ce l'ha non chiede «c'è il sole» ma
+«quanto produco domani». Schema di cache alla versione 13.
+
+**Decisioni**
+
+- **Il backend calcola la resa specifica, non i kWh.** kWh per kWp è la grandezza fisica,
+  indipendente dalla taglia dell'impianto; moltiplicarla per i kWp dell'utente è una
+  moltiplicazione e sta nel client. Se la potenza entrasse nel backend, la risposta smetterebbe
+  di essere la stessa per tutti quelli sulla stessa località e la cache a 30 minuti — condivisa —
+  si frammenterebbe per utente. La potenza vive in `localStorage` e non tocca mai il server.
+- **Inclinazione e orientamento sono costanti della query, non preferenze.** Per lo stesso motivo:
+  con il tetto di ciascuno, la chiamata a Open-Meteo diventerebbe diversa per ogni utente. Trenta
+  gradi esposti a sud sono l'impianto domestico tipico italiano, lo scarto su un tetto diverso è
+  di pochi punti percentuali, e la cache condivisa vale di più.
+- **La trasposizione sul piano la fa Open-Meteo, non noi.** `global_tilted_irradiance` è la
+  radiazione sul piano dei pannelli già calcolata dalla fonte: ricavarla da DNI e DHI con un
+  modello di trasposizione scritto qui sarebbe codice di astronomia che non possiamo validare
+  contro dati reali, e un errore resterebbe silenzioso.
+- **C'è un ripiego esplicito sul piano orizzontale.** Se Open-Meteo cambiasse il nome del campo o
+  rifiutasse i parametri del piano, la stima degraderebbe invece di sparire — e il piano
+  effettivamente ricevuto viaggia fino all'utente, perché su orizzontale un impianto inclinato
+  produce di più d'inverno e tacerlo renderebbe la stima ingannevole invece che approssimata.
+- **Le assunzioni sono sempre scritte a schermo**: inclinazione e perdite di impianto. Chi ha un
+  impianto sa la propria inclinazione e ha diritto di sapere quale abbiamo supposto noi; un
+  numero di kWh senza di esse non è verificabile da nessuno.
+- **Un giorno con meno di 22 ore di dati non viene riportato.** La giornata in corso è già
+  cominciata: darne il totale sarebbe una sottostima travestita da previsione.
+- **`useSyncExternalStore` invece di `useEffect`.** `localStorage` è uno store esterno al React
+  tree: leggerlo in un effetto e riversarlo in `setState` è il pattern che React sconsiglia (e
+  che il lint del progetto segnala già in due punti); così non si disallinea nemmeno
+  l'idratazione, perché sul server lo store risponde `null`.
+
+**Ritrovamento:** il test che verifica i parametri della query ha scoperto che `tilt` e `azimuth`
+non venivano inviati affatto — una sostituzione sul file non aveva agganciato per via
+dell'indentazione. Senza quel test, `global_tilted_irradiance` sarebbe silenziosamente tornato
+orizzontale, con una stima sbagliata di circa il 15% e nessun sintomo visibile.
+
+**Limite dichiarato:** solo backend e web. La versione iOS richiede un campo per la potenza
+dell'impianto nelle impostazioni, e aggiungere una quinta schermata Swift non verificata sopra le
+quattro già scritte è la cosa che ho segnalato di non voler fare prima di un passaggio su
+simulatore.
+
+**Verifiche:** 524 test backend (24 suite), 214 web (12 suite), 40 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+#### 6. Tramonti spettacolari e cielo notturno
+
+Chiude §5.12. Commit `feat(6E): tramonti spettacolari e cielo notturno`.
+
+Due indici che nascono dalla stessa intuizione: **la copertura nuvolosa totale non basta, conta
+la quota**. Schema di cache alla versione 14.
+
+**Decisioni**
+
+- **Il tramonto è un prodotto di due fattori, non una somma.** La *tela* sono le nuvole alte che
+  possono accendersi — massimo a metà copertura, zero sia col cielo terso (non c'è niente da
+  illuminare) sia con la volta chiusa; la *luce* è quanto l'orizzonte è libero. Con una somma, un
+  cielo perfettamente sereno prenderebbe comunque metà punteggio per il solo fatto di non avere
+  nuvole basse, e verrebbe annunciato come mezzo spettacolo.
+- **Le nuvole basse pesano più delle medie** nel bloccare la luce: stanno fra il sole e chi guarda
+  all'orizzonte e spengono la scena, mentre le medie la attenuano soltanto.
+- **La luna penalizza l'osservazione ma non l'azzera.** Con la luna piena si vedono benissimo
+  pianeti, luna stessa e stelle luminose: sono gli oggetti deboli a sparire. Il fattore 0.6 lascia
+  un cielo terso con luna piena intorno al 40, cioè «discreta», che è la verità.
+- **La copertura totale, quando manca, si ricava dal massimo delle quote e non dalla somma**: tre
+  strati al 40% non fanno un cielo coperto al 120%.
+- **La notte si prende con un OR, non con un intervallo.** È a cavallo della mezzanotte: con un
+  `22 <= ora <= 3` non resterebbe nessuna ora.
+- **Il riquadro cielo si compone dopo la riconciliazione dei dati lunari fra le fonti**, non
+  durante l'aggregazione oraria: l'illuminazione della luna è uno dei due ingredienti e spesso
+  arriva da una fonte diversa da quella astronomica principale.
+- **In cima va l'indice più alto fra il solare e la notte.** Il pannello ha una riga sola di
+  titolo: con un titolo fisso sul tramonto, una notte eccezionale sotto un tramonto ordinario
+  resterebbe invisibile — ed è proprio il caso che fa aprire il pannello.
+- **Il giudizio sulla notte mostra i suoi due ingredienti** (nuvole e luna): un verdetto senza il
+  perché è un verdetto senza appello.
+
+**Ritrovamento, e non era un flake.** Il test E2E «da ospite il salvataggio nei preferiti è
+disabilitato» era fallito due volte a intermittenza. Guardandolo: il pulsante è
+`disabled={!coords}` — dipende dall'avere una località, **non dall'essere autenticati** — e gli
+ospiti possono salvare nei preferiti per progetto dichiarato (localStorage, con sincronizzazione
+su Supabase al login). Il test asseriva quindi un comportamento che il prodotto non ha mai avuto,
+e passava solo vincendo la corsa con l'effetto che legge la località di casa da localStorage.
+Sostituito con due test che verificano il comportamento reale: il pulsante è inerte senza
+località, e un ospite salva regolarmente in locale. La suite completa gira ora verde due volte di
+fila.
+
+**Limite dichiarato:** solo backend e web, come le due voci precedenti.
+
+**Nota di prodotto:** la dashboard ha ora nove riquadri (allerte, nowcast, corrente, sole e vento,
+narrativa, AQI, pollini, neve, orto, fotovoltaico, cielo, fonti). Sono tutti utili a qualcuno e
+quasi nessuno a tutti: prima di aggiungerne altri conviene decidere come raggrupparli — sezioni
+richiudibili, o una scelta di quali mostrare.
+
+**Verifiche:** 549 test backend (25 suite), 231 web (13 suite), 44 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+#### 7. Mare: onde e temperatura dell'acqua
+
+Chiude §5.11. Commit `feat(6E): mare, onde e temperatura dell'acqua`.
+
+La domanda di chi va al mare è doppia e concreta: quanto è fredda l'acqua e quanto è mosso.
+Schema di cache alla versione 15.
+
+**Decisioni**
+
+- **Il criterio di costa è la fonte stessa.** Il modello d'onda copre solo i punti di griglia sul
+  mare: nell'entroterra l'endpoint risponde con un errore, o con serie tutte nulle, e in entrambi
+  i casi il connettore restituisce `null`. Niente dataset di coste, niente soglia sulla distanza
+  dal mare — e il risultato è più accurato di qualunque soglia avremmo scelto.
+- **Il criterio è il dato, non il codice HTTP.** Alcuni punti interni rispondono 200 con le serie
+  a null: senza il controllo sull'altezza d'onda comparirebbe un riquadro «mare calmo, 0 m» in
+  mezzo alla pianura, che è peggio di nessun riquadro.
+- **L'altezza d'onda diventa una parola.** «1,3 m» sembra poco scritto così, ed è il mare che
+  rovescia un pedalò: si usano i termini dei bollettini italiani (calmo, poco mosso, mosso, molto
+  mosso), che chi va al mare riconosce. Sopra il «molto mosso» le distinzioni della scala Douglas
+  riguardano la navigazione, non chi sceglie se fare il bagno.
+- **Onda e temperatura sono stati, non medie**: si leggono adesso. Il massimo atteso viaggia a
+  parte, perché è l'informazione che fa cambiare programma — il mare adesso è calmo, nel
+  pomeriggio no.
+- **L'avviso di peggioramento compare solo se cambia la fascia.** Se il picco resta nello stesso
+  stato il numero è già nella riga dell'onda, e ripeterlo come avviso sarebbe un falso allarme.
+- **La provenienza dell'onda usa otto punti, non sedici**: fra NNE e NE non cambia niente per chi
+  sceglie una spiaggia, e allunga solo l'etichetta.
+- **Le maree si dichiarano assenti.** Sono su `marine.json` di WeatherAPI, fuori dal piano
+  gratuito: scriverlo nel pannello è meglio che lasciare all'utente il dubbio di non averle
+  trovate.
+
+**Verifiche:** 567 test backend (27 suite), 246 web (14 suite), 47 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+**Limite dichiarato:** solo backend e web, come le tre voci precedenti. E il connettore è scritto
+contro una forma di risposta non verificabile da qui — `marine-api.open-meteo.com` è negato dalla
+rete dell'ambiente, come tutti gli host Open-Meteo. A differenza del radar, però, il rischio è
+contenuto: la famiglia di API Open-Meteo ha una forma uniforme (`hourly: { time: [], <param>: [] }`)
+già dimostrata da tre connettori in questo repo, e ciò che si sta ricordando sono i **nomi dei
+parametri**, non la struttura. Il connettore è scritto per degradare: qualunque serie assente
+diventa `null` e il riquadro sparisce, invece di mostrare un mare inventato.
+
+#### 8. Indici lifestyle: «buona giornata per…»
+
+Chiude §5.6. Commit `feat(6E): indici lifestyle, buona giornata per…`.
+
+Corsa, bici e bucato: un punteggio 0-100 sulla prossima finestra diurna, con il fattore che lo
+tiene basso. Schema di cache alla versione 16.
+
+**Decisioni**
+
+- **Calcolati, non comprati.** È la decisione che riscrive la proposta §5.6, e nasce da
+  un'aritmetica: AccuWeather free dà 50 chiamate al giorno, `connectors/accuweather.ts` ne spende
+  già 3 per cache miss (~16 previsioni servibili al giorno) e ogni indice è una chiamata in più.
+  Tre indici avrebbero dimezzato le previsioni servibili per aggiungere tre numeri. I dati che
+  servono — temperatura percepita, pioggia, vento, UV, umidità, AQI europeo — li aggreghiamo già
+  tutti.
+- **Il punteggio è il MINIMO dei fattori, non la media.** Una giornata perfetta sotto il diluvio
+  non è mezza buona: la media darebbe 60 e nasconderebbe proprio il fattore per cui si rinuncia.
+- **Accanto al numero c'è il perché.** «65» non dice niente, «65, limita il vento» dice se
+  rimandare o cambiare percorso. È l'unica cosa che un indice a scatola chiusa non può dare, ed è
+  il motivo per cui calcolarli in casa non è solo un ripiego sul budget.
+- **Il fattore limitante si nomina solo sotto 80.** Sopra, niente limita davvero, e scriverlo
+  suggerirebbe un problema che non c'è.
+- **Probabilità e vento si prendono al massimo, i millimetri si sommano.** Un'ora al 90% in mezzo
+  a undici serene è comunque un'uscita da rimandare; i millimetri invece bagnano per quantità
+  totale.
+- **La finestra è quella di un solo giorno.** Di sera scivola a domani — «buona giornata per
+  correre» alle 23 significa domani — ma non mescola mai oggi pomeriggio con domani mattina: un
+  punteggio così non varrebbe per nessuno dei due. Il giorno valutato viaggia nella risposta e il
+  pannello lo dichiara.
+- **Le soglie del vento in bici sono metà di quelle a piedi** (12/30 km/h contro 20/45): a 25 km/h
+  si corre, in bici si soffre.
+- **Il vento del bucato è l'unico fattore invertito**, e vive in una funzione a sé invece che in un
+  parametro di `windScore`: un segno meno nascosto dentro una soglia si legge male a mesi di
+  distanza.
+
+**Due errori miei, trovati dai miei stessi test**
+
+- `dryAirScore` era `100 - umidità`: al 50% di umidità — aria perfettamente normale, in cui il
+  bucato asciuga benissimo — dava 50, e qualunque giornata ordinaria sarebbe sembrata mediocre.
+  Sostituita con una curva a soglie (piena fino al 65%, zero al 95%).
+- Il pavimento di `dryingWindScore` era 40: con aria ferma il vento risultava **il fattore
+  limitante** di una giornata di sole asciutta e tiepida, cioè un avviso su un problema che non
+  c'è. Il vento è un bonus, non un requisito: pavimento alzato a 80, e aggiunta
+  `dryingTempScore`, senza la quale il registro avrebbe detto «stendi pure» a 3 °C.
+
+**Verifiche:** 588 test backend (28 suite), 255 web (15 suite), 50 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+**Limite dichiarato:** solo backend e web, come le quattro voci precedenti. E i pesi delle soglie
+sono scelte ragionevoli, non tarate su dati: nessuno ha misurato a che temperatura la gente
+smette davvero di correre. Sono però tutte costanti esportate e testate, quindi tarabili quando
+un dato ci sarà.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1090,13 +1307,22 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 
 ### Prossimo blocco
 
-**Fase 6E, punti 22-23 e 25-27**: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto,
-test iOS e audit Lighthouse.
-**Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
+**Le feature della 6E sono finite.** Restano due voci, e nessuna delle due è una feature:
 
-Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
-della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i
-pollini. I modelli Swift decodificano già tutti e tre i dati: manca solo la vista.
+**Fase 6E, punto 27 — test iOS e audit Lighthouse.** L'audit è impossibile da qui (vedi sopra),
+non rinviato. I test iOS non esistono e non possono nascere in questo ambiente: non c'è toolchain
+Swift.
+**Fase 6D, punto 17 — radar**: bloccato, quando l'ambiente lo consente.
+
+**Il debito iOS, dichiarato e non nascosto:** iOS è indietro di **cinque** feature — orto,
+fotovoltaico, cielo, mare e ora gli indici lifestyle — e porta **cinque schermate Swift mai
+compilate** (`AlertRulesView`, `SnowPanelView`, `SourcesIndicatorView`, `PollenPanelView`,
+`GardenPanelView`, più le modifiche a `HourlyForecastView`). Un passaggio su simulatore viene
+prima di qualunque altra riga di Swift.
+
+**Nota di prodotto:** la dashboard web è arrivata a una dozzina di riquadri. Prima di
+aggiungerne altri serve un raggruppamento — oggi neve, orto, fotovoltaico, cielo, mare e indici
+stanno tutti sullo stesso piano, e nessuno di essi interessa a tutti gli utenti tutti i giorni.
 
 ---
 

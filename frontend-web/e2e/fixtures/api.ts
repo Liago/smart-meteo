@@ -80,6 +80,20 @@ export interface ForecastOptions {
 	withoutStorm?: boolean;
 	/** Blocco orto. Presente per default: Open-Meteo dà i dati agronomici ovunque. */
 	garden?: Record<string, unknown> | null;
+	/** Blocco fotovoltaico. Presente per default. */
+	solar?: Record<string, unknown> | null;
+	/** Blocco cielo: tramonti e osservazione astronomica. */
+	sky?: Record<string, unknown> | null;
+	/**
+	 * Indici lifestyle. Presenti per default: si calcolano dalle ore che il
+	 * backend manda comunque, quindi ci sono ovunque ci sia una previsione.
+	 */
+	activities?: Record<string, unknown> | null;
+	/**
+	 * Blocco mare. **Assente per default**: la località di prova è Milano, e
+	 * nell'entroterra il modello d'onda non copre.
+	 */
+	sea?: Record<string, unknown>;
 	/**
 	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
 	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
@@ -185,6 +199,45 @@ export function buildForecast(options: ForecastOptions = {}) {
 			water_balance_mm: 4.8,
 			advice: 'water_soon',
 			sowing_ok: true,
+		};
+	}
+
+	if (options.solar !== null) {
+		forecast.solar = options.solar ?? {
+			plane: 'tilted',
+			tilt_deg: 30,
+			azimuth_deg: 0,
+			performance_ratio: 0.75,
+			days: [
+				{ date: isoDate(1), kwh_per_kwp: 5.2, sunshine_hours: 11, peak_w: 890 },
+				{ date: isoDate(2), kwh_per_kwp: 2.6, sunshine_hours: 4, peak_w: 430 },
+			],
+		};
+	}
+
+	if (options.sky !== null) {
+		forecast.sky = options.sky ?? {
+			sunset: { at: `${today}T20:00`, score: 82, level: 'excellent' },
+			sunrise: null,
+			stargazing: { score: 40, level: 'fair', cloud_cover: 30, moon_illumination: 60 },
+		};
+	}
+
+	if (options.sea) {
+		forecast.sea = options.sea;
+	}
+
+	if (options.activities !== null) {
+		forecast.activities = options.activities ?? {
+			date: today,
+			from: `${today}T08:00`,
+			to: `${today}T19:00`,
+			// Già ordinati per punteggio decrescente, come li manda il backend.
+			activities: [
+				{ id: 'cycling', label: 'Andare in bici', score: 100, limiting: null },
+				{ id: 'laundry', label: 'Stendere il bucato', score: 88, limiting: null },
+				{ id: 'running', label: 'Correre', score: 62, limiting: 'temperatura' },
+			],
 		};
 	}
 

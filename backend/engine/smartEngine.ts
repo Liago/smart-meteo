@@ -1,7 +1,8 @@
 import { fetchFromTomorrow } from '../connectors/tomorrow';
-import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS } from '../connectors/openmeteo';
+import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS, SOLAR_AZIMUTH_DEG, SOLAR_TILT_DEG } from '../connectors/openmeteo';
 import { fetchTemperatureBand } from '../connectors/openmeteoEnsemble';
 import { fetchAirQuality } from '../connectors/openmeteoAirQuality';
+import { fetchMarine } from '../connectors/openmeteoMarine';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -16,6 +17,10 @@ import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { aggregateSnowfallCm, buildSnowOutlook } from '../utils/snow';
 import { stormIndex } from '../utils/storm';
 import { buildGardenOutlook, gardenHoursFrom } from '../utils/garden';
+import { buildSolarOutlook, solarHoursFrom } from '../utils/solar';
+import { buildSkyOutlook, skyHoursFrom } from '../utils/sky';
+import { buildSeaOutlook } from '../utils/sea';
+import { buildActivities } from '../utils/activities';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
 import { weightedMean, weightedVote } from '../utils/aggregate';
@@ -54,12 +59,16 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *       di essi è "adesso"
  *  12 → blocco garden e campi agronomici (umidità e temperatura del suolo,
  *       evapotraspirazione, deficit di pressione di vapore) sugli slot orari
+ *  13 → blocco solar e radiazione solare sugli slot orari
+ *  14 → blocco sky e nuvolosità per quota sugli slot orari
+ *  15 → blocco sea (onde e temperatura dell'acqua, solo sulle coste)
+ *  16 → blocco activities ("buona giornata per…")
  *
  * Esportata perché i test la usino invece di ricopiarne il numero: una copia
  * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
  * modifica non c'entra niente.
  */
-export const FORECAST_SCHEMA_VERSION = 12;
+export const FORECAST_SCHEMA_VERSION = 16;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -215,6 +224,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// fonti: sono arricchimenti e non devono allungare il percorso critico.
 	const ensemblePromise = fetchTemperatureBand(lat, lon);
 	const airQualityPromise = fetchAirQuality(lat, lon);
+	// Il modello d'onda si auto-esclude nell'entroterra: non serve un test
+	// sulla distanza dalla costa, la fonte stessa è il criterio.
+	const marinePromise = fetchMarine(lat, lon);
 
 	// 3. Fetch from External & Load Accuracies
 	//
@@ -477,6 +489,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		soil_moistures: Weighted[];
 		evapotranspirations: Weighted[];
 		vapour_deficits: Weighted[];
+		irradiances: Weighted[];
+		sunshines: Weighted[];
+		clouds: Weighted[];
+		clouds_low: Weighted[];
+		clouds_mid: Weighted[];
+		clouds_high: Weighted[];
 		capes: Weighted[];
 		lifted_indices: Weighted[];
 		cins: Weighted[];
@@ -488,7 +506,7 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 			f.hourly.forEach(h => {
 				const timeKey = hourKeyOf(h.time);
 				if (!hourlyMap.has(timeKey)) {
-					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [], soil_temperatures_root: [], soil_moistures: [], evapotranspirations: [], vapour_deficits: [], capes: [], lifted_indices: [], cins: [], thunder_probs: [] });
+					hourlyMap.set(timeKey, { temps: [], feels_like: [], probs: [], codes: [], humidities: [], wind_speeds: [], uv_indices: [], precip_mm: [], wind_directions: [], wind_gusts: [], snowfall_cm: [], snow_depth_cm: [], freezing_levels: [], soil_temperatures: [], soil_temperatures_root: [], soil_moistures: [], evapotranspirations: [], vapour_deficits: [], irradiances: [], sunshines: [], clouds: [], clouds_low: [], clouds_mid: [], clouds_high: [], capes: [], lifted_indices: [], cins: [], thunder_probs: [] });
 				}
 				const entry = hourlyMap.get(timeKey)!;
 				if (h.temp != null) entry.temps.push({ val: h.temp, weight: sourceWeight });
@@ -516,6 +534,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				if (h.soil_moisture != null) entry.soil_moistures.push({ val: h.soil_moisture, weight: sourceWeight });
 				if (h.evapotranspiration != null) entry.evapotranspirations.push({ val: h.evapotranspiration, weight: sourceWeight });
 				if (h.vapour_pressure_deficit != null) entry.vapour_deficits.push({ val: h.vapour_pressure_deficit, weight: sourceWeight });
+				// Radiazione solare: la portano solo i modelli Open-Meteo.
+				if (h.solar_irradiance != null) entry.irradiances.push({ val: h.solar_irradiance, weight: sourceWeight });
+				if (h.sunshine_duration != null) entry.sunshines.push({ val: h.sunshine_duration, weight: sourceWeight });
+				// Nuvolosità per quota: serve ai tramonti e al cielo notturno.
+				if (h.cloud_cover != null) entry.clouds.push({ val: h.cloud_cover, weight: sourceWeight });
+				if (h.cloud_cover_low != null) entry.clouds_low.push({ val: h.cloud_cover_low, weight: sourceWeight });
+				if (h.cloud_cover_mid != null) entry.clouds_mid.push({ val: h.cloud_cover_mid, weight: sourceWeight });
+				if (h.cloud_cover_high != null) entry.clouds_high.push({ val: h.cloud_cover_high, weight: sourceWeight });
 				// Indici convettivi: li portano i modelli Open-Meteo, la
 				// probabilità di tuono la sola WorldWeatherOnline.
 				if (h.cape != null) entry.capes.push({ val: h.cape, weight: sourceWeight });
@@ -572,6 +598,12 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 				...(data.soil_moistures.length > 0 && { soil_moisture: weightedMean(data.soil_moistures, 3) }),
 				...(data.evapotranspirations.length > 0 && { evapotranspiration: weightedMean(data.evapotranspirations, 3) }),
 				...(data.vapour_deficits.length > 0 && { vapour_pressure_deficit: weightedMean(data.vapour_deficits, 3) }),
+				...(data.irradiances.length > 0 && { solar_irradiance: weightedMean(data.irradiances) }),
+				...(data.sunshines.length > 0 && { sunshine_duration: weightedMean(data.sunshines) }),
+				...(data.clouds.length > 0 && { cloud_cover: weightedMean(data.clouds) }),
+				...(data.clouds_low.length > 0 && { cloud_cover_low: weightedMean(data.clouds_low) }),
+				...(data.clouds_mid.length > 0 && { cloud_cover_mid: weightedMean(data.clouds_mid) }),
+				...(data.clouds_high.length > 0 && { cloud_cover_high: weightedMean(data.clouds_high) }),
 				...(cape != null && { cape }),
 				...(liftedIndex != null && { lifted_index: liftedIndex }),
 				...(storm != null && { storm_index: storm }),
@@ -600,6 +632,34 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// differenza del riquadro neve non si omette quando è tutto tranquillo —
 	// «non serve innaffiare» è la risposta che chi ha un orto cerca la sera.
 	const garden = buildGardenOutlook(gardenHoursFrom(aggregatedHourly as any), hourKeyOf(new Date().toISOString()));
+
+	// Mare: onde e temperatura dell'acqua. Le chiavi orarie del modello d'onda
+	// arrivano con lo stesso `timezone:auto` delle previsioni, quindi passano
+	// dallo stesso `hourKeyOf` del resto.
+	const marine = await marinePromise;
+	const sea = marine
+		? buildSeaOutlook(
+				marine.hours.map(h => ({ ...h, time: hourKeyOf(h.time) })),
+				hourKeyOf(new Date().toISOString())
+			)
+		: null;
+
+	// Cielo: tramonti e osservazione astronomica. Va calcolato DOPO il merge
+	// dei dati lunari qui sotto, perché l'illuminazione della luna è uno dei
+	// due ingredienti — quindi il blocco si compone più avanti, subito prima
+	// della risposta.
+
+	// Fotovoltaico. Il piano su cui la radiazione è calcolata lo dichiara il
+	// connettore: senza, il numero non avrebbe significato e il blocco non si
+	// produce affatto.
+	const solarPlane = validForecasts.find(f => f.solar_plane != null)?.solar_plane ?? null;
+	const solar = buildSolarOutlook(
+		solarHoursFrom(aggregatedHourly as any),
+		solarPlane,
+		SOLAR_TILT_DEG,
+		SOLAR_AZIMUTH_DEG,
+		hourKeyOf(new Date().toISOString())
+	);
 
 	// Neve e gelate. La quota del punto di griglia la dichiara solo Open-Meteo:
 	// senza di lei la quota neve resta un numero da bollettino, perché è il
@@ -643,6 +703,18 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		}
 	}
 
+	// Ora che i dati lunari sono stati riconciliati fra le fonti si può
+	// comporre il riquadro cielo: senza l'illuminazione della luna l'indice di
+	// osservazione astronomica sarebbe monco.
+	const astronomy = sourceWithAstronomy?.astronomy;
+	const sky = buildSkyOutlook({
+		hours: skyHoursFrom(aggregatedHourly as any),
+		sunrise: astronomy?.sunrise,
+		sunset: astronomy?.sunset,
+		moonIllumination: astronomy?.moon_illumination,
+		fromTime: hourKeyOf(new Date().toISOString()),
+	});
+
 	// Qualità dell'aria: WeatherAPI porta l'indice EPA e gli inquinanti,
 	// Open-Meteo l'indice europeo e i pollini. Si fondono invece di scegliere:
 	// finché WeatherAPI era l'unica fonte, un suo errore lasciava la dashboard
@@ -677,6 +749,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		aggregation.temp,
 		aggregation.precipitation_prob,
 		validForecasts.length
+	);
+
+	// «Buona giornata per…»: si calcola qui perché ha bisogno della qualità
+	// dell'aria già fusa fra le due fonti.
+	const activities = buildActivities(
+		aggregatedHourly as any,
+		mergedAirQuality?.european_aqi,
+		hourKeyOf(new Date().toISOString())
 	);
 
 	const result = {
@@ -720,6 +800,17 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		...(snow && { snow }),
 		// Orto: presente ovunque Open-Meteo dia i dati agronomici.
 		...(garden && { garden }),
+		// «Buona giornata per…»: indici calcolati dai dati che già aggreghiamo,
+		// non comprati da un'API a consumo.
+		...(activities && { activities }),
+		// Mare: presente solo dove il modello d'onda copre, cioè sulle coste.
+		...(sea && { sea }),
+		// Cielo: quanto sarà bello il tramonto e quanto si vedranno le stelle.
+		...(sky && { sky }),
+		// Fotovoltaico: resa specifica per giorno, in kWh per kWp installato.
+		// La moltiplicazione per la taglia dell'impianto sta nel client, così
+		// la risposta in cache resta la stessa per tutti.
+		...(solar && { solar }),
 		daily: aggregatedDaily,
 		hourly: aggregatedHourly,
 		astronomy: sourceWithAstronomy?.astronomy,

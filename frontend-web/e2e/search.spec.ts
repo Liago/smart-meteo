@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi, seedHomeLocation } from './fixtures/api';
+import { mockApi, seedHomeLocation, startAsNewVisitor } from './fixtures/api';
 
 /**
  * Ricerca località e gestione dei preferiti.
@@ -57,10 +57,30 @@ test('una ricerca senza risultati non lascia suggerimenti a schermo', async ({ p
 	await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
-test('da ospite il salvataggio nei preferiti è disabilitato', async ({ page }) => {
-	// Salvare richiede un account: il pulsante resta visibile ma inerte, così
-	// l'utente capisce che la funzione esiste.
+test('senza una località selezionata il salvataggio è inerte', async ({ page }) => {
+	// Il pulsante dipende dall'avere delle coordinate, non dall'essere
+	// autenticati: resta visibile ma inerte, così si capisce che la funzione
+	// esiste.
+	//
+	// Questo test prima girava con la località di casa già in localStorage e
+	// asseriva «da ospite il salvataggio è disabilitato»: un comportamento che
+	// il prodotto non ha mai avuto. Passava solo vincendo la corsa con
+	// l'effetto che legge quella località, e falliva a intermittenza.
+	await startAsNewVisitor(page);
 	await page.goto('/');
 
 	await expect(page.getByRole('button', { name: 'Salva nei preferiti' })).toBeDisabled();
+});
+
+test('da ospite si può comunque salvare nei preferiti, in locale', async ({ page }) => {
+	// È il comportamento dichiarato: localStorage per gli ospiti, con
+	// sincronizzazione su Supabase al login.
+	await page.goto('/');
+
+	const salva = page.getByRole('button', { name: 'Salva nei preferiti' });
+	await expect(salva).toBeEnabled();
+	await salva.click();
+
+	// Il pulsante diventa quello per rimuovere: la località è nei preferiti.
+	await expect(page.getByRole('button', { name: 'Rimuovi dai preferiti' })).toBeVisible();
 });

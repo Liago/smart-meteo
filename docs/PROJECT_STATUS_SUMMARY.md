@@ -115,14 +115,23 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
-### Fase 6E — Nicchie e rifiniture (2026-09-13, 4 punti su 9)
+### Fase 6E — Nicchie e rifiniture (2026-09-13, 8 punti su 9)
 - **Neve multi-fonte da WeatherKit**: `snowfallAmount` e `snowfallIntensity`, che Apple dà in **millimetri di manto** — una lunghezza, non l'equivalente in acqua. Senza la divisione per dieci, 40 mm sarebbero comparsi come «40 cm». Chiude il limite dichiarato al punto 15, dove i centimetri venivano dai soli modelli Open-Meteo
 - **Le due funzioni di fetch WeatherKit unificate**: erano due blocchi copiati, già divergenti sull'arrotondamento del vento, e un campo aggiunto a uno solo sarebbe comparso o sparito a seconda di quale l'engine avesse chiamato
 - **Pannello fonti su iOS** con l'indice di consenso e i pollini: chiude l'asimmetria dichiarata dalla Fase 6A, dove iOS non mostrava nemmeno `sources_used`
 - **Banda di incertezza sul grafico orario iOS**: chiude l'asimmetria dichiarata dalla Fase 6C. Il modello Swift non aveva nemmeno i campi
 - **Orto e giardino**: umidità del suolo, evapotraspirazione FAO e temperatura dello strato radicale da Open-Meteo rispondono a «devo innaffiare stasera?» e alla finestra di semina. **La pioggia ha la precedenza su tutto**: con almeno 5 mm attesi il consiglio è «non innaffiare» anche su terreno molto secco — ed è proprio il caso in cui si sbaglierebbe da soli
 - **Il consiglio mostra sempre il proprio motivo** e il numero grezzo dell'umidità: le soglie dipendono dal tipo di terreno, che l'API non dichiara, quindi chi conosce il proprio suolo deve poter correggere il giudizio
-- ⏳ Restano: mare e maree, fotovoltaico, indici lifestyle, alba/tramonto, test iOS e audit Lighthouse (quest'ultimo **bloccato**: `next build` non scarica i font Google, host negato dalla rete dell'ambiente)
+- **Resa fotovoltaica** (backend + web): radiazione sul piano dei pannelli da Open-Meteo → kWh per kWp al giorno. **Il backend dà la resa specifica, non i kWh**: la potenza dell'impianto è un dato dell'utente, vive in `localStorage` e non tocca il server — se entrasse nel backend, la cache della previsione si frammenterebbe per utente invece di servire tutti quelli sulla stessa località
+- **Le assunzioni della stima sono sempre a schermo** (30° a sud, 25% di perdite): chi ha un impianto sa la propria inclinazione e ha diritto di sapere quale abbiamo supposto noi
+- **Tramonti e cielo notturno**: la copertura nuvolosa totale non basta, **conta la quota**. Un tramonto memorabile vuole nuvole alte illuminate e l'orizzonte libero; un cielo terso e uno coperto danno entrambi un tramonto ordinario, per ragioni opposte. Secondo indice per l'osservazione astronomica, dall'illuminazione lunare che avevamo già in casa
+- **Ritrovamento**: il test E2E sui preferiti asseriva un comportamento che il prodotto non ha mai avuto (il pulsante dipende dall'avere una località, non dall'essere autenticati) e passava vincendo una corsa. Sostituito con due test sul comportamento reale
+- **Mare**: onde, mare lungo e temperatura dell'acqua da Open-Meteo Marine. **Il test sulla distanza dalla costa non serve**: il modello d'onda copre solo i punti sul mare, quindi nell'entroterra il connettore restituisce null e il riquadro non compare — la fonte stessa è il criterio, più accurato di qualunque soglia. L'altezza d'onda diventa una parola dei bollettini («mosso»), perché «1,3 m» sembra poco ed è il mare che rovescia un pedalò
+- **Le maree sono dichiarate assenti**: stanno su `marine.json` di WeatherAPI, fuori dal piano gratuito
+- **Indici lifestyle** («buona giornata per correre, andare in bici, stendere il bucato»): **calcolati in casa, non comprati**. AccuWeather li vende già pronti, ma ogni indice è una chiamata a sé su un piano da 50 al giorno di cui ne spendiamo già 3 per cache miss: tre indici avrebbero dimezzato le previsioni servibili. I dati che servono li aggreghiamo già tutti
+- **Il punteggio è il fattore peggiore, non la media**: una giornata perfetta sotto il diluvio non è mezza buona, e la media nasconderebbe proprio il motivo per cui si rinuncia. Accanto al numero c'è sempre il fattore che lo limita — «65» non dice niente, «65, limita il vento» dice se rimandare o cambiare percorso
+- **Due errori miei trovati dai miei test**: l'umidità del bucato era `100 - umidità`, che bollava come mediocre qualunque giornata al 50% di umidità; e il vento con aria ferma risultava il fattore limitante di una bella giornata asciutta — il vento è un bonus, non un requisito
+- ⏳ Restano solo test iOS e audit Lighthouse (quest'ultimo **bloccato**: `next build` non scarica i font Google, host negato dalla rete dell'ambiente). Nessuna delle due è una feature: **le feature della 6E sono finite**
 
 ### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
@@ -195,9 +204,9 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 196 test (11 suite) | Restano i 3 hook → TODO_TESTING §4 |
-| Frontend web E2E (Playwright) | ✅ 37 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **504 test in 23 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
+| Frontend web unit test | ✅ 255 test (15 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web E2E (Playwright) | ✅ 50 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
+| Backend unit/integration test | ✅ **588 test in 28 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguibile in sviluppo | `next build` fallisce: `next/font` non raggiunge Google Fonts. Da fare in CI |
 
@@ -205,7 +214,7 @@
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
 > (entrambi documentati da test, risolti nella 6C).
-> **Prossimo blocco: Fase 6E punti 22-23 e 25-27** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
+> **Prossimo blocco: Fase 6E punto 27** della `GAP_ANALYSIS_2026-09.md` — test iOS e audit Lighthouse, nessuno dei due eseguibile in questo ambiente (niente toolchain Swift, `next build` bloccato dai font). Il punto 17, il radar, resta bloccato. **Il debito iOS è ora di cinque feature (orto, fotovoltaico, cielo, mare, indici lifestyle) e cinque schermate Swift mai compilate: un passaggio su simulatore viene prima di altre viste Swift.**
 
 ### 3.4 Database ✅ VERIFICATO
 

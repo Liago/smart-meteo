@@ -66,6 +66,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 	cloud_cover: number | null;
 	utc_offset_seconds: number | null;
 	elevation: number | null;
+	solar_plane: 'tilted' | 'horizontal' | null;
 	air_quality?: AirQualityDetail;
 	raw_data?: any;
 	daily?: DailyForecast[];
@@ -98,6 +99,7 @@ export class UnifiedForecast implements UnifiedForecastData {
 		this.cloud_cover = data.cloud_cover ?? null;
 		this.utc_offset_seconds = data.utc_offset_seconds ?? null;
 		this.elevation = data.elevation ?? null;
+		this.solar_plane = data.solar_plane ?? null;
 		this.raw_data = data.raw_data;
 		if (data.air_quality) {
 			this.air_quality = data.air_quality;

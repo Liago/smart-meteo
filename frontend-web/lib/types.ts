@@ -96,6 +96,16 @@ export interface HourlyForecast {
 	evapotranspiration?: number | null;
 	/** Deficit di pressione di vapore, kPa. */
 	vapour_pressure_deficit?: number | null;
+	/** Radiazione solare media dell'ora, W/m². */
+	solar_irradiance?: number | null;
+	/** Secondi di sole pieno nell'ora. */
+	sunshine_duration?: number | null;
+	/** Copertura nuvolosa totale dell'ora, %. */
+	cloud_cover?: number | null;
+	/** Copertura per quota, %: il tramonto nasce dalle nuvole alte. */
+	cloud_cover_low?: number | null;
+	cloud_cover_mid?: number | null;
+	cloud_cover_high?: number | null;
 	/** Energia potenziale convettiva disponibile, J/kg. */
 	cape?: number | null;
 	/** Lifted index, °C: negativo = instabile. */
@@ -226,6 +236,127 @@ export interface GardenOutlook {
 	sowing_ok: boolean | null;
 }
 
+/** Su quale piano è misurata la radiazione ricevuta. */
+export type SolarPlane = 'tilted' | 'horizontal';
+
+export interface SolarDay {
+	/** Data locale, YYYY-MM-DD. */
+	date: string;
+	/** Resa specifica del giorno, kWh per kWp installato. */
+	kwh_per_kwp: number;
+	/** Ore di sole pieno, quando la fonte le dichiara. */
+	sunshine_hours: number | null;
+	/** Picco di irraggiamento del giorno, W/m². */
+	peak_w: number;
+}
+
+/**
+ * Resa fotovoltaica prevista.
+ *
+ * Il backend dà la resa **specifica**, in kWh per kWp: è la grandezza fisica,
+ * indipendente dalla taglia dell'impianto. Moltiplicarla per i kWp dell'utente
+ * è una moltiplicazione e sta qui, così la risposta in cache resta la stessa
+ * per tutti quelli sulla stessa località.
+ */
+export interface SolarOutlook {
+	plane: SolarPlane;
+	/** Inclinazione e orientamento assunti, gradi (azimut: 0 = sud). */
+	tilt_deg: number;
+	azimuth_deg: number;
+	/** Rapporto di prestazione usato nella stima. */
+	performance_ratio: number;
+	days: SolarDay[];
+}
+
+/** Fasce dei due indici del cielo. */
+export type SkyLevel = 'plain' | 'fair' | 'good' | 'excellent';
+
+export interface SkyEvent {
+	/** Slot orario valutato, nella chiave locale degli hourly. */
+	at: string;
+	score: number;
+	level: SkyLevel;
+}
+
+export interface StargazingOutlook {
+	score: number;
+	level: SkyLevel;
+	/** Copertura media della notte, %. */
+	cloud_cover: number;
+	/** Percentuale di disco lunare illuminato, quando la conosciamo. */
+	moon_illumination: number | null;
+}
+
+/**
+ * Tramonti e cielo notturno.
+ *
+ * Nasce dall'osservazione che la copertura totale non basta: un tramonto
+ * memorabile vuole nuvole **alte** illuminate e l'orizzonte libero, e un cielo
+ * terso e uno coperto danno entrambi un tramonto ordinario per ragioni opposte.
+ */
+export interface SkyOutlook {
+	sunset: SkyEvent | null;
+	sunrise: SkyEvent | null;
+	stargazing: StargazingOutlook | null;
+}
+
+/** Stato del mare, nella scala dei bollettini italiani. */
+export type SeaState = 'calm' | 'slight' | 'moderate' | 'rough';
+
+/**
+ * Onde e temperatura dell'acqua.
+ *
+ * Presente solo dove il modello d'onda di Open-Meteo copre, cioè sulle coste:
+ * si auto-esclude nell'entroterra, quindi la presenza del blocco è già il test
+ * di costa.
+ */
+export interface SeaOutlook {
+	/** Temperatura dell'acqua adesso, °C. */
+	sea_temperature: number | null;
+	/** Altezza d'onda significativa adesso, metri. */
+	wave_height: number | null;
+	wave_direction: number | null;
+	/** Periodo dell'onda, secondi. */
+	wave_period: number | null;
+	/** Mare lungo adesso, metri. */
+	swell_height: number | null;
+	state: SeaState;
+	/** Onda massima attesa nelle prossime 24 ore, metri. */
+	max_wave_24h: number | null;
+	max_wave_at: string | null;
+}
+
+/** Attività valutate dagli indici «buona giornata per…». */
+export type ActivityId = 'running' | 'cycling' | 'laundry';
+
+export interface ActivityScore {
+	id: ActivityId;
+	label: string;
+	/** 0-100. */
+	score: number;
+	/**
+	 * Il fattore che tiene basso il punteggio, quando ce n'è uno. È
+	 * l'informazione che rende il numero utile: «65» non dice niente, «65,
+	 * limita il vento» dice se rimandare o cambiare percorso.
+	 */
+	limiting: string | null;
+}
+
+/**
+ * «Oggi è una buona giornata per…», calcolato dai dati che già aggreghiamo.
+ *
+ * Non viene da un'API di indici a consumo: il piano gratuito di AccuWeather dà
+ * 50 chiamate al giorno e ne usiamo già 3 per cache miss, quindi tre indici
+ * dimezzerebbero le previsioni servibili.
+ */
+export interface ActivitiesOutlook {
+	/** Giorno locale della finestra valutata. */
+	date: string;
+	from: string;
+	to: string;
+	activities: ActivityScore[];
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -267,6 +398,14 @@ export interface ForecastResponse {
 	snow?: SnowOutlook;
 	/** Orto: presente ovunque Open-Meteo dia i dati agronomici. */
 	garden?: GardenOutlook;
+	/** Fotovoltaico: resa specifica per giorno. */
+	solar?: SolarOutlook;
+	/** Cielo: qualità di alba/tramonto e osservazione astronomica. */
+	sky?: SkyOutlook;
+	/** Mare: presente solo sulle località costiere. */
+	sea?: SeaOutlook;
+	/** «Buona giornata per…» sulla prossima finestra diurna. */
+	activities?: ActivitiesOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

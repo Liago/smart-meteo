@@ -78,6 +78,10 @@ jest.mock('../../connectors/openmeteo', () => ({
 	),
 	activeOpenMeteoModels: jest.fn(() => activeModels),
 	OPENMETEO_MODELS: MODELLI,
+	// Il piano dei pannelli è una costante del connettore, non un dato: senza
+	// riesportarla il blocco solar arriverebbe con tilt e azimut undefined.
+	SOLAR_TILT_DEG: 30,
+	SOLAR_AZIMUTH_DEG: 0,
 }));
 jest.mock('../../connectors/accuweather', () => ({ fetchFromAccuWeather: jest.fn(async () => sourceResponses['accuweather'] ?? null) }));
 jest.mock('../../connectors/worldweatheronline', () => ({ fetchFromWWO: jest.fn(async () => sourceResponses['worldweatheronline'] ?? null) }));
@@ -115,6 +119,13 @@ jest.mock('../../connectors/openmeteoAirQuality', () => ({
 	fetchAirQuality: jest.fn(async () => airQualityResult),
 }));
 
+/** Ore del modello d'onda: assenti per default, come nell'entroterra. */
+let marineResult: any = null;
+
+jest.mock('../../connectors/openmeteoMarine', () => ({
+	fetchMarine: jest.fn(async () => marineResult),
+}));
+
 jest.mock('../../connectors/openmeteoEnsemble', () => ({
 	fetchTemperatureBand: jest.fn(async () =>
 		ensembleBands.length > 0
@@ -147,6 +158,7 @@ beforeEach(() => {
 	activeModels = [];
 	ensembleBands = [];
 	airQualityResult = null;
+	marineResult = null;
 });
 
 // --------------------------------------------------------------------- tests
@@ -1189,5 +1201,217 @@ describe('orto e suolo', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r).not.toHaveProperty('garden');
+	});
+});
+
+describe('fotovoltaico', () => {
+	/** Una giornata piena di irraggiamento, a partire da domani. */
+	const giornataSolare = (picco: number) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+		return Array.from({ length: 24 }, (_, h) => {
+			const fromNoon = Math.abs(h - 12);
+			const value = fromNoon > 6 ? 0 : Math.round(picco * (1 - fromNoon / 6));
+			return {
+				time: `${date}T${String(h).padStart(2, '0')}:00`,
+				temp: 24,
+				precipitation_prob: 0,
+				condition_code: '0',
+				condition_text: 'Sereno',
+				solar_irradiance: value,
+				sunshine_duration: value > 100 ? 3600 : 0,
+			};
+		});
+	};
+
+	it('espone la resa specifica per giorno, non i watt grezzi', async () => {
+		// kWh per kWp è la grandezza indipendente dalla taglia dell'impianto:
+		// la moltiplicazione per i kWp dell'utente sta nel client, così la
+		// risposta in cache resta la stessa per tutti.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			solar_plane: 'tilted',
+			hourly: giornataSolare(900),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.solar).toBeDefined();
+		expect(r.solar.days).toHaveLength(1);
+		expect(r.solar.days[0].kwh_per_kwp).toBeGreaterThan(3);
+		expect(r.solar.plane).toBe('tilted');
+		expect(r.solar.tilt_deg).toBe(30);
+	});
+
+	it('senza il piano dichiarato non produce una stima', async () => {
+		// Non sapere su che piano è misurata la radiazione rende il numero
+		// privo di significato.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			hourly: giornataSolare(900),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('solar');
+	});
+
+	it('una fonte senza radiazione non azzera quella delle altre', async () => {
+		const senzaSole = giornataSolare(900).map((h) => ({
+			...h,
+			solar_irradiance: undefined,
+			sunshine_duration: undefined,
+		}));
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 24,
+			utc_offset_seconds: 0,
+			solar_plane: 'tilted',
+			hourly: giornataSolare(900),
+		});
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 24,
+			hourly: senzaSole,
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.solar.days[0].kwh_per_kwp).toBeGreaterThan(3);
+	});
+});
+
+
+describe('cielo: tramonti e stelle', () => {
+	/** Una giornata con la copertura indicata a tutte le ore, da domani. */
+	const giornata = (over: Record<string, any>) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+		return Array.from({ length: 24 }, (_, h) => ({
+			time: `${date}T${String(h).padStart(2, '0')}:00`,
+			temp: 20,
+			precipitation_prob: 0,
+			condition_code: '1',
+			condition_text: 'Sereno',
+			...over,
+		}));
+	};
+
+	const domaniAlle = (hour: string) => {
+		const domani = new Date();
+		domani.setUTCDate(domani.getUTCDate() + 1);
+		return `${domani.toISOString().slice(0, 10)}T${hour}:00`;
+	};
+
+	it('valuta il tramonto sulle nuvole alte, non sulla copertura totale', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({ cloud_cover: 55, cloud_cover_low: 0, cloud_cover_mid: 0, cloud_cover_high: 50 }),
+			astronomy: {
+				sunrise: domaniAlle('05:30'),
+				sunset: domaniAlle('20:44'),
+				moon_phase: 'Luna Nuova',
+				moon_illumination: 5,
+			},
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sky).toBeDefined();
+		// Copertura totale 55% ma tutta alta e orizzonte libero: spettacolare.
+		expect(r.sky.sunset.score).toBe(100);
+		expect(r.sky.sunset.level).toBe('excellent');
+	});
+
+	it('usa l illuminazione lunare riconciliata fra le fonti', async () => {
+		// La luna arriva da una fonte diversa da quella astronomica principale:
+		// il riquadro cielo si compone dopo quel merge, non prima.
+		sourceResponses['open-meteo'] = forecast('open-meteo', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({ cloud_cover: 0 }),
+			astronomy: { sunrise: domaniAlle('05:30'), sunset: domaniAlle('20:44'), moon_phase: 'Luna Piena' },
+		});
+		sourceResponses['weatherapi'] = forecast('weatherapi', {
+			temp: 20,
+			astronomy: {
+				sunrise: domaniAlle('05:31'),
+				sunset: domaniAlle('20:45'),
+				moon_phase: 'Full Moon',
+				moon_illumination: 100,
+			},
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sky.stargazing.moon_illumination).toBe(100);
+		// Cielo terso ma luna piena: buono per i pianeti, non per il profondo.
+		expect(r.sky.stargazing.score).toBeLessThan(50);
+	});
+
+	it('senza nuvolosità per quota il blocco non compare', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', {
+			temp: 20,
+			utc_offset_seconds: 0,
+			hourly: giornata({}),
+		});
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('sky');
+	});
+});
+
+
+describe('mare', () => {
+	const oreMare = (count: number, over: Record<string, any> = {}) => {
+		const base = new Date();
+		base.setUTCMinutes(0, 0, 0);
+		return Array.from({ length: count }, (_, i) => ({
+			time: new Date(base.getTime() + i * 3600_000).toISOString().slice(0, 16),
+			wave_height: 0.3,
+			wave_direction: 110,
+			wave_period: 4.2,
+			swell_height: 0.2,
+			sea_temperature: 24.6,
+			...over,
+		}));
+	};
+
+	it('espone il riquadro mare sulle località costiere', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = { hours: oreMare(24), utcOffsetSeconds: 0 };
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sea).toBeDefined();
+		expect(r.sea.sea_temperature).toBeCloseTo(24.6, 1);
+		expect(r.sea.state).toBe('calm');
+	});
+
+	it('nell entroterra il blocco non compare', async () => {
+		// Il connettore si auto-esclude: non serve un test sulla distanza dalla
+		// costa, la fonte stessa è il criterio.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = null;
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('sea');
+	});
+
+	it('riporta il picco d onda atteso, non solo quello attuale', async () => {
+		const ore = oreMare(24);
+		ore[6]!.wave_height = 1.6;
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = { hours: ore, utcOffsetSeconds: 0 };
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sea.state).toBe('calm');
+		expect(r.sea.max_wave_24h).toBeCloseTo(1.6, 2);
 	});
 });

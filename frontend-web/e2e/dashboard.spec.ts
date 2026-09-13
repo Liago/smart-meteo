@@ -258,6 +258,175 @@ test.describe('orto e giardino', () => {
 	});
 });
 
+test.describe('fotovoltaico', () => {
+	test('senza impianto impostato mostra la resa specifica', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fotovoltaico')).toBeVisible();
+		await expect(page.getByText('Imposta impianto')).toBeVisible();
+		await expect(page.getByText('5,20 kWh/kWp').first()).toBeVisible();
+		// Le assunzioni vanno sempre scritte: senza, il numero non è
+		// verificabile da chi conosce il proprio tetto.
+		await expect(page.getByText(/30° esposti a sud/)).toBeVisible();
+	});
+
+	test('salvata la potenza, i kWh compaiono e restano al ricaricamento', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await page.getByText('Imposta impianto').click();
+		await page.getByLabel('Potenza impianto').fill('3');
+		// `exact`: nell'header c'è già un «Salva nei preferiti».
+		await page.getByRole('button', { name: 'Salva', exact: true }).click();
+
+		// 5,2 kWh/kWp × 3 kWp
+		await expect(page.getByText('15,6 kWh').first()).toBeVisible();
+
+		// La potenza vive in localStorage: deve sopravvivere al ricaricamento
+		// senza aver mai toccato il backend.
+		await page.reload();
+		await expect(page.getByText('15,6 kWh').first()).toBeVisible();
+	});
+
+	test('senza dati di radiazione il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { solar: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Fotovoltaico')).toHaveCount(0);
+	});
+});
+
+test.describe('cielo', () => {
+	test('mette in cima il tramonto e mostra gli ingredienti della notte', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Cielo')).toBeVisible();
+		await expect(page.getByText('Tramonto spettacolare verso le 20:00')).toBeVisible();
+		await expect(page.getByText('30% di nuvole, luna al 60%')).toBeVisible();
+	});
+
+	test('cede il titolo alla notte quando è lei la notevole', async ({ page }) => {
+		// Senza questa regola una notte ottima sotto un tramonto ordinario
+		// resterebbe invisibile.
+		await mockApi(page, {
+			sky: {
+				sunset: { at: `${new Date().toISOString().slice(0, 10)}T20:00`, score: 10, level: 'plain' },
+				sunrise: null,
+				stargazing: { score: 92, level: 'excellent', cloud_cover: 5, moon_illumination: 4 },
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Notte ottima per le stelle')).toBeVisible();
+		await expect(page.getByText('cielo terso, luna quasi nuova')).toBeVisible();
+	});
+
+	test('senza nuvolosità per quota il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { sky: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Cielo')).toHaveCount(0);
+	});
+});
+
+test.describe('mare', () => {
+	test('sulla costa mostra acqua, onda e provenienza', async ({ page }) => {
+		await mockApi(page, {
+			sea: {
+				sea_temperature: 24.6,
+				wave_height: 0.32,
+				wave_direction: 110,
+				wave_period: 4.2,
+				swell_height: 0.2,
+				state: 'calm',
+				max_wave_24h: 0.41,
+				max_wave_at: `${new Date().toISOString().slice(0, 10)}T18:00`,
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Mare', { exact: true })).toBeVisible();
+		await expect(page.getByText('Acqua a 25°, mare calmo')).toBeVisible();
+		await expect(page.getByText('da E')).toBeVisible();
+	});
+
+	test('avvisa quando il mare peggiora nel pomeriggio', async ({ page }) => {
+		await mockApi(page, {
+			sea: {
+				sea_temperature: 23,
+				wave_height: 0.3,
+				wave_direction: 200,
+				wave_period: 5,
+				swell_height: 0.2,
+				state: 'calm',
+				max_wave_24h: 1.8,
+				max_wave_at: `${new Date().toISOString().slice(0, 10)}T17:00`,
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText(/Verso le 17:00 diventa mosso/)).toBeVisible();
+	});
+
+	test('nell entroterra il riquadro non compare', async ({ page }) => {
+		// Il modello d'onda si auto-esclude: il backend non manda il blocco.
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Mare', { exact: true })).toHaveCount(0);
+	});
+});
+
+test.describe('buona giornata per…', () => {
+	test('elenca le attività con il punteggio e il fattore che lo limita', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Buona giornata per…')).toBeVisible();
+		// La migliore apre il riquadro, in minuscolo dentro la frase.
+		await expect(page.getByText('andare in bici: condizioni ottime')).toBeVisible();
+
+		// La riga va cercata nel suo elemento: «62» da solo comparirebbe anche
+		// altrove sulla dashboard (il picco dei pollini, per dirne una).
+		const corsa = page.getByRole('listitem').filter({ hasText: 'Correre' });
+		await expect(corsa).toContainText('62');
+		// Il numero da solo non dice niente: accanto c'è il perché.
+		await expect(corsa).toContainText('limita temperatura');
+	});
+
+	test('di sera dichiara che la finestra è quella di domani', async ({ page }) => {
+		const domani = new Date();
+		domani.setDate(domani.getDate() + 1);
+		const date = domani.toISOString().slice(0, 10);
+
+		await mockApi(page, {
+			activities: {
+				date,
+				from: `${date}T08:00`,
+				to: `${date}T19:00`,
+				activities: [{ id: 'running', label: 'Correre', score: 90, limiting: null }],
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Buona giornata per…')).toBeVisible();
+		await expect(page.getByText('domani', { exact: true })).toBeVisible();
+	});
+
+	test('senza ore diurne davanti il riquadro non compare', async ({ page }) => {
+		await mockApi(page, { activities: null });
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Buona giornata per…')).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);
