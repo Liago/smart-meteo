@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D-6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (1 punto su 5) · 6E da fare.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -174,12 +174,17 @@ mostra nemmeno `sources_used` — non esiste un pannello fonti — e crearlo esc
 6A. Il modello Swift decodifica già `confidence`, quindi manca solo la vista: voce aperta in
 §6.5.
 
-### 3.6 AQI monofonte, senza previsione 🟠
+### 3.6 AQI monofonte, senza previsione ✅ RISOLTO (6D)
 
-`current.aqi` e `air_quality` vengono solo da WeatherAPI (`smartEngine.ts:495-496`,
-`sourceWithAirQuality`): nessuna aggregazione, nessun fallback se WeatherAPI è giù, nessun
-andamento orario o giornaliero. Tutto il bel pannello `AirQualityPanel.tsx` dipende da una singola
-chiamata. Risolvibile gratis (§5.1).
+`current.aqi` e `air_quality` venivano solo da WeatherAPI: nessuna aggregazione, nessun fallback
+se quella fonte era giù, nessun andamento. Tutto il pannello `AirQualityPanel.tsx` dipendeva da
+una singola chiamata.
+
+**Risolto:** `connectors/openmeteoAirQuality.ts` aggiunge l'indice europeo e gli stessi
+inquinanti da un'API gratuita e senza chiave. Le due fonti si fondono invece di escludersi, ma
+WeatherAPI mantiene la precedenza su ogni inquinante — sono i valori mostrati da mesi, e le due
+non usano la stessa unità per il monossido di carbonio. Con lo stesso connettore arrivano anche i
+**pollini** (§5.1).
 
 ### 3.7 Notifiche email: piano intero aperto 🔴
 
@@ -522,13 +527,13 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 
 ### 6.4 Fase 6D — Nuove feature utente (**prossimo blocco**)
 
-| # | Intervento | Chiude |
-|---|-----------|--------|
-| 14 | Connettore Open-Meteo Air Quality: pollini + AQI previsionale multi-fonte | §3.6, §5.1 |
-| 15 | Quota neve, neve al suolo, rischio gelate | §5.2 |
-| 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 |
-| 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 |
-| 18 | Allerte su soglie personali | §5.15 |
+| # | Intervento | Chiude | Stato |
+|---|-----------|--------|:-----:|
+| 14 | Connettore Open-Meteo Air Quality: pollini + AQI multi-fonte | §3.6, §5.1 | ✅ |
+| 15 | Quota neve, neve al suolo, rischio gelate | §5.2 | ⏳ |
+| 16 | Indice temporali (CAPE / lifted index) nel registry metriche | §5.8 | ⏳ |
+| 17 | Radar/mappa (RainViewer o tile OWM) | §3.9, §5.5 | ⏳ |
+| 18 | Allerte su soglie personali | §5.15 | ⏳ |
 
 ### 6.5 Fase 6E — Nicchie e rifiniture
 
@@ -764,15 +769,41 @@ consenso`):
 **Verifiche finali:** 326 test backend (16 suite), 137 web (7 suite), 27 scenari E2E × 2
 viewport, typecheck pulito su entrambi i lati, lint web a 2 errori preesistenti.
 
+### Fase 6D — in corso (1 punto su 5 al 2026-09-13)
+
+Commit `feat(6D): pollini e qualità dell'aria da Open-Meteo`.
+
+**Fatto**
+
+1. **Qualità dell'aria a due fonti e pollini** (§3.6, §5.1). Indice europeo e inquinanti da
+   Open-Meteo accanto all'EPA di WeatherAPI, fusi invece che alternativi; sei specie polliniche
+   dal modello CAMS con etichette in italiano.
+
+**Decisioni**
+
+- **Soglie per specie, non una sola.** 30 granuli/m³ di graminacee sono una giornata pesante per
+  chi è allergico, gli stessi 30 di olivo sono poca cosa: una soglia unica darebbe il livello
+  sbagliato a metà delle specie.
+- **Si mostra il massimo previsto in giornata**, non il valore dell'ora: chi è allergico decide
+  la mattina se uscire, e il picco a mezzogiorno è l'informazione utile.
+- **Fuori dall'Europa il blocco è omesso**, non mostrato a zero: uno zero direbbe «nessun
+  polline» invece di «non lo sappiamo».
+- **WeatherAPI mantiene la precedenza sugli inquinanti.** Sono i valori mostrati da mesi, e le
+  due fonti non usano la stessa unità per il monossido di carbonio: mescolarle darebbe numeri
+  incoerenti con lo storico.
+- **Le specie a zero restano in lista.** L'assenza è un'informazione, e una lista che cambia
+  lunghezza ogni giorno è più difficile da leggere.
+
+**Verifiche:** 352 test backend (17 suite), 148 web (8 suite), 29 scenari E2E × 2 viewport.
+
 ### Prossimo blocco
 
-**Fase 6D — nuove feature utente** (§6.4): pollini e AQI previsionale da Open-Meteo Air Quality
-(§5.1), quota neve e rischio gelate (§5.2), indice temporali da CAPE (§5.8), radar (§5.5),
-allerte su soglie personali (§5.15).
+**Fase 6D, punti 15-18**: quota neve e rischio gelate (§5.2), indice temporali da CAPE (§5.8),
+radar (§5.5), allerte su soglie personali (§5.15).
 
-Da valutare prima della 6D: **la resa grafica della banda su iOS** e **il pannello fonti su
-iOS**, dove mostrare anche l'indice di consenso. Entrambi sono asimmetrie dichiarate fra i due
-client, non dimenticanze — ma sono le uniche due rimaste.
+Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
+della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i
+pollini. I modelli Swift decodificano già tutti e tre i dati: manca solo la vista.
 
 ---
 

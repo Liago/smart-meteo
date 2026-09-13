@@ -115,6 +115,11 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
+### Fase 6D — Nuove feature utente (2026-09-13, 1 punto su 5)
+- **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
+- **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
+- ⏳ Restano: quota neve e gelate, indice temporali, radar, allerte su soglie personali
+
 ### Fase 6C — Qualità della previsione (2026-09-12, completata)
 - **Daily e hourly pesati**: `avgSimple` ignorava `SOURCE_WEIGHTS` proprio sui sette giorni e sulla curva oraria. Nuovo `utils/aggregate.ts` (`weightedMean`, `weightedVote`) al posto di tre implementazioni quasi identiche
 - **Modelli Open-Meteo come fonti indipendenti**: ICON-D2, ICON-EU, ECMWF IFS, Météo-France e GFS al posto della miscela `best_match`, che è una loro combinazione — affiancarli l'avrebbe contata due volte. Migrazione 022, `OPENMETEO_MODELS=off` per tornare indietro
@@ -215,7 +220,7 @@ Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`
 | 4 | `precipitation_intensity` estratto e mai aggregato | 🟢 | ✅ Risolto in Fase 6A |
 | 5 | Meteostat nell'aggregazione: osservazioni passate mescolate a previsioni | 🔴 | ✅ Risolto in 6C |
 | 6 | `source_accuracy` misura la conformità al consenso, non l'errore vs osservato | 🔴 | ✅ Risolto in 6C (resta il nowcast vs +24h) |
-| 7 | AQI da una sola fonte, senza previsione né fallback | 🟠 | ⏳ Fase 6D |
+| 7 | AQI da una sola fonte, senza previsione né fallback | 🟠 | ✅ Risolto in 6D |
 | 8 | `EMAIL_NOTIFICATIONS_PLAN.md` interamente non implementato | 🔴 | ⏳ Decisione pendente (Web Push come alternativa) |
 | 9 | Nessun Jest sul backend, nessun E2E, nessun test iOS, nessun Lighthouse | 🔴 | ✅ 6B (restano iOS e Lighthouse) |
 | 13 | Vento in km/h da tre connettori su otto | 🔴 | ✅ Risolto in 6B |
