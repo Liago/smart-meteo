@@ -333,6 +333,55 @@ test.describe('cielo', () => {
 	});
 });
 
+test.describe('mare', () => {
+	test('sulla costa mostra acqua, onda e provenienza', async ({ page }) => {
+		await mockApi(page, {
+			sea: {
+				sea_temperature: 24.6,
+				wave_height: 0.32,
+				wave_direction: 110,
+				wave_period: 4.2,
+				swell_height: 0.2,
+				state: 'calm',
+				max_wave_24h: 0.41,
+				max_wave_at: `${new Date().toISOString().slice(0, 10)}T18:00`,
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText('Mare', { exact: true })).toBeVisible();
+		await expect(page.getByText('Acqua a 25°, mare calmo')).toBeVisible();
+		await expect(page.getByText('da E')).toBeVisible();
+	});
+
+	test('avvisa quando il mare peggiora nel pomeriggio', async ({ page }) => {
+		await mockApi(page, {
+			sea: {
+				sea_temperature: 23,
+				wave_height: 0.3,
+				wave_direction: 200,
+				wave_period: 5,
+				swell_height: 0.2,
+				state: 'calm',
+				max_wave_24h: 1.8,
+				max_wave_at: `${new Date().toISOString().slice(0, 10)}T17:00`,
+			},
+		});
+		await page.goto('/');
+
+		await expect(page.getByText(/Verso le 17:00 diventa mosso/)).toBeVisible();
+	});
+
+	test('nell entroterra il riquadro non compare', async ({ page }) => {
+		// Il modello d'onda si auto-esclude: il backend non manda il blocco.
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await expect(page.getByText('Mare', { exact: true })).toHaveCount(0);
+	});
+});
+
 test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);

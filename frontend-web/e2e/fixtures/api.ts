@@ -85,6 +85,11 @@ export interface ForecastOptions {
 	/** Blocco cielo: tramonti e osservazione astronomica. */
 	sky?: Record<string, unknown> | null;
 	/**
+	 * Blocco mare. **Assente per default**: la località di prova è Milano, e
+	 * nell'entroterra il modello d'onda non copre.
+	 */
+	sea?: Record<string, unknown>;
+	/**
 	 * Blocco neve e gelate. Assente per default: il backend lo manda solo
 	 * quando c'è qualcosa da dire, e la risposta di base è una giornata
 	 * serena di settembre.
@@ -211,6 +216,10 @@ export function buildForecast(options: ForecastOptions = {}) {
 			sunrise: null,
 			stargazing: { score: 40, level: 'fair', cloud_cover: 30, moon_illumination: 60 },
 		};
+	}
+
+	if (options.sea) {
+		forecast.sea = options.sea;
 	}
 
 	if (!options.withoutNextHour) {

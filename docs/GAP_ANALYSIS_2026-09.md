@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 6 punti su 9.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E 7 punti su 9.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -457,12 +457,20 @@ innaffiare?» e finestra di semina. Il rischio gelata tardiva era già coperto d
 Implementata in `backend/utils/garden.ts` (blocco `garden`), `GardenPanel.tsx` e
 `GardenPanelView.swift`. Le decisioni sono nel registro, §7 → Fase 6E punto 4.
 
-#### 5.11 Mare (Open-Meteo Marine + WeatherAPI)
+#### 5.11 Mare (Open-Meteo Marine) ⭐ ✅ IMPLEMENTATA (6E)
 
-`https://marine-api.open-meteo.com/v1/marine`: `wave_height`, `wave_direction`, `wave_period`,
-`swell_wave_height`, `sea_surface_temperature`. WeatherAPI `marine.json` aggiunge le **maree**.
-Da attivare solo per località costiere (test sulla distanza dal mare): temperatura dell'acqua e
-onde sono la prima domanda di chi va al mare.
+`https://marine-api.open-meteo.com/v1/marine`: onde, mare lungo e temperatura dell'acqua.
+
+**Il test sulla distanza dal mare non serve**: il modello d'onda copre solo i punti di griglia
+sul mare, quindi nell'entroterra la chiamata fallisce o torna tutta nulla e il connettore
+restituisce `null`. La fonte stessa è il criterio di costa, ed è più accurata di qualunque soglia
+avremmo scelto noi.
+
+**Le maree restano fuori**: WeatherAPI le espone su `marine.json`, che non è nel piano gratuito
+che usiamo. Il pannello lo dichiara invece di lasciarlo intendere.
+
+Implementata in `connectors/openmeteoMarine.ts`, `utils/sea.ts` (blocco `sea`) e `SeaPanel.tsx`.
+Le decisioni sono nel registro, §7 → Fase 6E punto 7.
 
 #### 5.12 Alba/tramonto "spettacolari" e cielo notturno ⭐ ✅ IMPLEMENTATA (6E)
 
@@ -569,7 +577,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 19 | Residui WeatherKit sulla neve: `snowfallAmount`, `snowfallIntensity` | §3.10 | ✅ |
 | 20 | Pannello fonti su iOS (consenso + pollini) | §3.5 | ✅ |
 | 21 | Banda di incertezza sul grafico orario iOS | §5.3.2 | ✅ |
-| 22 | Mare e maree | §5.11 | ⏳ |
+| 22 | Mare: onde e temperatura dell'acqua | §5.11 | ✅ |
 | 23 | Radiazione solare e resa fotovoltaica | §5.9 | ✅ |
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
 | 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
@@ -978,7 +986,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (6 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (7 punti su 9 al 2026-09-13)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1188,6 +1196,48 @@ richiudibili, o una scelta di quali mostrare.
 **Verifiche:** 549 test backend (25 suite), 231 web (13 suite), 44 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
+#### 7. Mare: onde e temperatura dell'acqua
+
+Chiude §5.11. Commit `feat(6E): mare, onde e temperatura dell'acqua`.
+
+La domanda di chi va al mare è doppia e concreta: quanto è fredda l'acqua e quanto è mosso.
+Schema di cache alla versione 15.
+
+**Decisioni**
+
+- **Il criterio di costa è la fonte stessa.** Il modello d'onda copre solo i punti di griglia sul
+  mare: nell'entroterra l'endpoint risponde con un errore, o con serie tutte nulle, e in entrambi
+  i casi il connettore restituisce `null`. Niente dataset di coste, niente soglia sulla distanza
+  dal mare — e il risultato è più accurato di qualunque soglia avremmo scelto.
+- **Il criterio è il dato, non il codice HTTP.** Alcuni punti interni rispondono 200 con le serie
+  a null: senza il controllo sull'altezza d'onda comparirebbe un riquadro «mare calmo, 0 m» in
+  mezzo alla pianura, che è peggio di nessun riquadro.
+- **L'altezza d'onda diventa una parola.** «1,3 m» sembra poco scritto così, ed è il mare che
+  rovescia un pedalò: si usano i termini dei bollettini italiani (calmo, poco mosso, mosso, molto
+  mosso), che chi va al mare riconosce. Sopra il «molto mosso» le distinzioni della scala Douglas
+  riguardano la navigazione, non chi sceglie se fare il bagno.
+- **Onda e temperatura sono stati, non medie**: si leggono adesso. Il massimo atteso viaggia a
+  parte, perché è l'informazione che fa cambiare programma — il mare adesso è calmo, nel
+  pomeriggio no.
+- **L'avviso di peggioramento compare solo se cambia la fascia.** Se il picco resta nello stesso
+  stato il numero è già nella riga dell'onda, e ripeterlo come avviso sarebbe un falso allarme.
+- **La provenienza dell'onda usa otto punti, non sedici**: fra NNE e NE non cambia niente per chi
+  sceglie una spiaggia, e allunga solo l'etichetta.
+- **Le maree si dichiarano assenti.** Sono su `marine.json` di WeatherAPI, fuori dal piano
+  gratuito: scriverlo nel pannello è meglio che lasciare all'utente il dubbio di non averle
+  trovate.
+
+**Verifiche:** 567 test backend (27 suite), 246 web (14 suite), 47 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
+**Limite dichiarato:** solo backend e web, come le tre voci precedenti. E il connettore è scritto
+contro una forma di risposta non verificabile da qui — `marine-api.open-meteo.com` è negato dalla
+rete dell'ambiente, come tutti gli host Open-Meteo. A differenza del radar, però, il rischio è
+contenuto: la famiglia di API Open-Meteo ha una forma uniforme (`hourly: { time: [], <param>: [] }`)
+già dimostrata da tre connettori in questo repo, e ciò che si sta ricordando sono i **nomi dei
+parametri**, non la struttura. Il connettore è scritto per degradare: qualunque serie assente
+diventa `null` e il riquadro sparisce, invece di mostrare un mare inventato.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1197,7 +1247,7 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 
 ### Prossimo blocco
 
-**Fase 6E, punti 22, 25 e 27**: mare e maree, indici lifestyle, test iOS e audit Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
+**Fase 6E, punti 25 e 27**: indici lifestyle, test iOS e audit Lighthouse. Sul fronte iOS il debito è ora di due feature (orto e fotovoltaico) più quattro
 schermate non compilate: un passaggio su simulatore viene prima.
 **Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
 

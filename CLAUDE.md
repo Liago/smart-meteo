@@ -9,7 +9,7 @@ Smart Meteo is a full-stack weather forecasting app that aggregates data from mu
 ```
 smart-meteo/
 ├── backend/                    # Express API (TypeScript, deployed on Netlify Functions)
-│   ├── connectors/             # 9 forecast providers + 1 alerts-only source
+│   ├── connectors/             # 9 forecast providers + alerts, marine, air quality, ensemble
 │   │   ├── weatherkit.ts       # Apple WeatherKit (weight: 1.2) - JWT auth, alerts, forecastNextHour, snow
 │   │   ├── tomorrow.ts         # Tomorrow.io (weight: 1.2)
 │   │   ├── openmeteo.ts        # Open-Meteo: best_match (1.1) + 5 models as separate sources
@@ -20,12 +20,13 @@ smart-meteo/
 │   │   ├── meteostat.ts        # Meteostat (weight: 0) - observations only, used as ground truth
 │   │   ├── weatherstack.ts     # WeatherStack (weight: 0 - disabled, free plan is HTTP-only)
 │   │   ├── openmeteoEnsemble.ts # Ensemble members -> temperature p10/p50/p90 band
+│   │   ├── openmeteoMarine.ts  # Waves + sea temperature; self-excludes inland
 │   │   ├── openmeteoAirQuality.ts # European AQI, pollutants and CAMS pollen
 │   │   │                          # (openmeteo.ts also carries snow depth,
 │   │   │                          #  snowfall, freezing level and soil temp)
 │   │   └── meteoalarm.ts       # MeteoAlarm/EUMETNET - weather alerts only, no forecast
 │   ├── engine/
-│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 14)
+│   │   └── smartEngine.ts      # Weighted aggregation + cache (schema_version 15)
 │   ├── middleware/
 │   │   └── auth.ts             # Supabase Bearer token auth
 │   ├── routes/
@@ -51,6 +52,7 @@ smart-meteo/
 │   │   ├── garden.ts           # Soil moisture + ET0 -> irrigation advice
 │   │   ├── solar.ts            # Irradiance -> PV specific yield (kWh/kWp)
 │   │   ├── sky.ts              # Cloud layers -> sunset quality, stargazing
+│   │   ├── sea.ts              # Wave height -> Italian sea-state wording
 │   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
@@ -77,6 +79,7 @@ smart-meteo/
 │   │   ├── GardenPanel.tsx      # Soil moisture, water balance, sowing window
 │   │   ├── SolarPanel.tsx       # PV yield per day, plant size in localStorage
 │   │   ├── SkyPanel.tsx         # Sunset quality + stargazing outlook
+│   │   ├── SeaPanel.tsx         # Water temperature, waves, sea state
 │   │   ├── HourlyDetail.tsx     # Hourly metric modal (precip/wind/humidity/UV/...)
 │   │   ├── WeatherEffects.tsx   # Particle layers for the dynamic background
 │   │   ├── ui/Modal.tsx, ui/MetricSelect.tsx # Shared primitives
@@ -238,11 +241,11 @@ cd frontend-web && npm run build
 
 ## Testing
 
-- Web tests are in `frontend-web/__tests__/` (13 suites: api, components, weather-utils,
-  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar, sky),
-  `npm test` from the repo root
+- Web tests are in `frontend-web/__tests__/` (14 suites: api, components, weather-utils,
+  air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar, sky, sea), `npm test` from the
+  repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **549 tests in 25 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **567 tests in 27 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -250,7 +253,7 @@ cd frontend-web && npm run build
 - `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
   per-connector test would not catch a unit mismatch, since each one is self-consistent
 - `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
-- E2E: `cd frontend-web && npm run test:e2e` - 44 scenarios × 2 viewports (Playwright).
+- E2E: `cd frontend-web && npm run test:e2e` - 47 scenarios × 2 viewports (Playwright).
   The backend API is never contacted: every scenario starts from a known response built
   in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
   downloaded. `e2e/` is excluded from Jest
@@ -282,6 +285,7 @@ cd frontend-web && npm run build
 - **Soil moisture thresholds depend on soil type and the API does not declare it**: field capacity runs ~0.15 m³/m³ for sand and ~0.40 for clay, so the thresholds are a loam's and the raw number is always shown next to the verdict — as percent of volume, because "25% vol." reads and "0.25 m³/m³" does not. Note the **two** soil temperatures: `soil_temperature_0cm` is the surface, where frost forms; `soil_temperature_0_to_7cm` is the root zone, which decides whether a seed germinates
 - **`weightedMean` takes a precision argument**: it rounded to one decimal, which on volumetric soil moisture turned 0.25 into 0.3 and 0.06 into 0.1 — from "very dry" to merely "dry". Quantities living between 0 and 1 pass their own `decimals`
 - **The PV backend returns specific yield (kWh/kWp), never kWh**: plant size is the user's datum, lives in `localStorage` and never reaches the server — if it did, the 30-minute forecast cache would fragment per user instead of serving everyone at that location. For the same reason **tilt and azimuth are constants of the query, not preferences**: 30° facing south is the typical Italian domestic array, the error on a different roof is a few percent, and the shared cache is worth more. The transposition onto the panel plane is done by Open-Meteo (`global_tilted_irradiance`), not by us — deriving it from DNI/DHI would be unvalidatable astronomy code whose errors stay silent. There is an explicit fallback to the horizontal plane, and **which plane was actually used travels to the user**, because a tilted array out-produces a horizontal estimate in winter
+- **The coastline test is the source itself** (`connectors/openmeteoMarine.ts`): the wave model only covers grid points at sea, so inland the endpoint errors or returns all-null series and the connector returns `null` — no coastline dataset, no distance threshold, and more accurate than any threshold we would have picked. The check is on the **data, not the HTTP code**: some inland points answer 200 with null series, and without that guard a "calm sea, 0 m" panel would appear in the middle of the plain. Wave height is rendered as an Italian sea-state word ("mosso"), because "1.3 m" reads as small and is the sea that capsizes a pedalo. Tides are **declared absent** rather than quietly missing: they live on WeatherAPI's `marine.json`, outside our free plan
 - **Total cloud cover cannot describe a sunset — altitude can** (`backend/utils/sky.ts`): a memorable sunset needs *high* cloud (cirrus, lit from below once the sun is down) plus a clear horizon for that light to arrive. A clear sky and an overcast one both give an ordinary sunset, for opposite reasons, and one coverage number confuses them. The score is a **product** of canvas (high cloud, peaking at ~50%) and light (how clear the low/mid sky is), never a sum: a sum would award a cloudless sky half marks just for having no low cloud. Low cloud blocks more than mid — it sits between the sun and the viewer at the horizon. The moon **penalises stargazing without zeroing it** (planets and bright stars survive a full moon; faint objects do not), and where total cover is missing it is the **max** of the layers, not their sum — three layers at 40% are not 120% overcast
 - **The garden block is NOT omitted when all is calm**, unlike the snow one. Not an inconsistency: the snow panel would have been *empty* — no depth, no snowfall, no frost — for eight months a year, whereas "no need to water" is a full answer, and the one someone with a garden goes looking for in the evening
 - **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
@@ -320,7 +324,8 @@ DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/tex
 HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, soil_temperature_root, soil_moisture, evapotranspiration, solar_irradiance, sunshine_duration, cloud_cover, cloud_cover_low/mid/high, cape, lifted_index, storm_index, thunder_prob
 AlertRule          // id, metric, comparator ('above'|'below'), threshold, horizon_hours, enabled
 AstronomyData      // sunrise, sunset, moon_phase
-ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, solar, sky, forecastNextHour
+ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, garden, solar, sky, sea, forecastNextHour
+SeaOutlook         // sea_temperature, wave_height, wave_direction, wave_period, swell_height, state, max_wave_24h, max_wave_at
 SkyOutlook         // sunset/sunrise {at, score, level}, stargazing {score, level, cloud_cover, moon_illumination}
 SolarOutlook       // plane ('tilted'|'horizontal'), tilt_deg, azimuth_deg, performance_ratio, days[{date, kwh_per_kwp, sunshine_hours, peak_w}]
 GardenOutlook      // soil_moisture, moisture_level, soil_temperature, evapotranspiration_mm, rain_mm, water_balance_mm, advice, sowing_ok
@@ -332,6 +337,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Sea state** (backend + web): a new `connectors/openmeteoMarine.ts` against Open-Meteo Marine for waves, swell and water temperature, turned into a `sea` block by `utils/sea.ts` and rendered by `SeaPanel.tsx`. The connector **self-excludes inland**, so no coastline test was needed. **Web only.**
 - **Sunset quality and stargazing** (backend + web): `cloud_cover_low/mid/high` plus hourly total cover from the Open-Meteo call we already made, combined with the moon illumination already in hand. `backend/utils/sky.ts` derives a `sky` block, rendered by `SkyPanel.tsx`, whose headline goes to whichever of the two indices is the more remarkable. **Web only**, like the two features before it.
 - **Photovoltaic yield** (backend + web): `global_tilted_irradiance` (with constant `tilt`/`azimuth` query params), `shortwave_radiation` as fallback and `sunshine_duration`, turned into a per-day specific yield in kWh/kWp by `backend/utils/solar.ts`. `SolarPanel.tsx` multiplies by the plant size the user stores locally. **Web only:** the iOS version needs a settings field for plant size, and that waits on a simulator pass over the Swift views already written.
 - **Garden and soil** (backend + web + iOS): `soil_moisture_0_to_7cm`, `et0_fao_evapotranspiration`, `soil_temperature_0_to_7cm` and `vapour_pressure_deficit` from the Open-Meteo call we already made, turned into a `garden` block that answers "do I need to water tonight?" and "is the soil warm enough to sow?". Rendered by `GardenPanel.tsx` / `GardenPanelView.swift`.

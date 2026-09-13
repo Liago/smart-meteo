@@ -2,6 +2,7 @@ import { fetchFromTomorrow } from '../connectors/tomorrow';
 import { fetchFromOpenMeteo, fetchFromOpenMeteoModel, activeOpenMeteoModels, OPENMETEO_MODELS, SOLAR_AZIMUTH_DEG, SOLAR_TILT_DEG } from '../connectors/openmeteo';
 import { fetchTemperatureBand } from '../connectors/openmeteoEnsemble';
 import { fetchAirQuality } from '../connectors/openmeteoAirQuality';
+import { fetchMarine } from '../connectors/openmeteoMarine';
 import { fetchFromOpenWeather } from '../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../connectors/accuweather';
@@ -18,6 +19,7 @@ import { stormIndex } from '../utils/storm';
 import { buildGardenOutlook, gardenHoursFrom } from '../utils/garden';
 import { buildSolarOutlook, solarHoursFrom } from '../utils/solar';
 import { buildSkyOutlook, skyHoursFrom } from '../utils/sky';
+import { buildSeaOutlook } from '../utils/sea';
 import { aggregateWindDirection, aggregateWindGust } from '../utils/wind';
 import { computeConsensus } from '../utils/consensus';
 import { weightedMean, weightedVote } from '../utils/aggregate';
@@ -58,12 +60,13 @@ import { aggregateAlerts } from '../utils/alertGeo';
  *       evapotraspirazione, deficit di pressione di vapore) sugli slot orari
  *  13 → blocco solar e radiazione solare sugli slot orari
  *  14 → blocco sky e nuvolosità per quota sugli slot orari
+ *  15 → blocco sea (onde e temperatura dell'acqua, solo sulle coste)
  *
  * Esportata perché i test la usino invece di ricopiarne il numero: una copia
  * scaduta farebbe fallire un test a ogni incremento, per un motivo che con la
  * modifica non c'entra niente.
  */
-export const FORECAST_SCHEMA_VERSION = 14;
+export const FORECAST_SCHEMA_VERSION = 15;
 
 const SOURCE_WEIGHTS: WeatherConditionWeights = {
 	'tomorrow.io': 1.2,
@@ -219,6 +222,9 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// fonti: sono arricchimenti e non devono allungare il percorso critico.
 	const ensemblePromise = fetchTemperatureBand(lat, lon);
 	const airQualityPromise = fetchAirQuality(lat, lon);
+	// Il modello d'onda si auto-esclude nell'entroterra: non serve un test
+	// sulla distanza dalla costa, la fonte stessa è il criterio.
+	const marinePromise = fetchMarine(lat, lon);
 
 	// 3. Fetch from External & Load Accuracies
 	//
@@ -625,6 +631,17 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 	// «non serve innaffiare» è la risposta che chi ha un orto cerca la sera.
 	const garden = buildGardenOutlook(gardenHoursFrom(aggregatedHourly as any), hourKeyOf(new Date().toISOString()));
 
+	// Mare: onde e temperatura dell'acqua. Le chiavi orarie del modello d'onda
+	// arrivano con lo stesso `timezone:auto` delle previsioni, quindi passano
+	// dallo stesso `hourKeyOf` del resto.
+	const marine = await marinePromise;
+	const sea = marine
+		? buildSeaOutlook(
+				marine.hours.map(h => ({ ...h, time: hourKeyOf(h.time) })),
+				hourKeyOf(new Date().toISOString())
+			)
+		: null;
+
 	// Cielo: tramonti e osservazione astronomica. Va calcolato DOPO il merge
 	// dei dati lunari qui sotto, perché l'illuminazione della luna è uno dei
 	// due ingredienti — quindi il blocco si compone più avanti, subito prima
@@ -773,6 +790,8 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		...(snow && { snow }),
 		// Orto: presente ovunque Open-Meteo dia i dati agronomici.
 		...(garden && { garden }),
+		// Mare: presente solo dove il modello d'onda copre, cioè sulle coste.
+		...(sea && { sea }),
 		// Cielo: quanto sarà bello il tramonto e quanto si vedranno le stelle.
 		...(sky && { sky }),
 		// Fotovoltaico: resa specifica per giorno, in kWh per kWp installato.

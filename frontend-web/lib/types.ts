@@ -300,6 +300,32 @@ export interface SkyOutlook {
 	stargazing: StargazingOutlook | null;
 }
 
+/** Stato del mare, nella scala dei bollettini italiani. */
+export type SeaState = 'calm' | 'slight' | 'moderate' | 'rough';
+
+/**
+ * Onde e temperatura dell'acqua.
+ *
+ * Presente solo dove il modello d'onda di Open-Meteo copre, cioè sulle coste:
+ * si auto-esclude nell'entroterra, quindi la presenza del blocco è già il test
+ * di costa.
+ */
+export interface SeaOutlook {
+	/** Temperatura dell'acqua adesso, °C. */
+	sea_temperature: number | null;
+	/** Altezza d'onda significativa adesso, metri. */
+	wave_height: number | null;
+	wave_direction: number | null;
+	/** Periodo dell'onda, secondi. */
+	wave_period: number | null;
+	/** Mare lungo adesso, metri. */
+	swell_height: number | null;
+	state: SeaState;
+	/** Onda massima attesa nelle prossime 24 ore, metri. */
+	max_wave_24h: number | null;
+	max_wave_at: string | null;
+}
+
 export interface WeatherAlert {
 	id: string;
 	areaId?: string;
@@ -345,6 +371,8 @@ export interface ForecastResponse {
 	solar?: SolarOutlook;
 	/** Cielo: qualità di alba/tramonto e osservazione astronomica. */
 	sky?: SkyOutlook;
+	/** Mare: presente solo sulle località costiere. */
+	sea?: SeaOutlook;
 	daily?: DailyForecast[];
 	hourly?: HourlyForecast[];
 	astronomy?: AstronomyData;

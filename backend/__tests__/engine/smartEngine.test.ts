@@ -119,6 +119,13 @@ jest.mock('../../connectors/openmeteoAirQuality', () => ({
 	fetchAirQuality: jest.fn(async () => airQualityResult),
 }));
 
+/** Ore del modello d'onda: assenti per default, come nell'entroterra. */
+let marineResult: any = null;
+
+jest.mock('../../connectors/openmeteoMarine', () => ({
+	fetchMarine: jest.fn(async () => marineResult),
+}));
+
 jest.mock('../../connectors/openmeteoEnsemble', () => ({
 	fetchTemperatureBand: jest.fn(async () =>
 		ensembleBands.length > 0
@@ -151,6 +158,7 @@ beforeEach(() => {
 	activeModels = [];
 	ensembleBands = [];
 	airQualityResult = null;
+	marineResult = null;
 });
 
 // --------------------------------------------------------------------- tests
@@ -1354,5 +1362,56 @@ describe('cielo: tramonti e stelle', () => {
 		const r = await getSmartForecast(LAT, LON);
 
 		expect(r).not.toHaveProperty('sky');
+	});
+});
+
+
+describe('mare', () => {
+	const oreMare = (count: number, over: Record<string, any> = {}) => {
+		const base = new Date();
+		base.setUTCMinutes(0, 0, 0);
+		return Array.from({ length: count }, (_, i) => ({
+			time: new Date(base.getTime() + i * 3600_000).toISOString().slice(0, 16),
+			wave_height: 0.3,
+			wave_direction: 110,
+			wave_period: 4.2,
+			swell_height: 0.2,
+			sea_temperature: 24.6,
+			...over,
+		}));
+	};
+
+	it('espone il riquadro mare sulle località costiere', async () => {
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = { hours: oreMare(24), utcOffsetSeconds: 0 };
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sea).toBeDefined();
+		expect(r.sea.sea_temperature).toBeCloseTo(24.6, 1);
+		expect(r.sea.state).toBe('calm');
+	});
+
+	it('nell entroterra il blocco non compare', async () => {
+		// Il connettore si auto-esclude: non serve un test sulla distanza dalla
+		// costa, la fonte stessa è il criterio.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = null;
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r).not.toHaveProperty('sea');
+	});
+
+	it('riporta il picco d onda atteso, non solo quello attuale', async () => {
+		const ore = oreMare(24);
+		ore[6]!.wave_height = 1.6;
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 28, utc_offset_seconds: 0 });
+		marineResult = { hours: ore, utcOffsetSeconds: 0 };
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.sea.state).toBe('calm');
+		expect(r.sea.max_wave_24h).toBeCloseTo(1.6, 2);
 	});
 });
