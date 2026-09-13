@@ -19,7 +19,7 @@ import { fetchFromOpenWeather } from '../../connectors/openweathermap';
 import { fetchFromWeatherAPI } from '../../connectors/weatherapi';
 import { fetchFromAccuWeather } from '../../connectors/accuweather';
 import { fetchFromWWO } from '../../connectors/worldweatheronline';
-import { fetchFromWeatherKit } from '../../connectors/weatherkit';
+import { fetchFromWeatherKit, fetchFromWeatherKitWithAlerts } from '../../connectors/weatherkit';
 import { fetchFromMeteostat } from '../../connectors/meteostat';
 import { fetchFromWeatherstack } from '../../connectors/weatherstack';
 
@@ -377,6 +377,48 @@ describe('world weather online', () => {
 });
 
 describe('weatherkit', () => {
+	it('converte i millimetri di neve di Apple in centimetri', async () => {
+		// `snowfallAmount` e `snowfallIntensity` sono LUNGHEZZE in millimetri,
+		// non equivalente in acqua: senza la divisione per dieci, 40 mm di manto
+		// diventerebbero «40 cm» — un ordine di grandezza su un numero che serve
+		// a decidere se mettere le catene.
+		mockWeatherKitFetch(weatherKitResponse());
+		const f = (await fetchFromWeatherKit(LAT, LON))!;
+
+		expect(f.daily![0]!.snowfall_cm).toBe(4);
+		expect(f.hourly![0]!.snowfall_cm).toBe(1.5);
+	});
+
+	it('una risposta senza campi neve non inventa uno zero', async () => {
+		// Zero direbbe «non nevica», l'assenza dice «non lo sappiamo»: con uno
+		// zero WeatherKit diluirebbe la neve prevista dagli altri modelli.
+		const senzaNeve: any = weatherKitResponse();
+		delete senzaNeve.forecastDaily.days[0].snowfallAmount;
+		delete senzaNeve.forecastHourly.hours[0].snowfallIntensity;
+		mockWeatherKitFetch(senzaNeve);
+
+		const f = (await fetchFromWeatherKit(LAT, LON))!;
+
+		expect(f.daily![0]!.snowfall_cm).toBeNull();
+		expect(f.hourly![0]!.snowfall_cm).toBeNull();
+	});
+
+	it('le due funzioni di fetch producono lo stesso forecast', async () => {
+		// Erano due blocchi copiati, già divergenti sull'arrotondamento del
+		// vento: un campo aggiunto a uno solo sarebbe comparso o sparito a
+		// seconda di quale l'engine avesse chiamato.
+		mockWeatherKitFetch(weatherKitResponse());
+		const senzaAllerte = (await fetchFromWeatherKit(LAT, LON))!;
+		mockWeatherKitFetch(weatherKitResponse());
+		const conAllerte = (await fetchFromWeatherKitWithAlerts(LAT, LON))!;
+
+		const scarta = (f: any) => {
+			const { raw_data, time, ...resto } = f;
+			return JSON.parse(JSON.stringify(resto));
+		};
+		expect(scarta(conAllerte.forecast)).toEqual(scarta(senzaAllerte));
+	});
+
 	it('converte le frazioni 0-1 di Apple in percentuali', async () => {
 		mockWeatherKitFetch(weatherKitResponse());
 		const f = (await fetchFromWeatherKit(LAT, LON))!;

@@ -212,6 +212,11 @@ struct HourlyForecast: Codable, Identifiable {
     /// Raffica in m/s, come `windSpeed`.
     let windGust: Double?
     let uvIndex: Double?
+    /// Banda di incertezza della temperatura dai membri dell'ensemble
+    /// (percentili 10 e 90). Presente solo dove il modello di ensemble copre
+    /// l'orizzonte: si assottiglia sulle ore vicine e si allarga in avanti.
+    let tempP10: Double?
+    let tempP90: Double?
     /// Neve fresca dell'ora in cm (non equivalente in acqua).
     let snowfallCm: Double?
     /// Manto nevoso al suolo, in cm.
@@ -244,6 +249,8 @@ struct HourlyForecast: Codable, Identifiable {
         case windDirection = "wind_direction"
         case windGust = "wind_gust"
         case uvIndex = "uv_index"
+        case tempP10 = "temp_p10"
+        case tempP90 = "temp_p90"
         case snowfallCm = "snowfall_cm"
         case snowDepthCm = "snow_depth_cm"
         case freezingLevel = "freezing_level"

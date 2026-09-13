@@ -10,7 +10,7 @@ Smart Meteo is a full-stack weather forecasting app that aggregates data from mu
 smart-meteo/
 ├── backend/                    # Express API (TypeScript, deployed on Netlify Functions)
 │   ├── connectors/             # 9 forecast providers + 1 alerts-only source
-│   │   ├── weatherkit.ts       # Apple WeatherKit (weight: 1.2) - JWT auth, alerts, forecastNextHour
+│   │   ├── weatherkit.ts       # Apple WeatherKit (weight: 1.2) - JWT auth, alerts, forecastNextHour, snow
 │   │   ├── tomorrow.ts         # Tomorrow.io (weight: 1.2)
 │   │   ├── openmeteo.ts        # Open-Meteo: best_match (1.1) + 5 models as separate sources
 │   │   ├── accuweather.ts      # AccuWeather (weight: 1.1)
@@ -135,7 +135,11 @@ smart-meteo/
 │               │   │   ├── CurrentWeatherView.swift  # Current conditions
 │               │   │   ├── HourlyForecastView.swift  # Hourly graph + timeline
 │               │   │   ├── DailyForecastView.swift   # Daily forecast + WMO icons
-│               │   │   └── SunWindCard.swift         # Sun arc, wind, pressure
+│               │   │   ├── SunWindCard.swift         # Sun arc, wind, pressure
+│               │   │   ├── SourcesIndicatorView.swift # Sources + consensus index
+│               │   │   ├── PollenPanelView.swift     # Pollen species, daily peak
+│               │   │   ├── SnowPanelView.swift       # Snow line, depth, frost
+│               │   │   └── NextHourPrecipitationView.swift # Minute-by-minute nowcast
 │               │   ├── Login/LoginView.swift
 │               │   ├── Search/SearchView.swift
 │               │   └── Settings/
@@ -231,7 +235,7 @@ cd frontend-web && npm run build
   air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm), `npm test` from the
   repo root
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **475 tests in 22 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **478 tests in 22 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -260,6 +264,7 @@ cd frontend-web && npm run build
 - **The snow line is not the freezing level**: a snowflake keeps falling past the 0 °C isotherm, cooling the air around it, and reaches the ground 200-400 m lower — `backend/utils/snow.ts` subtracts 300 m, the conventional value for moderate precipitation. The number is only useful **next to the location's own altitude**, which Open-Meteo declares as `elevation` alongside the forecast: "snow line 900 m, you are at 1800 m" is an answer, "freezing level 1500 m" is a bulletin reading. Within 150 m of the line the phase is reported as sleet rather than guessed
 - **Frost is judged on the ground when the data is there**: frost forms on the surface, not at the 2 m where stations measure — `soil_temperature_0cm` uses the physical threshold (0 °C), the 2 m fallback a compensated one (+3 °C, because on clear nights the surface radiates and stays 3-4 degrees below the air). The block declares which one it used, and both clients write it out
 - **The storm risk is an index, not raw CAPE**: "1800 J/kg" means nothing to a reader, a 0-100 scale with four named bands does — but the CAPE stays in the caption, so whoever can read it has the number and nobody has to trust a unitless score. `backend/utils/storm.ts` averages CAPE and lifted index (the same instability measured two ways), then damps by convective inhibition down to a **floor of 0.3, never to zero**: the cap breaks (afternoon heating, orographic lift, a passing front), and calling 3000 J/kg under a lid "no risk" is the kind of forecast that hurts someone in the mountains. The index is computed **once, on the already-averaged fields** — the function is non-linear, so averaging per-source indices instead gives a different number
+- **Apple gives snow in millimetres of depth**, not centimetres and not water equivalent: `snowfallAmount` and `snowfallIntensity` are lengths, so `connectors/weatherkit.ts` divides by ten. Without it 40 mm would have surfaced as "40 cm" — an order of magnitude on a number people use to decide whether to fit snow chains. An absent field stays `null` rather than becoming zero, or WeatherKit's 1.2 weight would dilute the snow the other models forecast
 - **Thunder probability is a second chart section, not an ingredient**: the convective indices say how much energy is there, WWO's `chanceofthunder` how likely it is to discharge — two questions, two sources, and merging them into one number loses one of them
 - **Personal threshold rules are evaluated on the aggregated forecast**, the same one the app shows: evaluating on a raw source would produce notifications announcing 12 mm while the screen shows 3 — neither wrong, just two different sources, which is worse. The threshold is stored in the unit the user typed (km/h for wind, not m/s) and `backend/utils/alertRules.ts` converts on read. Millimetres **sum** over the window rather than taking the max, because "more than 10 mm tomorrow" is a total
 - **A rule belongs to the device, not the subscription**: `/alerts/subscribe` rewrites the subscription row on every significant move and cleans up leftovers, so a CASCADE foreign key would take the rules with it — the same incident migration 021 fixed for dedup. The dedup signature is `rule + day of the trigger`: the poller runs every 15 minutes, so without it four notifications an hour, and keyed on the rule id alone tonight's frost would mute tomorrow's. Rules live in their own table because `weather_alerts`' cooldown is per severity, where an AQI rule would silence a frost rule for six hours
@@ -297,6 +302,7 @@ cd frontend-web && npm run build
 ForecastCurrent    // temperature, feels_like, humidity, wind (speed/direction/gust/label), precipitation_prob, dew_point, aqi, pressure, condition
 DailyForecast      // date, temp_max/min, precipitation_prob, condition_code/text, snowfall_cm
 HourlyForecast     // time, temp, precipitation_prob, condition_code/text, feels_like, humidity, wind_*, uv_index, precipitation_mm, temp_p10/temp_p90 (ensemble band), snowfall_cm, snow_depth_cm, freezing_level, soil_temperature, cape, lifted_index, storm_index, thunder_prob
+AlertRule          // id, metric, comparator ('above'|'below'), threshold, horizon_hours, enabled
 AstronomyData      // sunrise, sunset, moon_phase
 ForecastResponse   // location, generated_at, utc_offset_seconds, sources_used, current, confidence, daily[], hourly[], astronomy, alerts[], pollen[], snow, forecastNextHour
 SnowOutlook        // elevation, snow_line, phase ('snow'|'sleet'|'rain'), snow_depth_cm, snowfall_cm, frost
@@ -307,6 +313,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **iOS parity, three declared debts closed** (6E): `SourcesIndicatorView.swift` brings the sources list and the consensus index to iOS (declared open since Phase 6A — iOS showed neither), `PollenPanelView.swift` the pollen panel, and `HourlyForecastView`'s chart finally draws the ensemble band (declared open since 6C; the Swift model did not even carry `temp_p10`/`temp_p90`). The band interpolates at the sunrise/sunset markers, includes the percentiles in the Y scale, and stops where the ensemble's coverage does. **None of it is compiled or tested here**: there is no Swift toolchain in this environment and the project still has no iOS tests.
 - **Personal threshold alerts** (backend + iOS): seven metrics — min, max, gusts, rain, snow, storm index, European AQI — with a threshold and horizon the user picks. Migration **024** (`alert_rules`, `alert_rule_hits`), four endpoints under `/api/alerts/rules`, evaluation hooked into the 15-minute poller already in production, and an "Avvisi personali" screen on iOS. **iOS only:** rules hang off an APNs device token and the web has no push, so a web screen would configure alerts that never arrive — it needs the still-open Web Push decision.
 - **Storm risk index** (backend + web + iOS): `cape`, `lifted_index` and `convective_inhibition` from the Open-Meteo call we already made, plus WWO's `chanceofthunder`, which was in the response and nobody read. `backend/utils/storm.ts` turns them into a 0-100 `storm_index` on each hourly slot; the new "Temporali" entry in the metric registry (`lib/metrics.ts` / `MetricScale.swift`) draws it with a second section for the thunder probability. Until now the storm risk could only be inferred from `condition_code`, which is a snapshot rather than a measurement. **Limit:** the risk is thermodynamic only — wind shear and storm relative helicity, which separate an isolated cell from an organised one, are not on the Open-Meteo forecast endpoint.
 - **Snow line, snow depth and frost risk** (backend + web + iOS): `freezing_level_height`, `snowfall`, `snow_depth` and `soil_temperature_0cm` hourly, `snowfall_sum` daily, plus the grid point's `elevation` — again from the call we already made. `backend/utils/snow.ts` derives a `snow` block, rendered by `SnowPanel.tsx` / `SnowPanelView.swift`, which the backend omits entirely when there is nothing to report.

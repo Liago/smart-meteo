@@ -115,6 +115,13 @@
 - 5D.6: Haptic feedback iOS con HapticManager integrato nella UI
 - 5D.7: Notifiche push per allerte meteo — backend APNs, migration DB, registrazione device token iOS
 
+### Fase 6E — Nicchie e rifiniture (2026-09-13, 3 punti su 9)
+- **Neve multi-fonte da WeatherKit**: `snowfallAmount` e `snowfallIntensity`, che Apple dà in **millimetri di manto** — una lunghezza, non l'equivalente in acqua. Senza la divisione per dieci, 40 mm sarebbero comparsi come «40 cm». Chiude il limite dichiarato al punto 15, dove i centimetri venivano dai soli modelli Open-Meteo
+- **Le due funzioni di fetch WeatherKit unificate**: erano due blocchi copiati, già divergenti sull'arrotondamento del vento, e un campo aggiunto a uno solo sarebbe comparso o sparito a seconda di quale l'engine avesse chiamato
+- **Pannello fonti su iOS** con l'indice di consenso e i pollini: chiude l'asimmetria dichiarata dalla Fase 6A, dove iOS non mostrava nemmeno `sources_used`
+- **Banda di incertezza sul grafico orario iOS**: chiude l'asimmetria dichiarata dalla Fase 6C. Il modello Swift non aveva nemmeno i campi
+- ⏳ Restano: mare e maree, fotovoltaico, giardino, indici lifestyle, alba/tramonto, test iOS e audit Lighthouse
+
 ### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
 - **Pollini** da Open-Meteo/CAMS: sei specie con etichette italiane, soglie **per specie** (30 granuli/m³ di graminacee sono una giornata pesante, gli stessi 30 di olivo poca cosa) e massimo previsto in giornata invece del valore dell'ora
 - **Qualità dell'aria a due fonti**: l'indice europeo e gli inquinanti di Open-Meteo si fondono con l'EPA di WeatherAPI, che finora era l'unica — un suo errore lasciava la dashboard senza AQI
@@ -188,7 +195,7 @@
 |------|-------|:-----:|
 | Frontend web unit test | ✅ 181 test (10 suite) | Restano i 3 hook → TODO_TESTING §4 |
 | Frontend web E2E (Playwright) | ✅ 34 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
-| Backend unit/integration test | ✅ **475 test in 22 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
+| Backend unit/integration test | ✅ **478 test in 22 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
 | Lighthouse performance audit | ❌ Non eseguito | → TODO_TESTING §5, da fare in CI |
 
@@ -196,7 +203,7 @@
 > (corretti), i nomi di quattro fonti mancanti nella UI (corretto), il daily e l'hourly
 > che ignorano i pesi delle fonti e `/api/alerts/poll` aperto senza `CRON_SECRET`
 > (entrambi documentati da test, risolti nella 6C).
-> **Prossimo blocco: Fase 6E** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
+> **Prossimo blocco: Fase 6E punti 22-27** della `GAP_ANALYSIS_2026-09.md` (il punto 17, il radar, resta bloccato dall'ambiente).
 
 ### 3.4 Database ✅ VERIFICATO
 
@@ -236,7 +243,7 @@ Rilevati confrontando tutti i documenti con il codice (`GAP_ANALYSIS_2026-09.md`
 | 15 | `/api/alerts/poll` aperto senza `CRON_SECRET` | 🟠 | ✅ Risolto in 6C |
 | 16 | `raw_forecasts` archivia solo i valori correnti: si misura il nowcast, non il +24h | 🟠 | ⏳ richiede una modifica di schema |
 | 10 | Radar/mappa previsti dal piano iniziale, mai realizzati | 🟡 | ⏳ Bloccato: host delle tile irraggiungibili in sviluppo |
-| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily snowfall/windMax) | 🟢 | ⏳ Fase 6E — i cm di neve oggi vengono dai soli modelli Open-Meteo |
+| 11 | Residui WeatherKit (hourly pressure/visibility/cloudCover, daily windMax) | 🟢 | ◑ La neve è risolta in 6E; il resto resta non estratto finché non c'è una vista che lo consuma |
 | 12 | Meteomatics spuntata in `PHASE_1` ma inesistente | 🟡 | ✅ Documentazione corretta |
 
 ## 4. Migliorie Future

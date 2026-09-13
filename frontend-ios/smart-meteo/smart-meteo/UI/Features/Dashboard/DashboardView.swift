@@ -208,6 +208,23 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                             }
 
+                            // Pollini: solo dove il modello CAMS copre.
+                            if let pollen = forecast.pollen, !pollen.isEmpty {
+                                PollenPanelView(pollen: pollen)
+                                    .padding(.horizontal)
+                            }
+
+                            // Fonti e indice di consenso: quanto le fonti sono
+                            // d'accordo è l'informazione che solo un
+                            // aggregatore possiede, e iOS non la mostrava.
+                            if !forecast.sourcesUsed.isEmpty {
+                                SourcesIndicatorView(
+                                    sources: forecast.sourcesUsed,
+                                    confidence: forecast.confidence
+                                )
+                                .padding(.horizontal)
+                            }
+
                             // Daily Forecast
                             if let daily = forecast.daily {
                                 DailyForecastView(

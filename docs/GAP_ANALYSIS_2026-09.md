@@ -8,7 +8,7 @@
 > e verifica puntuale nel codice (backend, frontend-web, frontend-ios, migrazioni).
 > Ogni riga di questo documento è verificata sul codice, non copiata dagli stati dichiarati.
 >
-> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D in corso (4 punti su 5, il radar resta aperto) · 6E da fare.
+> **Stato avanzamento roadmap:** Fasi 6A ✅, 6B ✅, 6C ✅ completate · 6D 4 punti su 5 (il radar resta bloccato) · 6E in corso: chiuse le tre asimmetrie dichiarate.
 > Il registro delle modifiche è in [§7](#7-registro-avanzamento).
 
 ---
@@ -169,10 +169,10 @@ fra i provider (Open-Meteo passa il codice WMO numerico, gli altri una stringa g
 normalizzata), quindi un voto sui codici grezzi conterebbe come disaccordo WMO 1 e WMO 2, che
 descrivono lo stesso cielo. Includerle richiede prima una mappa WMO → famiglia lato backend.
 
-**Asimmetria introdotta e dichiarata:** la confidenza è per ora **solo sul web**. iOS non
-mostra nemmeno `sources_used` — non esiste un pannello fonti — e crearlo esce dal perimetro di
-6A. Il modello Swift decodifica già `confidence`, quindi manca solo la vista: voce aperta in
-§6.5.
+**Asimmetria chiusa in 6E:** era **solo sul web** — iOS non mostrava nemmeno `sources_used`.
+`SourcesIndicatorView.swift` porta ora su iOS le stesse etichette, l'indice di consenso e
+l'intervallo fra la fonte più fredda e la più calda, con un `FlowLayout` perché SwiftUI non ne
+ha uno nativo e nove fonti su una riga sola diventerebbero illeggibili.
 
 ### 3.6 AQI monofonte, senza previsione ✅ RISOLTO (6D)
 
@@ -216,10 +216,18 @@ logout), e i tre hook web non coperti.
 `IMPLEMENTATION_PLAN.md` li prevede due volte (radar/satellite come ruolo di Meteomatics;
 "Integrazione MapKit per radar" come feature chiave iOS). Non esiste nulla su nessuna piattaforma.
 
-### 3.10 Residui di estrazione 🟢
+### 3.10 Residui di estrazione 🟢 PARZIALMENTE RISOLTO (6E)
 
-- WeatherKit hourly: `pressure`, `visibility`, `cloudCover`, `windDirection`, `snowfallIntensity`.
-- WeatherKit daily: `snowfallAmount`, `windSpeedMax`, `windGustSpeedMax`.
+- ✅ **WeatherKit `snowfallAmount` (daily) e `snowfallIntensity` (hourly)**: estratti in 6E, e
+  con essi i centimetri di neve smettono di venire dai soli modelli Open-Meteo. Apple li dà in
+  **millimetri di manto** — una lunghezza, non l'equivalente in acqua — quindi vanno divisi per
+  dieci: senza, 40 mm sarebbero diventati «40 cm».
+- ⏸️ **WeatherKit hourly `pressure`, `visibility`, `cloudCover`; daily `windSpeedMax`,
+  `windGustSpeedMax`**: deliberatamente **non** estratti. Nessuna vista li consuma, e metterli
+  sul filo ricreerebbe in un posto nuovo esattamente il problema che questa sezione denuncia —
+  campi estratti e mai usati. Da fare insieme alla funzionalità che li richiede (una riga
+  «giornata ventosa» nel 7 giorni, o pressione e visibilità nel registro metriche orarie).
+- `windDirection` hourly era già estratto: la voce in questa lista era stale.
 - ~~`precipitation_intensity` corrente: estratto da 5 connettori, mai aggregato né esposto.~~
   ✅ **Risolto (6A)**: aggregato con lo stesso gate sulla frazione bagnata dei mm previsti, così
   una fonte isolata non inventa pioggia in corso. Le due grandezze sono numericamente
@@ -546,13 +554,17 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 
 ### 6.5 Fase 6E — Nicchie e rifiniture
 
-- **Pannello fonti su iOS**, con l'indice di consenso e `sources_used` — che iOS non ha mai
-  mostrato. Chiude l'asimmetria dichiarata in §3.5.
-- Mare e maree (§5.11), fotovoltaico (§5.9), giardino (§5.10), indici lifestyle (§5.6, con
-  cache per il limite AccuWeather), alba/tramonto e cielo notturno (§5.12).
-- Residui WeatherKit (§3.10): `snowfallAmount` e `snowfallIntensity` renderebbero i centimetri
-  di neve multi-fonte, oggi presi dai soli modelli Open-Meteo (§5.2, ora implementata).
-- Test iOS e audit Lighthouse (`VALUTAZIONI_TECNICHE` §2 e §4).
+| # | Intervento | Chiude | Stato |
+|---|-----------|--------|:-----:|
+| 19 | Residui WeatherKit sulla neve: `snowfallAmount`, `snowfallIntensity` | §3.10 | ✅ |
+| 20 | Pannello fonti su iOS (consenso + pollini) | §3.5 | ✅ |
+| 21 | Banda di incertezza sul grafico orario iOS | §5.3.2 | ✅ |
+| 22 | Mare e maree | §5.11 | ⏳ |
+| 23 | Radiazione solare e resa fotovoltaica | §5.9 | ⏳ |
+| 24 | Giardino e suolo | §5.10 | ⏳ |
+| 25 | Indici lifestyle (con cache per il limite AccuWeather) | §5.6 | ⏳ |
+| 26 | Alba/tramonto e cielo notturno | §5.12 | ⏳ |
+| 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
 
 ### 6.6 Decisione richiesta: notifiche email
 
@@ -956,11 +968,73 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
+### Fase 6E — in corso (3 punti su 9 al 2026-09-13)
+
+Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
+
+Il blocco chiude i **tre debiti dichiarati** nelle fasi precedenti, invece di aprire feature
+nuove: due asimmetrie fra i client e un limite sui dati.
+
+#### 19. Neve multi-fonte da WeatherKit
+
+Chiude la parte sulla neve di §3.10, e con essa il limite dichiarato ieri al punto 15: i
+centimetri venivano dai soli modelli Open-Meteo.
+
+- **Apple dà la neve in millimetri di manto**, non in centimetri e non in equivalente in acqua:
+  `snowfallAmount` e `snowfallIntensity` sono lunghezze. Senza la divisione per dieci, 40 mm
+  sarebbero comparsi come «40 cm» — un ordine di grandezza su un numero che serve a decidere se
+  mettere le catene. C'è un test che fissa proprio questa conversione.
+- **Un campo assente resta `null`, non zero.** Uno zero direbbe «non nevica», e WeatherKit
+  diluirebbe con il suo peso 1.2 la neve prevista dagli altri modelli.
+- **Le due funzioni di fetch sono state unificate.** `fetchFromWeatherKit` e
+  `fetchFromWeatherKitWithAlerts` contenevano due blocchi di estrazione copiati, già divergenti
+  sull'arrotondamento della velocità del vento: un campo aggiunto a uno solo sarebbe comparso o
+  sparito a seconda di quale l'engine avesse chiamato. Ora c'è `buildWeatherKitForecast`, e un
+  test verifica che le due strade producano lo stesso forecast.
+
+#### 20. Pannello fonti su iOS
+
+Chiude §3.5, dichiarato aperto dalla Fase 6A. iOS non mostrava nemmeno `sources_used`, e
+l'indice di consenso — l'informazione più distintiva che possiede un aggregatore — arrivava già
+nel modello Swift senza che nessuna vista lo leggesse. Aggiunto anche il pannello pollini, che
+era nella stessa condizione.
+
+- **`FlowLayout` scritto a mano**: SwiftUI non ha un flow layout nativo, un `HStack` con nove
+  fonti le comprimerebbe fino a renderle illeggibili e una `LazyVGrid` a colonne fisse
+  sprecherebbe spazio, perché «GFS» e «World Weather Online» hanno lunghezze molto diverse.
+- **L'intervallo di temperatura si mostra solo oltre 1 °C di scarto**: mezzo grado non è
+  disaccordo, è arrotondamento, e scriverlo suggerirebbe un'incertezza che non c'è.
+
+#### 21. Banda di incertezza su iOS
+
+Chiude l'asimmetria dichiarata nella Fase 6C. Il modello Swift non aveva nemmeno i campi:
+`temp_p10`/`temp_p90` sono stati aggiunti insieme alla resa.
+
+- **I marker di alba e tramonto cadono fra due ore piene** e non hanno percentili propri: la
+  banda si spezzerebbe proprio lì. Si interpolano, con la stessa logica che il grafico già usava
+  per la temperatura di quei marker.
+- **La scala verticale comprende i percentili.** È lo stesso errore che il web aveva fatto: senza,
+  la banda esce dal grafico proprio nelle ore in cui è più larga, cioè quelle che giustificano
+  il disegnarla.
+- **La banda si ferma dove finisce il dato.** L'ensemble copre meno ore della previsione, e
+  chiudere il poligono oltre il buco disegnerebbe una banda dove non c'è alcun dato.
+- **Il bordo inferiore continua il poligono invece di aprirne uno nuovo.** `Path.addPath` porta
+  con sé il proprio `move(to:)`: usandolo, il riempimento avrebbe reso due schegge aperte invece
+  di una banda. Serve una funzione che aggiunga la curva al tracciato in corso.
+
+**Limite dichiarato:** le tre voci iOS non sono compilate né testate — non esiste una toolchain
+Swift in questo ambiente, e il progetto non ha ancora test iOS (punto 27). La verifica si è
+fermata al controllo statico: nessun `switch` esaustivo rotto, nessun sito di costruzione
+lasciato indietro, parentesi bilanciate, idiomi coerenti con il deployment target del progetto.
+
+**Verifiche:** 478 test backend (22 suite), 181 web (10 suite), 34 scenari E2E × 2 viewport,
+typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
+
 ### Prossimo blocco
 
+**Fase 6E, punti 22-27**: mare e maree, fotovoltaico, giardino, indici lifestyle, alba/tramonto,
+test iOS e audit Lighthouse.
 **Fase 6D, punto 17**: radar, quando l'ambiente lo consente (vedi sopra).
-**Fase 6E**: pannello fonti su iOS, banda di incertezza su iOS, mare e maree, fotovoltaico,
-giardino, indici lifestyle, alba/tramonto, residui WeatherKit, test iOS, audit Lighthouse.
 
 Restano in coda, dichiarate e non dimenticate, le due asimmetrie fra i client: **la resa grafica
 della banda su iOS** e **il pannello fonti su iOS**, dove mostrare anche l'indice di consenso e i

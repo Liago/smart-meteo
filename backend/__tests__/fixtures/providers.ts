@@ -365,6 +365,9 @@ export function weatherKitResponse(overrides?: { currentWeather?: Overrides }) {
 					conditionCode: 'PartlyCloudy',
 					maxUvIndex: 6,
 					precipitationAmount: 0,
+					// MILLIMETRI di manto nevoso: Apple usa una lunghezza, non
+					// l'equivalente in acqua e non i centimetri.
+					snowfallAmount: 40,
 					sunrise: '2026-09-12T04:52:00Z',
 					sunset: '2026-09-12T17:44:00Z',
 					moonPhase: 'waxingGibbous',
@@ -385,6 +388,7 @@ export function weatherKitResponse(overrides?: { currentWeather?: Overrides }) {
 					windGust: GUST_KMH,
 					uvIndex: 5,
 					precipitationAmount: 0,
+					snowfallIntensity: 15, // mm/h di neve
 				},
 			],
 		},
