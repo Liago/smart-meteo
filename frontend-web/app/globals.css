@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
+/*
+  Design system: Apple Human Interface Guidelines.
+  I nomi dei token (--color-duet-*) restano invariati rispetto al vecchio
+  sistema "Duet": decine di componenti li leggono via var(--color-duet-*)
+  in inline style, quindi ridefinirli qui basta a propagare la nuova
+  identità visiva ovunque, senza toccare ogni file. I valori sono le
+  System Colors di iOS/macOS (label, secondaryLabel, systemBlue, i
+  livelli di background raggruppato, i separator) in light e dark mode.
+*/
 @theme inline {
-  /* Duet design system tokens (see Claude Design handoff "Smart Meteo Dashboard (Duet)") */
-  --color-duet-bg: #f5f8fa;
-  --color-duet-surface: #ffffff;
-  --color-duet-border: #e4eaf0;
-  --color-duet-border-strong: #7f96a5;
-  --color-duet-ink: #082a4d;
-  --color-duet-ink-soft: #3e5466;
-  --color-duet-muted: #62798a;
-  --color-duet-faint: #7f96a5;
-  --color-duet-accent: #0077b3;
-  --color-duet-accent-hover: #004b81;
-  --color-duet-accent-soft: #f0f7fa;
-  --color-duet-accent-border: #d9ecf5;
-  --color-duet-amber-bg: #fff7dd;
-  --color-duet-amber-border: #ffd978;
-  --color-duet-amber-ink: #513709;
-  --color-duet-amber-strong: #7e5710;
-  --color-duet-green-bg: #e7f8ef;
-  --color-duet-green-ink: #1d6a58;
-  --color-duet-green: #308369;
+  --color-duet-bg: #f2f2f7;              /* systemGroupedBackground */
+  --color-duet-surface: #ffffff;         /* secondarySystemGroupedBackground */
+  --color-duet-border: rgba(60, 60, 67, 0.13);   /* separator, attenuato per i bordi carta */
+  --color-duet-border-strong: rgba(60, 60, 67, 0.29); /* separator */
+  --color-duet-ink: #000000;             /* label */
+  --color-duet-ink-soft: rgba(60, 60, 67, 0.78);
+  --color-duet-muted: rgba(60, 60, 67, 0.6);     /* secondaryLabel */
+  --color-duet-faint: rgba(60, 60, 67, 0.3);     /* tertiaryLabel */
+  --color-duet-accent: #007aff;          /* systemBlue */
+  --color-duet-accent-hover: #0062cc;    /* systemBlue, stato premuto */
+  --color-duet-accent-soft: rgba(0, 122, 255, 0.12);
+  --color-duet-accent-border: rgba(0, 122, 255, 0.28);
+  --color-duet-amber-bg: rgba(255, 204, 0, 0.16);
+  --color-duet-amber-border: rgba(255, 204, 0, 0.45);
+  --color-duet-amber-ink: #7a5900;
+  --color-duet-amber-strong: #8a6400;
+  /* Badge pieno (non un tint): stessa saturazione in entrambi i temi,
+     perché il testo sopra resta sempre scuro — systemYellow è troppo
+     chiaro per il testo bianco che usano gli altri badge di severity. */
+  --color-duet-amber-badge: #f0b400;
+  --color-duet-amber-badge-ink: #3d2c00;
+  --color-duet-green-bg: rgba(52, 199, 89, 0.14);
+  --color-duet-green-ink: #1c7a3e;
+  --color-duet-green: #34c759;           /* systemGreen */
+  --color-duet-red: #ff3b30;             /* systemRed */
+  --color-duet-red-bg: rgba(255, 59, 48, 0.12);
+  --color-duet-red-border: rgba(255, 59, 48, 0.35);
+  --color-duet-red-ink: #b52620;
+  --color-duet-orange: #ff9500;          /* systemOrange */
+  --color-duet-orange-bg: rgba(255, 149, 0, 0.14);
+  --color-duet-orange-border: rgba(255, 149, 0, 0.4);
+  --color-duet-orange-ink: #8a4b00;
+
+  /* Materiali: vetro smerigliato vero (blur + saturate), non solo opacità */
+  --color-material-thin: rgba(255, 255, 255, 0.65);
+  --color-material-regular: rgba(255, 255, 255, 0.82);
+  --color-material-thick: rgba(255, 255, 255, 0.94);
 
   --color-glass-bg: rgba(255, 255, 255, 0.12);
   --color-glass-border: rgba(255, 255, 255, 0.2);
@@ -34,13 +60,59 @@
   --color-weather-storm: #1e293b;
   --color-weather-fog: #94a3b8;
 
-  --font-sans: var(--font-sans), "Figtree", system-ui, -apple-system, sans-serif;
+  /* Stack di sistema: sui dispositivi Apple risolve a San Francisco,
+     lo stesso font della HIG, senza scaricare un web font. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* Dark mode: stessi token, valori delle System Colors in variante scura.
+   Segue solo l'impostazione di sistema (prefers-color-scheme), come da HIG:
+   nessun toggle manuale nell'interfaccia. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-duet-bg: #000000;              /* systemGroupedBackground (dark) */
+    --color-duet-surface: #1c1c1e;         /* secondarySystemGroupedBackground (dark) */
+    --color-duet-border: rgba(255, 255, 255, 0.1);
+    --color-duet-border-strong: rgba(84, 84, 88, 0.65);
+    --color-duet-ink: #ffffff;
+    --color-duet-ink-soft: rgba(235, 235, 245, 0.82);
+    --color-duet-muted: rgba(235, 235, 245, 0.6);
+    --color-duet-faint: rgba(235, 235, 245, 0.3);
+    --color-duet-accent: #0a84ff;
+    --color-duet-accent-hover: #409cff;
+    --color-duet-accent-soft: rgba(10, 132, 255, 0.2);
+    --color-duet-accent-border: rgba(10, 132, 255, 0.36);
+    --color-duet-amber-bg: rgba(255, 214, 10, 0.16);
+    --color-duet-amber-border: rgba(255, 214, 10, 0.4);
+    --color-duet-amber-ink: #ffd60a;
+    --color-duet-amber-strong: #ffd60a;
+    --color-duet-green-bg: rgba(48, 209, 88, 0.18);
+    --color-duet-green-ink: #30d158;
+    --color-duet-green: #30d158;
+    --color-duet-red: #ff453a;
+    --color-duet-red-bg: rgba(255, 69, 58, 0.18);
+    --color-duet-red-border: rgba(255, 69, 58, 0.4);
+    --color-duet-red-ink: #ff6961;
+    --color-duet-orange: #ff9f0a;
+    --color-duet-orange-bg: rgba(255, 159, 10, 0.18);
+    --color-duet-orange-border: rgba(255, 159, 10, 0.42);
+    --color-duet-orange-ink: #ffb454;
+
+    --color-material-thin: rgba(28, 28, 30, 0.6);
+    --color-material-regular: rgba(28, 28, 30, 0.78);
+    --color-material-thick: rgba(28, 28, 30, 0.92);
+  }
 }
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
 }
 
 body {
@@ -51,43 +123,96 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color .25s ease;
 }
 
 a { color: var(--color-duet-accent); }
 a:hover { color: var(--color-duet-accent-hover); }
 ::selection { background: var(--color-duet-accent-border); }
 
-/* Duet card surfaces (kept the .glass/.glass-strong names so every component
-   that already uses them picks up the new look without a rename pass) */
+/* Focus visibile, tastiera-first, coerente con le linee guida di accessibilità HIG */
+:focus-visible {
+  outline: 2px solid var(--color-duet-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scala tipografica HIG (San Francisco): dimensione, peso e tracking di
+   Large Title / Title 1-3 / Headline / Body / Callout / Subhead / Footnote / Caption.
+   Classi opzionali, usate nei punti che fanno davvero da titolo di schermata. */
+.hig-large-title { font-size: 2.125rem; line-height: 2.5rem; font-weight: 700; letter-spacing: -0.02em; }
+.hig-title-1 { font-size: 1.75rem; line-height: 2.125rem; font-weight: 700; letter-spacing: -0.015em; }
+.hig-title-2 { font-size: 1.375rem; line-height: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
+.hig-title-3 { font-size: 1.25rem; line-height: 1.5rem; font-weight: 600; }
+.hig-headline { font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; }
+.hig-body { font-size: 1.0625rem; line-height: 1.375rem; font-weight: 400; }
+.hig-callout { font-size: 1rem; line-height: 1.3125rem; font-weight: 400; }
+.hig-subhead { font-size: 0.9375rem; line-height: 1.25rem; font-weight: 400; }
+.hig-footnote { font-size: 0.8125rem; line-height: 1.125rem; font-weight: 400; }
+.hig-caption-1 { font-size: 0.75rem; line-height: 1rem; font-weight: 400; }
+.hig-caption-2 { font-size: 0.6875rem; line-height: 0.8125rem; font-weight: 500; }
+
+/*
+  Superfici "carta": nomi .glass/.glass-strong/.glass-dark invariati (usati in
+  ~20 componenti) ma reimplementati come vere Material HIG — sfondo
+  semitrasparente + backdrop blur/saturate, non solo un riquadro pieno. Angoli
+  ampi e continui in stile iOS, ombra bassa e diffusa invece del bordo netto.
+*/
 .glass {
-  background: var(--color-duet-surface);
-  border: 1px solid var(--color-duet-border);
-  border-radius: 0.625rem;
-  box-shadow: 0 1px 3px rgba(8, 42, 77, 0.06);
+  background: var(--color-material-regular);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 0.5px solid var(--color-duet-border);
+  border-radius: 1.125rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
 }
 
 .glass-strong {
-  background: var(--color-duet-surface);
-  border: 1px solid var(--color-duet-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 20px 48px rgba(8, 42, 77, 0.16);
+  background: var(--color-material-thick);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 0.5px solid var(--color-duet-border);
+  border-radius: 1.375rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Sheet iOS: angoli superiori arrotondati e piatti in basso sotto `sm`
+   (occupa tutta la larghezza, attaccato al bordo inferiore dello schermo),
+   angoli tutti arrotondati da `sm` in su come una scheda centrata. Va dopo
+   .glass-strong nel foglio di stile: stessa specificità, vince per ordine. */
+.modal-sheet {
+  border-radius: 1.375rem 1.375rem 0 0;
+}
+@media (min-width: 640px) {
+  .modal-sheet {
+    border-radius: 1.375rem;
+  }
 }
 
 .glass-dark {
-  background: var(--color-duet-surface);
-  border: 1px solid var(--color-duet-border);
-  border-radius: 0.625rem;
+  background: var(--color-material-thin);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--color-duet-border);
+  border-radius: 1.125rem;
 }
 
-.dt-icon-btn { transition: background .15s ease, color .15s ease; }
+/* Interazioni: hover discreto + press "tattile" (scale-down) come i
+   controlli iOS — vale per tutti i bottoni che già usano queste classi
+   condivise, senza dover toccare ogni componente. */
+.dt-icon-btn { transition: background .15s ease, color .15s ease, transform .15s cubic-bezier(.2,.8,.2,1); }
 .dt-icon-btn:hover { background: var(--color-duet-accent-soft); color: var(--color-duet-accent); }
-.dt-row { transition: background .12s ease; }
+.dt-icon-btn:active { transform: scale(0.92); }
+.dt-row { transition: background .12s ease; border-radius: 0.625rem; }
 .dt-row:hover { background: var(--color-duet-bg); }
-.dt-secondary { transition: background .15s ease, border-color .15s ease; }
+.dt-row:active { transform: scale(0.99); }
+.dt-secondary { transition: background .15s ease, border-color .15s ease, transform .15s cubic-bezier(.2,.8,.2,1); }
 .dt-secondary:hover:not(:disabled) { background: var(--color-duet-accent-soft); border-color: var(--color-duet-accent); }
-.dt-primary { transition: background .15s ease; }
+.dt-secondary:active:not(:disabled) { transform: scale(0.97); }
+.dt-primary { transition: background .15s ease, transform .15s cubic-bezier(.2,.8,.2,1); }
 .dt-primary:hover:not(:disabled) { background: var(--color-duet-accent-hover); }
-.dt-input:focus-within { border-color: var(--color-duet-accent); box-shadow: 0 0 0 3px rgba(0,119,179,.15); }
+.dt-primary:active:not(:disabled) { transform: scale(0.97); }
+.dt-input:focus-within { border-color: var(--color-duet-accent); box-shadow: 0 0 0 3px var(--color-duet-accent-soft); }
 
 /* Animated background (kept for the pre-Duet dark theme; unused on the light dashboard) */
 .weather-bg {
@@ -106,10 +231,11 @@ a:hover { color: var(--color-duet-accent-hover); }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(8,42,77,0.06) 25%, rgba(8,42,77,0.12) 50%, rgba(8,42,77,0.06) 75%);
+  background: linear-gradient(90deg, var(--color-duet-border) 25%, var(--color-duet-border-strong) 50%, var(--color-duet-border) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 0.5rem;
+  border-radius: 0.625rem;
+  opacity: 0.5;
 }
 
 /* Rain animation */
@@ -137,7 +263,7 @@ a:hover { color: var(--color-duet-accent-hover); }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-duet-border-strong);
   border-radius: 3px;
 }
 

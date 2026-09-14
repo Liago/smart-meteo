@@ -16,8 +16,8 @@ const confidenceLabels: Record<ConfidenceIndex['level'], string> = {
 
 const confidenceColors: Record<ConfidenceIndex['level'], string> = {
   high: 'var(--color-duet-green)',
-  medium: '#f7b228',
-  low: '#EC685A',
+  medium: 'var(--color-duet-amber-badge)',
+  low: 'var(--color-duet-red)',
 };
 
 const sourceColors: Record<string, string> = {

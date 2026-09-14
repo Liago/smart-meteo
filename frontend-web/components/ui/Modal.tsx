@@ -24,13 +24,19 @@ const useIsClient = () =>
 	);
 
 /**
- * Modale centrata nella pagina. È l'unico dialog dell'app, quindi implementa
- * qui il minimo indispensabile per essere corretto: portal, ESC, blocco dello
+ * Modale a comparsa. È l'unico dialog dell'app, quindi implementa qui il
+ * minimo indispensabile per essere corretto: portal, ESC, blocco dello
  * scroll, gestione del focus e ruoli ARIA.
  *
+ * Sotto la soglia `sm` si comporta come uno sheet iOS: entra dal basso,
+ * occupa tutta la larghezza, angoli superiori arrotondati e una "maniglia"
+ * (grabber) decorativa — il gesto di trascinamento verso il basso non è
+ * implementato, la maniglia resta comunque il segnale visivo atteso. Da `sm`
+ * in su torna una scheda centrata, come su iPad/macOS.
+ *
  * Il pannello sta a z-101 perché il dropdown della SearchBar occupa z-50, che
- * era finora il massimo usato nell'app. La superficie usa `.glass`, la stessa
- * della card "Dettagli previsione", così i due contesti hanno lo stesso tono.
+ * era finora il massimo usato nell'app. La superficie usa `.glass-strong`
+ * (vera Material HIG, con blur), così i due contesti hanno lo stesso tono.
  */
 export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
 	const isClient = useIsClient();
@@ -92,7 +98,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 				<>
 					<motion.div
 						className="fixed inset-0 z-[100] backdrop-blur-sm"
-						style={{ background: 'rgba(8,42,77,.45)' }}
+						style={{ background: 'rgba(0,0,0,.4)' }}
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
@@ -101,24 +107,29 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 						aria-hidden="true"
 					/>
 					{/*
-					  Il contenitore centra il pannello e lascia passare i click
+					  Il contenitore allinea il pannello in basso sotto `sm` (sheet) e
+					  al centro da `sm` in su (scheda), lasciando passare i click
 					  all'overlay sottostante, che è quello che chiude la modale.
 					*/}
-					<div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+					<div className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
 						<motion.div
 							ref={panelRef}
 							role="dialog"
 							aria-modal="true"
 							aria-labelledby={titleId}
 							tabIndex={-1}
-							className="w-full max-w-lg glass-strong max-h-[85dvh] overflow-y-auto p-4 sm:p-6 outline-none pointer-events-auto"
+							className="w-full sm:max-w-lg glass-strong modal-sheet max-h-[88dvh] overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 outline-none pointer-events-auto"
 							style={{ color: 'var(--color-duet-ink)' }}
-							initial={{ opacity: 0, scale: 0.95, y: 12 }}
-							animate={{ opacity: 1, scale: 1, y: 0 }}
-							exit={{ opacity: 0, scale: 0.95, y: 12 }}
-							transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+							initial={{ opacity: 0, y: 32 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: 32 }}
+							transition={{ type: 'spring', damping: 28, stiffness: 340 }}
 							onClick={(e) => e.stopPropagation()}
 						>
+							{/* Grabber: solo sullo sheet mobile, invisibile da `sm` in su */}
+							<div className="flex justify-center mb-3 -mt-1 sm:hidden" aria-hidden="true">
+								<div className="h-[5px] w-9 rounded-full" style={{ background: 'var(--color-duet-border-strong)' }} />
+							</div>
 							<div className="flex items-center justify-between mb-4">
 								{/*
 								  Non un <h2>: il titolo può contenere controlli (la dropdown
@@ -130,7 +141,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 									id={titleId}
 									role="heading"
 									aria-level={2}
-									className="flex items-center gap-2 text-base font-bold"
+									className="hig-headline flex items-center gap-2"
 								>
 									{title}
 								</div>
@@ -138,10 +149,10 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
 									type="button"
 									onClick={onClose}
 									aria-label="Chiudi"
-									className="dt-icon-btn w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+									className="dt-icon-btn w-8 h-8 flex items-center justify-center rounded-full shrink-0 transition-colors"
 									style={{ background: 'var(--color-duet-bg)', color: 'var(--color-duet-muted)' }}
 								>
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
 										<path d="M18 6L6 18M6 6l12 12" />
 									</svg>
 								</button>
