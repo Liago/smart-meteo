@@ -88,16 +88,40 @@ jest.mock('../../connectors/worldweatheronline', () => ({ fetchFromWWO: jest.fn(
 jest.mock('../../connectors/weatherstack', () => ({ fetchFromWeatherstack: jest.fn(async () => sourceResponses['weatherstack'] ?? null) }));
 jest.mock('../../connectors/meteostat', () => ({ fetchFromMeteostat: jest.fn(async () => sourceResponses['meteostat'] ?? null) }));
 
+/**
+ * Allerte restituite da ciascuna fonte. Vuote per default, come lo erano
+ * **tutte** finché il percorso delle allerte non aveva alcuna copertura: ogni
+ * mock restituiva `alerts: []`, quindi il motore poteva smettere di propagarle
+ * senza che un solo test se ne accorgesse.
+ */
+let providerAlerts: {
+	weatherkit: any[];
+	weatherapi: any[];
+	owm: any[];
+	meteoalarm: any[];
+} = {
+	weatherkit: [],
+	weatherapi: [],
+	owm: [],
+	meteoalarm: [],
+};
+
+jest.mock('../../connectors/meteoalarm', () => ({
+	fetchMeteoAlarmAlerts: jest.fn(async () => providerAlerts.meteoalarm),
+}));
+
 jest.mock('../../connectors/openweathermap', () => ({
 	fetchFromOpenWeather: jest.fn(async () => sourceResponses['openweathermap'] ?? null),
-	fetchOWMAlerts: jest.fn(async () => []),
+	fetchOWMAlerts: jest.fn(async () => providerAlerts.owm),
 }));
 
 jest.mock('../../connectors/weatherapi', () => ({
 	fetchFromWeatherAPI: jest.fn(async () => sourceResponses['weatherapi'] ?? null),
 	fetchFromWeatherAPIWithAlerts: jest.fn(async () => {
 		const forecast = sourceResponses['weatherapi'];
-		return forecast ? { forecast, alerts: [] } : null;
+		// Le allerte arrivano anche senza previsione: WeatherAPI può fallire sul
+		// forecast e rispondere comunque sul bollettino.
+		return forecast ? { forecast, alerts: providerAlerts.weatherapi } : null;
 	}),
 }));
 
@@ -105,7 +129,7 @@ jest.mock('../../connectors/weatherkit', () => ({
 	fetchFromWeatherKit: jest.fn(async () => sourceResponses['apple_weatherkit'] ?? null),
 	fetchFromWeatherKitWithAlerts: jest.fn(async () => {
 		const forecast = sourceResponses['apple_weatherkit'];
-		return forecast ? { forecast, alerts: [] } : null;
+		return forecast ? { forecast, alerts: providerAlerts.weatherkit } : null;
 	}),
 }));
 
@@ -159,6 +183,7 @@ beforeEach(() => {
 	ensembleBands = [];
 	airQualityResult = null;
 	marineResult = null;
+	providerAlerts = { weatherkit: [], weatherapi: [], owm: [], meteoalarm: [] };
 });
 
 // --------------------------------------------------------------------- tests
@@ -533,6 +558,194 @@ describe('bucketing orario e fusi', () => {
 
 		const times = r.hourly.map((h: any) => h.time);
 		expect(times).toEqual([...times].sort());
+	});
+});
+
+describe('allerte', () => {
+	// Il percorso delle allerte attraversava il motore senza un solo test:
+	// tutti i mock rispondevano `alerts: []`. È la funzione più delicata
+	// dell'app — quella per cui qualcuno non esce di casa — e l'unica in cui
+	// un guasto si manifesta come *silenzio*, che è indistinguibile dal
+	// funzionamento corretto in una giornata serena.
+
+	/** Un'allerta come la manda un provider, attiva salvo indicazione. */
+	function alert(over: Partial<Record<string, any>> = {}) {
+		return {
+			id: 'wk-1',
+			certainty: 'likely',
+			description: 'Temporali forti sulla Lombardia occidentale.',
+			effectiveTime: new Date(Date.now() - 3600_000).toISOString(),
+			expireTime: new Date(Date.now() + 6 * 3600_000).toISOString(),
+			severity: 'severe',
+			event: 'Thunderstorm',
+			headline: 'Temporali forti',
+			...over,
+		};
+	}
+
+	it('porta nella risposta un allerta della fonte', async () => {
+		// La previsione di WeatherKit serve perché le allerte viaggiano sulla
+		// *stessa* risposta: il connettore restituisce null in blocco quando la
+		// chiamata fallisce, e le allerte se ne vanno con la previsione.
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [alert()];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+		expect(r.alerts[0].headline).toBe('Temporali forti');
+		// La fonte viene etichettata dal motore: senza, in un elenco a più
+		// fonti non si saprebbe chi ha emesso cosa.
+		expect(r.alerts[0].providerSource).toBe('weatherkit');
+	});
+
+	it('unisce le allerte delle fonti diverse', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [alert({ id: 'wk-1', event: 'Thunderstorm' })];
+		providerAlerts.owm = [
+			alert({ id: 'owm-1', event: 'Flood', headline: 'Rischio allagamenti', providerSource: 'openweathermap' }),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(2);
+		expect(r.alerts.map((a: any) => a.event).sort()).toEqual(['Flood', 'Thunderstorm']);
+	});
+
+	it('scarta un allerta già scaduta', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [
+			alert({ expireTime: new Date(Date.now() - 3600_000).toISOString() }),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(0);
+	});
+
+	it('scarta un allerta di un altra regione', async () => {
+		// Un'allerta per la Sicilia non riguarda chi sta a Milano: prima del
+		// filtro geografico le allerte nazionali arrivavano a tutti.
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [
+			alert({ areaName: 'Sicilia', countryCode: 'IT', headline: 'Vento forte in Sicilia' }),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(0);
+	});
+
+	it('tiene un allerta della regione del punto', async () => {
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [alert({ areaName: 'Lombardia', countryCode: 'IT' })];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+	});
+
+	it('sulla cache le allerte si rileggono dal vivo, non dalla riga salvata', async () => {
+		// È la ragione per cui la cache non si limita a restituire la riga: una
+		// previsione vale trenta minuti, un'allerta emessa dieci minuti fa no.
+		cachedRow = {
+			full_data: {
+				schema_version: FORECAST_SCHEMA_VERSION,
+				current: { temperature: 11.1 },
+				sources_used: ['cached-source'],
+				alerts: [],
+			},
+		};
+		sourceResponses['apple_weatherkit'] = forecast('apple_weatherkit', { temp: 20 });
+		providerAlerts.weatherkit = [alert()];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBe(11.1);
+		expect(r.alerts).toHaveLength(1);
+		expect(r.alerts[0].headline).toBe('Temporali forti');
+	});
+
+	it('sulla cache un allerta scaduta nella riga salvata sparisce', async () => {
+		cachedRow = {
+			full_data: {
+				schema_version: FORECAST_SCHEMA_VERSION,
+				current: { temperature: 11.1 },
+				sources_used: ['cached-source'],
+				alerts: [alert({ id: 'vecchia' })],
+			},
+		};
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(0);
+	});
+
+
+	it('porta nella risposta le allerte di MeteoAlarm', async () => {
+		// In Italia MeteoAlarm è il feed della protezione civile: è la fonte che
+		// conta, ed è normale che in una giornata sia l'unica ad avere qualcosa.
+		// Restava fuori dal motore, quindi il forecast usciva senza allerte
+		// mentre /api/alerts/active ne aveva due.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		providerAlerts.meteoalarm = [
+			alert({
+				id: 'meteoalarm:IT001-1',
+				areaId: 'IT001',
+				areaName: 'Piemonte',
+				countryCode: 'IT',
+				severity: 'moderate',
+				event: 'Yellow Thunderstorm Warning',
+				headline: 'Yellow Thunderstorm Warning',
+				providerSource: 'meteoalarm',
+			}),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+		expect(r.alerts[0].providerSource).toBe('meteoalarm');
+	});
+
+	it('le allerte di MeteoAlarm arrivano anche su una risposta in cache', async () => {
+		cachedRow = {
+			full_data: {
+				schema_version: FORECAST_SCHEMA_VERSION,
+				current: { temperature: 11.1 },
+				sources_used: ['cached-source'],
+				alerts: [],
+			},
+		};
+		providerAlerts.meteoalarm = [
+			alert({ id: 'meteoalarm:IT001-1', areaId: 'IT001', areaName: 'Piemonte', countryCode: 'IT' }),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+	});
+
+	it('una fonte di allerte che non risponde non fa fallire la previsione', async () => {
+		// Un bollettino irraggiungibile non deve portarsi via il meteo.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		const meteoalarm = require('../../connectors/meteoalarm');
+		meteoalarm.fetchMeteoAlarmAlerts.mockRejectedValueOnce(new Error('feed giù'));
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(20, 1);
+		expect(r.alerts).toHaveLength(0);
+	});
+
+	it('una giornata serena risponde con un elenco vuoto, non con l assenza del campo', async () => {
+		// I client distinguono «nessuna allerta» da «campo mancante»: il badge
+		// dell'intestazione si regge su `alerts.length`.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(Array.isArray(r.alerts)).toBe(true);
+		expect(r.alerts).toHaveLength(0);
 	});
 });
 

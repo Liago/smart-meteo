@@ -12,6 +12,7 @@ import { fetchFromMeteostat } from '../connectors/meteostat';
 import { fetchFromWeatherKit, fetchFromWeatherKitWithAlerts } from '../connectors/weatherkit';
 import { fetchFromWeatherAPIWithAlerts } from '../connectors/weatherapi';
 import { fetchOWMAlerts } from '../connectors/openweathermap';
+import { fetchMeteoAlarmAlerts } from '../connectors/meteoalarm';
 import { UnifiedForecast, normalizeConditionWithCloudCover } from '../utils/formatter';
 import { aggregatePrecipitationMm } from '../utils/precipitation';
 import { aggregateSnowfallCm, buildSnowOutlook } from '../utils/snow';
@@ -188,6 +189,14 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 						fetchFromWeatherKitWithAlerts(lat, lon).then(r => r?.alerts.map(a => ({ ...a, providerSource: a.providerSource || 'weatherkit' })) || []),
 						fetchFromWeatherAPIWithAlerts(lat, lon).then(r => r?.alerts || []),
 						fetchOWMAlerts(lat, lon),
+						// MeteoAlarm/EUMETNET: in Italia è il feed della protezione
+						// civile, cioè la fonte che conta davvero. Restava fuori di
+						// qui pur essendo già nel poller delle push e in
+						// /api/alerts/active, quindi in una giornata in cui l'unico
+						// bollettino è il suo — il caso normale — la risposta del
+						// forecast usciva senza allerte e i client dipendevano dalla
+						// loro seconda chiamata.
+						fetchMeteoAlarmAlerts(lat, lon),
 					]);
 
 					const freshAlertsRaw: WeatherAlert[] = [];
@@ -821,15 +830,25 @@ export async function getSmartForecast(lat: number, lon: number): Promise<any> {
 		alerts: [] as WeatherAlert[], // verrà popolato dopo la deduplicazione
 	};
 
-	// 5c. Fetch allerte OWM in parallelo (non blocca il forecast)
-	try {
-		const owmAlerts = await fetchOWMAlerts(lat, lon);
-		if (owmAlerts.length > 0) {
-			allAlerts.push(...owmAlerts);
+	// 5c. Allerte dalle fonti che non passano dai connettori di previsione.
+	//
+	// WeatherKit e WeatherAPI consegnano le proprie allerte sulla stessa
+	// risposta della previsione, quindi sono già in `allAlerts`. Queste due no:
+	// OpenWeatherMap ha un endpoint a parte, e MeteoAlarm non è affatto una
+	// fonte di previsione. Nessuna delle due blocca il forecast: un bollettino
+	// che non risponde non deve far fallire il meteo.
+	const extraAlertSources = await Promise.allSettled([
+		fetchOWMAlerts(lat, lon),
+		fetchMeteoAlarmAlerts(lat, lon),
+	]);
+	const extraNames = ['OWM', 'MeteoAlarm'];
+	extraAlertSources.forEach((result, i) => {
+		if (result.status === 'fulfilled') {
+			allAlerts.push(...result.value);
+		} else {
+			console.warn(`[AlertPipeline] ${extraNames[i]} alerts fetch failed: ${result.reason?.message}`);
 		}
-	} catch (err: any) {
-		console.warn(`[AlertPipeline] OWM alerts fetch failed: ${err.message}`);
-	}
+	});
 
 	// 5d. Filtro geografico + deduplicazione allerte multi-source
 	result.alerts = aggregateAlerts(allAlerts, lat, lon);
