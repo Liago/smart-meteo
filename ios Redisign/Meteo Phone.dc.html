@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>a{color:#E2704F}a:hover{color:#c2543a}.mp-scroll::-webkit-scrollbar{display:none}</style></helmet>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ frameW }}" height="{{ frameH }}" hint-size="402px,874px">
+<div class="mp-scroll" style="min-height:100%;padding-top:54px;background:{{ pageBg }};font-family:Manrope,system-ui,sans-serif;scrollbar-width:none">
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px;padding:8px 0 40px">
+
+<div style="display:flex;align-items:center;gap:10px;padding:0 20px">
+<div onClick="{{ goSearch }}" style="width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05)" style-hover="background:#fff">
+<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#4A2D1C" stroke-width="2" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.6"></circle><line x1="12.8" y1="12.8" x2="17.5" y2="17.5"></line></svg>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:1px">
+<div style="display:flex;align-items:center;gap:5px">
+<svg width="11" height="11" viewBox="0 0 16 16" fill="#4A2D1C"><path d="M8 1.6 1.6 7h1.9v7.4h9V7h1.9z"></path></svg>
+<span style="font:800 15px/1.2 Manrope,sans-serif;color:#4A2D1C;letter-spacing:-.01em">Milano</span>
+</div>
+<span style="font:500 11px/1.2 Manrope,sans-serif;color:rgba(74,45,28,.5)">aggiornato 2 min fa · 5 fonti</span>
+</div>
+<div onClick="{{ goSettings }}" style="width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05)" style-hover="background:#fff">
+<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#4A2D1C" stroke-width="1.8"><circle cx="10" cy="10" r="2.6"></circle><circle cx="10" cy="10" r="7.2" stroke-dasharray="2.2 2.2"></circle></svg>
+</div>
+</div>
+
+<div onClick="{{ goAlerts }}" style="margin:0 20px;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:16px;background:#F6D9CE;cursor:pointer" style-hover="background:#F0CBBC">
+<span style="width:26px;height:26px;border-radius:9px;background:#C2543A;color:#fff;display:flex;align-items:center;justify-content:center;font:800 14px/1 Manrope,sans-serif">!</span>
+<span style="flex:1;font:700 12.5px/1.35 Manrope,sans-serif;color:#7A2E19">Vento forte fino alle 22:00 — allerta gialla</span>
+<svg width="7" height="12" viewBox="0 0 8 13" fill="none" stroke="#7A2E19" stroke-width="2" stroke-linecap="round"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"></path></svg>
+</div>
+
+<sc-if value="{{ isSheet }}" hint-placeholder-val="{{ true }}">
+<div style="margin:0 16px;border-radius:30px;padding:22px 22px 18px;background:{{ heroBg }};position:relative;overflow:hidden">
+<div style="position:absolute;top:-18px;right:-14px;opacity:.9">{{ heroGlyph }}</div>
+<div style="position:relative;display:flex;flex-direction:column;gap:2px">
+<div style="font:500 12px/1 Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:{{ heroInk }};opacity:.65">Adesso</div>
+<div style="display:flex;align-items:baseline;gap:2px">
+<span style="font:400 92px/.9 'Instrument Serif',ui-serif,Georgia,serif;color:{{ heroInk }};letter-spacing:-.03em">{{ tempLabel }}</span>
+</div>
+<div style="font:400 21px/1.25 'Instrument Serif',ui-serif,Georgia,serif;color:{{ heroInk }};max-width:250px;margin-top:6px">{{ narrative }}</div>
+<div style="margin-top:14px;display:flex;gap:18px">
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 10.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:{{ heroInk }};opacity:.55">Percepita</span><span style="font:700 15px/1.2 Manrope,sans-serif;color:{{ heroInk }}">26°</span></div>
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 10.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:{{ heroInk }};opacity:.55">Max / Min</span><span style="font:700 15px/1.2 Manrope,sans-serif;color:{{ heroInk }}">30° / 8°</span></div>
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 10.5px/1.2 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:{{ heroInk }};opacity:.55">Pioggia</span><span style="font:700 15px/1.2 Manrope,sans-serif;color:{{ heroInk }}">{{ rainProb }}</span></div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGrid }}" hint-placeholder-val="{{ false }}">
+<div style="margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="grid-column:span 2;border-radius:26px;padding:18px 20px;background:{{ heroBg }};display:flex;align-items:center;gap:12px">
+<div style="flex:1;display:flex;flex-direction:column;gap:2px">
+<div style="font:500 11px/1 Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:{{ heroInk }};opacity:.6">Adesso</div>
+<div style="display:flex;align-items:baseline"><span style="font:400 66px/.92 'Instrument Serif',ui-serif,Georgia,serif;color:{{ heroInk }}">{{ temp }}</span><span style="font:400 30px/1 'Instrument Serif',serif;color:{{ heroInk }};opacity:.6">°</span></div>
+<div style="font:700 12.5px/1.3 Manrope,sans-serif;color:{{ heroInk }};opacity:.8">Percepita 26° · Max 30° Min 8°</div>
+</div>
+<div>{{ heroGlyphSm }}</div>
+</div>
+<sc-for list="{{ tiles }}" as="t" hint-placeholder-count="4">
+<div style="border-radius:22px;padding:14px;background:{{ t.bg }};display:flex;flex-direction:column;gap:6px;min-height:96px">
+<span style="font:600 10.5px/1.2 Manrope,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:rgba(30,30,40,.5)">{{ t.label }}</span>
+<span style="font:700 24px/1.05 Manrope,sans-serif;color:#26262E;letter-spacing:-.02em">{{ t.value }}</span>
+<span style="font:500 11.5px/1.3 Manrope,sans-serif;color:rgba(30,30,40,.55)">{{ t.note }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="margin:2px 20px 0;display:flex;gap:6px">
+<sc-for list="{{ conditions }}" as="c" hint-placeholder-count="3">
+<div onClick="{{ c.pick }}" style="padding:6px 12px;border-radius:999px;cursor:pointer;font:600 11px/1.2 Manrope,sans-serif;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }}">{{ c.label }}</div>
+</sc-for>
+<span style="flex:1"></span>
+<span style="font:500 10px/2 Manrope,sans-serif;color:rgba(74,45,28,.35)">anteprima condizione</span>
+</div>
+
+<div style="margin:6px 16px 0;border-radius:28px;background:#fff;box-shadow:0 2px 14px rgba(40,28,20,.06);overflow:hidden">
+
+<div onClick="{{ toggleOra }}" style="display:flex;align-items:center;gap:10px;padding:18px 20px;cursor:pointer">
+<span style="flex:1;font:400 22px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Ora per ora</span>
+<span style="font:600 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.45)">{{ oraSummary }}</span>
+<span style="transform:{{ oraRot }};display:flex"><svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg></span>
+</div>
+<sc-if value="{{ oraOpen }}" hint-placeholder-val="{{ true }}">
+<div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:800 30px/1 Manrope,sans-serif;color:#2A2622;letter-spacing:-.03em">{{ scrubTemp }}</span>
+<span style="font:700 13px/1.2 Manrope,sans-serif;color:{{ accent }}">{{ scrubTime }}</span>
+<span style="flex:1"></span>
+<span style="font:500 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.5)">{{ scrubDetail }}</span>
+</div>
+<div ref="{{ scrubRef }}" onPointerDown="{{ onScrubDown }}" onPointerMove="{{ onScrubMove }}" onPointerUp="{{ onScrubUp }}" style="position:relative;height:118px;touch-action:none;cursor:ew-resize">{{ sparkline }}</div>
+<div onClick="{{ goHourly }}" style="align-self:flex-start;padding:9px 14px;border-radius:999px;background:#F6EFE8;color:#7A4B32;font:700 11.5px/1.2 Manrope,sans-serif;cursor:pointer" style-hover="background:#EFE3D8">Apri dettaglio orario</div>
+</div>
+</sc-if>
+
+<div style="height:1px;background:rgba(42,38,34,.07);margin:0 20px"></div>
+
+<div onClick="{{ toggleGiorni }}" style="display:flex;align-items:center;gap:10px;padding:18px 20px;cursor:pointer">
+<span style="flex:1;font:400 22px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Prossimi giorni</span>
+<span style="font:600 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.45)">7 giorni</span>
+<span style="transform:{{ giorniRot }};display:flex"><svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg></span>
+</div>
+<sc-if value="{{ giorniOpen }}" hint-placeholder-val="{{ true }}">
+<div style="padding:0 20px 18px;display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;gap:10px;padding:7px 0">
+<span style="width:34px;font:700 13px/1.2 Manrope,sans-serif;color:#2A2622">{{ d.name }}</span>
+<span style="width:22px;display:flex;justify-content:center">{{ d.icon }}</span>
+<span style="width:34px;font:600 11px/1.2 Manrope,sans-serif;color:#4A7FB5">{{ d.precip }}</span>
+<span style="width:24px;text-align:right;font:500 12.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.45)">{{ d.min }}°</span>
+<span style="flex:1;height:7px;border-radius:4px;background:rgba(42,38,34,.08);position:relative"><span style="position:absolute;top:0;bottom:0;left:{{ d.barLeft }};width:{{ d.barWidth }};border-radius:4px;background:linear-gradient(90deg,#A9CBE8,#F2D9A4,#E8A183)"></span></span>
+<span style="width:26px;font:700 12.5px/1.2 Manrope,sans-serif;color:#2A2622">{{ d.max }}°</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="height:1px;background:rgba(42,38,34,.07);margin:0 20px"></div>
+
+<div onClick="{{ togglePerTe }}" style="display:flex;align-items:center;gap:10px;padding:18px 20px;cursor:pointer">
+<span style="flex:1;font:400 22px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Per te</span>
+<span style="font:600 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.45)">{{ perTeSummary }}</span>
+<span style="transform:{{ perTeRot }};display:flex"><svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg></span>
+</div>
+<sc-if value="{{ perTeOpen }}" hint-placeholder-val="{{ true }}">
+<div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:10px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+<div onClick="{{ c.toggle }}" style="grid-column:{{ c.span }};border-radius:20px;padding:13px;background:{{ c.bg }};display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;transform:{{ c.scale }};box-shadow:{{ c.shadow }}">
+<div style="display:flex;align-items:center;gap:6px">
+<span style="flex:1;font:600 10px/1.2 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:{{ c.tagColor }}">{{ c.tag }}</span>
+<span style="display:flex;transition:transform .3s cubic-bezier(.2,.8,.2,1);transform:{{ c.chevron }}"><svg width="11" height="7" viewBox="0 0 12 8" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg></span>
+</div>
+<span style="font:700 13.5px/1.3 Manrope,sans-serif;color:#2A2622">{{ c.headline }}</span>
+<span style="font:500 11px/1.35 Manrope,sans-serif;color:rgba(42,38,34,.58)">{{ c.detail }}</span>
+<div style="overflow:hidden;transition:max-height .38s cubic-bezier(.2,.8,.2,1),opacity .28s ease;max-height:{{ c.bodyMax }};opacity:{{ c.bodyOpacity }}">
+<div style="padding-top:11px;margin-top:9px;border-top:1px solid rgba(42,38,34,.1);display:flex;flex-direction:column;gap:7px">
+<sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:500 11.5px/1.3 Manrope,sans-serif;color:rgba(42,38,34,.55)">{{ r.label }}</span>
+<span style="flex:1"></span>
+<span style="font:500 10.5px/1.3 Manrope,sans-serif;color:rgba(42,38,34,.4)">{{ r.hint }}</span>
+<span style="font:700 11.5px/1.3 Manrope,sans-serif;color:#2A2622;font-variant-numeric:tabular-nums">{{ r.value }}</span>
+</div>
+</sc-for>
+<span style="font:500 10px/1.4 Manrope,sans-serif;color:rgba(42,38,34,.42)">{{ c.note }}</span>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+<div onClick="{{ goSettings }}" style="align-self:flex-start;padding:9px 14px;border-radius:999px;border:1px dashed rgba(42,38,34,.25);color:rgba(42,38,34,.6);font:700 11.5px/1.2 Manrope,sans-serif;cursor:pointer" style-hover="border-color:rgba(42,38,34,.45)">Personalizza sezioni</div>
+</div>
+</sc-if>
+
+<div style="height:1px;background:rgba(42,38,34,.07);margin:0 20px"></div>
+
+<div onClick="{{ toggleFonti }}" style="display:flex;align-items:center;gap:10px;padding:18px 20px;cursor:pointer">
+<span style="flex:1;font:400 22px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Fonti dati</span>
+<span style="font:600 11.5px/1.2 Manrope,sans-serif;color:#2F7D43">6 attive · 88/100</span>
+<span style="transform:{{ fontiRot }};display:flex"><svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg></span>
+</div>
+<sc-if value="{{ fontiOpen }}" hint-placeholder-val="{{ true }}">
+<div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="border-radius:16px;background:#EDF4EE;padding:12px 14px;display:flex;flex-direction:column;gap:3px">
+<div style="display:flex;align-items:center;gap:7px">
+<span style="width:8px;height:8px;border-radius:50%;background:#22C55E"></span>
+<span style="font:700 13px/1.2 Manrope,sans-serif;color:#2A2622">Fonti concordi</span>
+<span style="font:500 12.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.5)">88/100</span>
+</div>
+<span style="font:500 11px/1.4 Manrope,sans-serif;color:rgba(42,38,34,.55)">Temperatura prevista fra 23° e 26°</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:7px">
+<sc-for list="{{ sources }}" as="s" hint-placeholder-count="6">
+<span style="display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:#F5F1EC">
+<span style="width:7px;height:7px;border-radius:50%;background:{{ s.color }}"></span>
+<span style="font:600 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.78)">{{ s.name }}</span>
+</span>
+</sc-for>
+</div>
+<span style="font:500 10.5px/1.45 Manrope,sans-serif;color:rgba(42,38,34,.42)">Il punteggio misura quanto le fonti sono d'accordo sulla stessa previsione.</span>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isHourly }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:8px 0 40px">
+<div style="display:flex;align-items:center;gap:12px;padding:0 20px">
+<div onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:13px;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="#4A2D1C" stroke-width="2" stroke-linecap="round"><path d="M6.5 1.5 1.5 6.5 6.5 11.5"></path></svg></div>
+<span style="font:400 26px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Dettaglio orario</span>
+</div>
+<div style="padding:0 20px;display:flex;gap:6px;overflow-x:auto">
+<sc-for list="{{ dayTabs }}" as="t" hint-placeholder-count="5">
+<div onClick="{{ t.pick }}" style="flex:none;padding:8px 13px;border-radius:14px;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }};font:700 12px/1.2 Manrope,sans-serif">{{ t.label }}</div>
+</sc-for>
+</div>
+<div style="margin:0 16px;border-radius:26px;background:#fff;box-shadow:0 2px 14px rgba(40,28,20,.06);padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:800 40px/1 Manrope,sans-serif;color:#2A2622;letter-spacing:-.03em">{{ scrubTemp }}</span>
+<div style="display:flex;flex-direction:column"><span style="font:700 13px/1.2 Manrope,sans-serif;color:{{ accent }}">{{ scrubTime }}</span><span style="font:500 11px/1.3 Manrope,sans-serif;color:rgba(42,38,34,.5)">{{ scrubDetail }}</span></div>
+</div>
+<div ref="{{ scrubRef }}" onPointerDown="{{ onScrubDown }}" onPointerMove="{{ onScrubMove }}" onPointerUp="{{ onScrubUp }}" style="position:relative;height:170px;touch-action:none;cursor:ew-resize">{{ bigChart }}</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<sc-for list="{{ scrubMetrics }}" as="m" hint-placeholder-count="4">
+<div style="border-radius:16px;background:#FAF7F3;padding:12px;display:flex;flex-direction:column;gap:3px">
+<span style="font:600 10px/1.2 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:rgba(42,38,34,.45)">{{ m.label }}</span>
+<span style="font:700 17px/1.2 Manrope,sans-serif;color:#2A2622">{{ m.value }}</span>
+</div>
+</sc-for>
+</div>
+<span style="font:500 11px/1.4 Manrope,sans-serif;color:rgba(42,38,34,.45)">Trascina sul grafico per scorrere le ore. La banda chiara è l'incertezza dell'ensemble.</span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:8px 0 40px">
+<div style="display:flex;align-items:center;gap:12px;padding:0 20px">
+<div onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:13px;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="#4A2D1C" stroke-width="2" stroke-linecap="round"><path d="M6.5 1.5 1.5 6.5 6.5 11.5"></path></svg></div>
+<span style="font:400 26px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Località</span>
+</div>
+<div style="margin:0 16px;display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:18px;background:#fff;box-shadow:0 2px 10px rgba(40,28,20,.05)">
+<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="rgba(42,38,34,.4)" stroke-width="2" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.6"></circle><line x1="12.8" y1="12.8" x2="17.5" y2="17.5"></line></svg>
+<span style="flex:1;font:600 14px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.35)">Cerca città o CAP</span>
+<span style="width:2px;height:18px;background:{{ accent }}"></span>
+</div>
+<div style="padding:0 20px;font:600 10.5px/1.2 Manrope,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(74,45,28,.45)">Preferiti</div>
+<div style="margin:0 16px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ favorites }}" as="f" hint-placeholder-count="4">
+<div onClick="{{ goHome }}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:20px;background:{{ f.bg }};cursor:pointer">
+<span style="width:26px;display:flex;justify-content:center">{{ f.icon }}</span>
+<div style="flex:1;display:flex;flex-direction:column;gap:1px">
+<div style="display:flex;align-items:center;gap:6px"><span style="font:700 14px/1.2 Manrope,sans-serif;color:#2A2622">{{ f.name }}</span><span style="font:700 9px/1.5 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:{{ f.badgeColor }}">{{ f.badge }}</span></div>
+<span style="font:500 11.5px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.5)">{{ f.note }}</span>
+</div>
+<span style="font:800 20px/1 Manrope,sans-serif;color:#2A2622">{{ f.temp }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:8px 0 40px">
+<div style="display:flex;align-items:center;gap:12px;padding:0 20px">
+<div onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:13px;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="#4A2D1C" stroke-width="2" stroke-linecap="round"><path d="M6.5 1.5 1.5 6.5 6.5 11.5"></path></svg></div>
+<span style="font:400 26px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Impostazioni</span>
+</div>
+<div style="margin:0 16px;border-radius:24px;background:#fff;box-shadow:0 2px 12px rgba(40,28,20,.05);padding:18px 18px 8px;display:flex;flex-direction:column;gap:12px">
+<span style="font:600 10.5px/1.2 Manrope,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(42,38,34,.45)">Sezione «Per te»</span>
+<sc-for list="{{ cardToggles }}" as="c" hint-placeholder-count="6">
+<div onClick="{{ c.toggle }}" style="display:flex;align-items:center;gap:12px;padding:9px 0;cursor:pointer;border-bottom:1px solid rgba(42,38,34,.06)">
+<span style="display:flex;flex-direction:column;gap:1px;flex:1"><span style="font:700 13.5px/1.2 Manrope,sans-serif;color:#2A2622">{{ c.name }}</span><span style="font:500 11px/1.3 Manrope,sans-serif;color:rgba(42,38,34,.5)">{{ c.note }}</span></span>
+<span style="font:500 10px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.3);letter-spacing:.08em">TRASCINA</span>
+<span style="width:42px;height:26px;border-radius:999px;background:{{ c.trackBg }};position:relative;transition:background .18s"><span style="position:absolute;top:3px;left:{{ c.knobLeft }};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .18s"></span></span>
+</div>
+</sc-for>
+</div>
+<div style="margin:0 16px;border-radius:24px;background:#fff;box-shadow:0 2px 12px rgba(40,28,20,.05);padding:18px;display:flex;flex-direction:column;gap:14px">
+<span style="font:600 10.5px/1.2 Manrope,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(42,38,34,.45)">Generali</span>
+<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font:700 13.5px/1.2 Manrope,sans-serif;color:#2A2622">Unità</span><span style="display:flex;gap:3px;padding:3px;border-radius:11px;background:#F3EEE8"><span style="padding:6px 12px;border-radius:9px;background:#fff;font:700 12px/1 Manrope,sans-serif;color:#2A2622">°C</span><span style="padding:6px 12px;border-radius:9px;font:700 12px/1 Manrope,sans-serif;color:rgba(42,38,34,.4)">°F</span></span></div>
+<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font:700 13.5px/1.2 Manrope,sans-serif;color:#2A2622">Notifiche allerte</span><span style="width:42px;height:26px;border-radius:999px;background:#E2704F;position:relative"><span style="position:absolute;top:3px;left:19px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span></span></div>
+<div onClick="{{ goAlerts }}" style="display:flex;align-items:center;gap:10px;cursor:pointer"><span style="flex:1;font:700 13.5px/1.2 Manrope,sans-serif;color:#2A2622">Regole personali</span><span style="font:600 12px/1.2 Manrope,sans-serif;color:rgba(42,38,34,.45)">3 attive</span><svg width="7" height="12" viewBox="0 0 8 13" fill="none" stroke="rgba(42,38,34,.35)" stroke-width="2" stroke-linecap="round"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"></path></svg></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isAlerts }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:8px 0 40px">
+<div style="display:flex;align-items:center;gap:12px;padding:0 20px">
+<div onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:13px;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="#4A2D1C" stroke-width="2" stroke-linecap="round"><path d="M6.5 1.5 1.5 6.5 6.5 11.5"></path></svg></div>
+<span style="font:400 26px/1.1 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Allerte</span>
+</div>
+<div style="margin:0 16px;display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ alerts }}" as="a" hint-placeholder-count="3">
+<div style="border-radius:22px;background:#fff;box-shadow:0 2px 12px rgba(40,28,20,.05);overflow:hidden">
+<div style="height:5px;background:{{ a.severityColor }}"></div>
+<div style="padding:16px;display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="padding:4px 9px;border-radius:8px;background:{{ a.tint }};color:{{ a.severityColor }};font:800 9.5px/1.2 Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase">{{ a.severity }}</span>
+<span style="flex:1;font:700 14px/1.25 Manrope,sans-serif;color:#2A2622">{{ a.title }}</span>
+</div>
+<span style="font:500 12px/1.45 Manrope,sans-serif;color:rgba(42,38,34,.6)">{{ a.body }}</span>
+<span style="font:600 10.5px/1.2 Manrope,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:rgba(42,38,34,.38)">{{ a.window }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:874},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sheet&quot;,&quot;grid&quot;],&quot;default&quot;:&quot;sheet&quot;,&quot;tsType&quot;:&quot;'sheet' | 'grid'&quot;}}">
+const el = React.createElement;
+
+function cloudShape(s, fill, o) {
+  return [el('circle', { key: 'a', cx: s * 0.37, cy: s * 0.5, r: s * 0.19, fill, opacity: o }),
+    el('circle', { key: 'b', cx: s * 0.58, cy: s * 0.44, r: s * 0.24, fill, opacity: o }),
+    el('rect', { key: 'c', x: s * 0.2, y: s * 0.55, width: s * 0.6, height: s * 0.17, rx: s * 0.085, fill, opacity: o })];
+}
+function glyph(kind, s, color) {
+  const c = s / 2;
+  if (kind === 'sun') {
+    const rays = [[c, 0.04, c, 0.16], [c, 0.84, c, 0.96], [0.04, c, 0.16, c], [0.84, c, 0.96, c],
+      [0.18, 0.18, 0.28, 0.28], [0.72, 0.72, 0.82, 0.82], [0.18, 0.82, 0.28, 0.72], [0.72, 0.28, 0.82, 0.18]];
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}`, fill: 'none', stroke: color, strokeWidth: s * 0.055, strokeLinecap: 'round' },
+      el('circle', { cx: c, cy: c, r: s * 0.2, fill: color, stroke: 'none' }),
+      rays.map((p, i) => el('line', { key: i, x1: typeof p[0] === 'number' && p[0] < 1 ? s * p[0] : p[0], y1: p[1] < 1 ? s * p[1] : p[1], x2: p[2] < 1 ? s * p[2] : p[2], y2: p[3] < 1 ? s * p[3] : p[3] })));
+  }
+  if (kind === 'rain') {
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` }, cloudShape(s, color, 0.9),
+      el('g', { stroke: color, strokeWidth: s * 0.06, strokeLinecap: 'round', opacity: 0.75 },
+        [0.34, 0.5, 0.66].map((x, i) => el('line', { key: i, x1: s * x, y1: s * 0.76, x2: s * (x - 0.03), y2: s * 0.92 }))));
+  }
+  if (kind === 'cloudSun') {
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` },
+      el('circle', { cx: s * 0.72, cy: s * 0.3, r: s * 0.15, fill: color, opacity: 0.95 }), cloudShape(s, color, 0.75));
+  }
+  return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` }, cloudShape(s, color, 0.85));
+}
+
+const THEMES = {
+  sereno:    { label: 'Sereno',    page: '#FDF7F0', hero: '#FBDFBE', ink: '#4A2D1C', accent: '#E2704F', g: 'sun',      narrative: 'Sole pieno tutto il giorno, brezza da nord-ovest.', rain: '0%' },
+  nuvoloso:  { label: 'Nuvoloso',  page: '#F5F5F8', hero: '#DFE3EC', ink: '#2E3440', accent: '#5E7191', g: 'cloudSun', narrative: 'Coperto ma asciutto, schiarite nel pomeriggio.',     rain: '15%' },
+  pioggia:   { label: 'Pioggia',   page: '#F1F5FA', hero: '#D5E4F3', ink: '#1F3040', accent: '#4A7FB5', g: 'rain',     narrative: 'Rovesci sparsi dal primo pomeriggio, 4 mm attesi.',  rain: '70%' },
+};
+
+const HOURS = [
+  ['Ora', 24, 0, 12, 48], ['15', 26, 0, 14, 44], ['16', 27, 5, 15, 42], ['17', 28, 5, 13, 41],
+  ['18', 27, 10, 11, 45], ['19', 24, 10, 9, 52], ['20', 21, 20, 8, 60], ['21', 19, 35, 10, 66],
+  ['22', 18, 45, 14, 71], ['23', 17, 55, 16, 75], ['00', 16, 60, 15, 78], ['01', 15, 50, 13, 80],
+];
+const DAYS = [
+  ['Mer', 9, 28, 0, 'sun'], ['Gio', 11, 27, 20, 'cloudSun'], ['Ven', 12, 23, 70, 'rain'],
+  ['Sab', 10, 21, 40, 'cloudSun'], ['Dom', 8, 24, 10, 'sun'], ['Lun', 9, 26, 0, 'sun'], ['Mar', 10, 25, 30, 'cloudSun'],
+];
+const CARDS = [
+  { key: 'neve', name: 'Neve e gelate', tag: 'Neve', tagColor: '#3D6FA8', bg: '#E3EDF7',
+    headline: 'Neve in quota, circa 6 cm', detail: 'Gelata possibile all\u2019alba',
+    note: 'Previsione sulle prossime 24 ore. La quota neve è stimata dallo zero termico dei modelli.',
+    rows: [{ label: 'Quota neve', value: '1800 m', hint: 'sei a 122 m' }, { label: 'Alla tua quota', value: 'Pioggia', hint: '' },
+      { label: 'Neve prevista', value: '6 cm', hint: 'in 24 ore' }, { label: 'Gelate', value: 'Brina possibile', hint: 'min. al suolo 2°' }] },
+  { key: 'orto', name: 'Orto e giardino', note: 'L\u2019umidità è in percentuale di volume: le soglie dipendono dal terreno.', tag: 'Orto', tagColor: '#2F7D43', bg: '#E4F0E3',
+    headline: 'Non serve innaffiare', detail: 'La pioggia attesa copre l\u2019evaporazione',
+    rows: [{ label: 'Terreno', value: 'Umidità adeguata', hint: '28% vol.' }, { label: 'Evaporazione', value: '3,4 mm', hint: 'in 24 ore' },
+      { label: 'Pioggia attesa', value: '4,2 mm', hint: 'in 24 ore' }, { label: 'Semina', value: 'Suolo a 14°', hint: 'si può seminare' }] },
+  { key: 'solare', name: 'Fotovoltaico', note: 'Stima su pannelli a 30° esposti a sud, con 14% di perdite.', tag: 'Solare', tagColor: '#9A6A1E', bg: '#FBEED2',
+    headline: '5,8 kWh stimati oggi', detail: 'Picco alle 13:00, cielo sereno',
+    rows: [{ label: 'Oggi', value: '5,42 kWh/kWp', hint: '9 h sole' }, { label: 'Domani', value: '4,55 kWh/kWp', hint: '8 h sole' },
+      { label: 'Venerdì', value: '2,49 kWh/kWp', hint: '4 h sole' }] },
+  { key: 'cielo', name: 'Cielo', note: 'I tramonti migliori nascono da nuvole alte con l\u2019orizzonte libero.', tag: 'Cielo', tagColor: '#4C5C93', bg: '#E4E6F4',
+    headline: 'Tramonto spettacolare', detail: 'Verso le 18:10, poi notte buona per le stelle',
+    rows: [{ label: 'Tramonto', value: 'Spettacolare', hint: '18:10' }, { label: 'Stelle stanotte', value: 'Buona', hint: 'cielo terso' },
+      { label: 'Luna', value: '35%', hint: 'calante' }] },
+  { key: 'attivita', name: 'Attività', note: 'Punteggio sulle ore diurne, pari al fattore peggiore.', tag: 'Attività', tagColor: '#2F7D7D', bg: '#DFEFEF',
+    headline: 'Corsa ideale 18–20', detail: 'Indice 82/100, vento leggero',
+    rows: [{ label: 'Corsa', value: '82', hint: '' }, { label: 'Bici', value: '64', hint: 'limita vento' }, { label: 'Bucato', value: '38', hint: 'limita umidità' }] },
+  { key: 'pollini', name: 'Pollini', note: 'Massimo previsto oggi in granuli/m³. Le soglie variano per specie.', tag: 'Pollini', tagColor: '#A2603C', bg: '#F6E3D6',
+    headline: 'Graminacee moderate', detail: 'In calo da domani sera',
+    rows: [{ label: 'Graminacee', value: 'Moderato', hint: 'max 38' }, { label: 'Olivo', value: 'Basso', hint: 'max 6,4' },
+      { label: 'Ambrosia', value: 'Assente', hint: 'max —' }] },
+  { key: 'mare', name: 'Mare', note: 'Le maree non sono disponibili sul piano gratuito delle fonti.', tag: 'Mare', tagColor: '#2E6E8E', bg: '#DCECF2',
+    headline: 'Mare poco mosso', detail: 'Onda 0,62 m, acqua 24°',
+    rows: [{ label: 'Acqua', value: '24°', hint: '' }, { label: 'Onda', value: '0,62 m', hint: 'da SO' }, { label: 'Mare lungo', value: '0,40 m', hint: '' }] },
+];
+
+const SOURCES = [
+  { name: 'Apple WeatherKit', color: '#334155' }, { name: 'ICON-D2', color: '#7E22CE' },
+  { name: 'ECMWF', color: '#8B5CF6' }, { name: 'GFS', color: '#D946EF' },
+  { name: 'AccuWeather', color: '#EF4444' }, { name: 'Tomorrow.io', color: '#3B82F6' },
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'home', cond: 'sereno', idx: 0, dragging: false, day: 0,
+    open: { ora: true, giorni: true, perte: true, fonti: false },
+    enabled: { neve: true, orto: true, solare: true, cielo: true, attivita: true, pollini: false, mare: false },
+    openCard: null,
+  };
+  scrubEl = null;
+
+  setScrubFromEvent = (e) => {
+    const node = this.scrubEl;
+    if (!node) return;
+    const r = node.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    this.setState({ idx: Math.round(ratio * (HOURS.length - 1)) });
+  };
+
+  chart(w, h, withBand) {
+    const t = THEMES[this.state.cond];
+    const temps = HOURS.map(x => x[1]);
+    const min = Math.min(...temps) - 3, max = Math.max(...temps) + 3;
+    const pad = 26;
+    const x = i => pad + (i / (HOURS.length - 1)) * (w - pad * 2);
+    const y = v => h - 26 - ((v - min) / (max - min)) * (h - 58);
+    const pts = HOURS.map((hh, i) => [x(i), y(hh[1])]);
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      d += ` Q${(x1 + mx) / 2} ${y1} ${mx} ${my} Q${(mx + x2) / 2} ${y2} ${x2} ${y2}`;
+    }
+    const band = withBand
+      ? HOURS.map((hh, i) => `${i ? 'L' : 'M'}${x(i)} ${y(hh[1] + 1.8)}`).join(' ') + ' ' +
+        HOURS.slice().reverse().map((hh, i) => `L${x(HOURS.length - 1 - i)} ${y(hh[1] - 1.8)}`).join(' ') + ' Z'
+      : null;
+    const sel = this.state.idx;
+    return el('svg', { width: '100%', height: h, viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'none', style: { display: 'block', overflow: 'visible' } },
+      el('defs', null, el('linearGradient', { id: 'mpg' + h, x1: 0, y1: 0, x2: 0, y2: 1 },
+        el('stop', { offset: '0%', stopColor: t.accent, stopOpacity: 0.22 }),
+        el('stop', { offset: '100%', stopColor: t.accent, stopOpacity: 0 }))),
+      band && el('path', { d: band, fill: t.accent, opacity: 0.1 }),
+      el('path', { d: `${d} L${pts[pts.length - 1][0]} ${h - 26} L${pts[0][0]} ${h - 26} Z`, fill: `url(#mpg${h})` }),
+      el('path', { d, fill: 'none', stroke: t.accent, strokeWidth: 2.5, strokeLinecap: 'round' }),
+      el('line', { x1: x(sel), y1: 6, x2: x(sel), y2: h - 20, stroke: t.accent, strokeWidth: 1.5, strokeDasharray: '3 3', opacity: 0.55 }),
+      el('circle', { cx: x(sel), cy: y(HOURS[sel][1]), r: 6, fill: '#fff', stroke: t.accent, strokeWidth: 3 }),
+      HOURS.map((hh, i) => i % 3 === 0 && el('text', {
+        key: i, x: x(i), y: h - 4, textAnchor: 'middle', fill: 'rgba(42,38,34,.45)',
+        style: { font: '600 10px Manrope,sans-serif' },
+      }, hh[0] === 'Ora' ? 'Ora' : hh[0] + ':00'))
+    );
+  }
+
+  renderVals() {
+    const s = this.state;
+    const t = THEMES[s.cond];
+    const variant = this.props.variant || 'sheet';
+    const h = HOURS[s.idx];
+    const go = screen => () => this.setState({ screen });
+    const toggleSection = k => () => this.setState(st => ({ open: { ...st.open, [k]: !st.open[k] } }));
+    const activeCards = CARDS.filter(c => s.enabled[c.key]);
+
+    return {
+      frameW: 402, frameH: 874,
+      pageBg: t.page, heroBg: t.hero, heroInk: t.ink, accent: t.accent,
+      heroGlyph: glyph(t.g, 150, t.ink === '#4A2D1C' ? '#F0B47E' : t.accent),
+      heroGlyphSm: glyph(t.g, 74, t.ink === '#4A2D1C' ? '#EFAE73' : t.accent),
+      temp: 24, tempLabel: '24°', narrative: t.narrative, rainProb: t.rain,
+      isHome: s.screen === 'home', isHourly: s.screen === 'hourly', isSearch: s.screen === 'search',
+      isSettings: s.screen === 'settings', isAlerts: s.screen === 'alerts',
+      isSheet: variant === 'sheet', isGrid: variant === 'grid',
+      goHome: go('home'), goSearch: go('search'), goSettings: go('settings'),
+      goAlerts: go('alerts'), goHourly: go('hourly'),
+      conditions: Object.keys(THEMES).map(k => ({
+        label: THEMES[k].label, pick: () => this.setState({ cond: k }),
+        bg: s.cond === k ? THEMES[k].hero : 'rgba(255,255,255,.6)',
+        fg: s.cond === k ? THEMES[k].ink : 'rgba(74,45,28,.55)',
+        border: s.cond === k ? 'transparent' : 'rgba(74,45,28,.12)',
+      })),
+      tiles: [
+        { label: 'Prossima ora', value: t.rain === '0%' ? 'Asciutto' : 'Pioggia', note: 'nowcast al minuto', bg: '#E6EEF6' },
+        { label: 'Vento', value: '12 km/h', note: 'raffiche 20 · NW', bg: '#EAEEE6' },
+        { label: 'UV', value: '6', note: 'alto fino alle 15', bg: '#FBEED2' },
+        { label: 'Alba · tramonto', value: '18:10', note: 'alba 06:45', bg: '#F1E7F1' },
+      ],
+      open: s.open,
+      oraOpen: s.open.ora, giorniOpen: s.open.giorni, perTeOpen: s.open.perte,
+      oraRot: s.open.ora ? 'rotate(180deg)' : 'rotate(0deg)',
+      giorniRot: s.open.giorni ? 'rotate(180deg)' : 'rotate(0deg)',
+      perTeRot: s.open.perte ? 'rotate(180deg)' : 'rotate(0deg)',
+      toggleOra: toggleSection('ora'), toggleGiorni: toggleSection('giorni'), togglePerTe: toggleSection('perte'),
+      oraSummary: `max ${Math.max(...HOURS.map(x => x[1]))}° · min ${Math.min(...HOURS.map(x => x[1]))}°`,
+      perTeSummary: `${activeCards.length} schede`,
+      scrubTemp: `${h[1]}°`, scrubTime: h[0] === 'Ora' ? 'adesso' : `${h[0]}:00`,
+      scrubDetail: `pioggia ${h[2]}% · vento ${h[3]} km/h`,
+      scrubMetrics: [
+        { label: 'Temperatura', value: `${h[1]}°` }, { label: 'Probabilità pioggia', value: `${h[2]}%` },
+        { label: 'Vento', value: `${h[3]} km/h` }, { label: 'Umidità', value: `${h[4]}%` },
+      ],
+      scrubRef: n => { this.scrubEl = n; },
+      onScrubDown: e => { e.currentTarget.setPointerCapture?.(e.pointerId); this.setState({ dragging: true }); this.setScrubFromEvent(e); },
+      onScrubMove: e => { if (s.dragging) this.setScrubFromEvent(e); },
+      onScrubUp: () => this.setState({ dragging: false }),
+      sparkline: this.chart(340, 112, false),
+      bigChart: this.chart(330, 164, true),
+      days: DAYS.map(d => ({
+        name: d[0], min: d[1], max: d[2], precip: d[3] > 0 ? `${d[3]}%` : '', icon: glyph(d[4], 20, 'rgba(42,38,34,.55)'),
+        barLeft: `${((d[1] + 5) / 45) * 100}%`, barWidth: `${((d[2] - d[1]) / 45) * 100}%`,
+      })),
+      dayTabs: DAYS.slice(0, 5).map((d, i) => ({
+        label: i === 0 ? 'Oggi' : d[0], pick: () => this.setState({ day: i }),
+        bg: s.day === i ? t.hero : '#fff', fg: s.day === i ? t.ink : 'rgba(42,38,34,.5)',
+      })),
+      fontiOpen: s.open.fonti, toggleFonti: toggleSection('fonti'),
+      fontiRot: s.open.fonti ? 'rotate(180deg)' : 'rotate(0deg)',
+      sources: SOURCES,
+      cards: activeCards.map(c => {
+        const open = s.openCard === c.key;
+        return { ...c, span: open ? 'span 2' : 'span 1', scale: open ? 'scale(1)' : 'scale(1)',
+          shadow: open ? '0 8px 22px rgba(40,28,20,.13)' : '0 0 0 rgba(0,0,0,0)',
+          chevron: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          bodyMax: open ? '280px' : '0px', bodyOpacity: open ? '1' : '0',
+          toggle: () => this.setState(st => ({ openCard: st.openCard === c.key ? null : c.key })) };
+      }),
+      cardToggles: CARDS.map(c => ({
+        name: c.name, note: c.note, toggle: () => this.setState(st => ({ enabled: { ...st.enabled, [c.key]: !st.enabled[c.key] } })),
+        trackBg: s.enabled[c.key] ? t.accent : 'rgba(42,38,34,.15)', knobLeft: s.enabled[c.key] ? '19px' : '3px',
+      })),
+      favorites: [
+        { name: 'Milano', badge: 'Casa', badgeColor: t.accent, note: 'Sereno · 5 fonti', temp: '24°', bg: '#fff', icon: glyph('sun', 22, '#E2704F') },
+        { name: 'Bergamo', badge: '', badgeColor: t.accent, note: 'Poco nuvoloso', temp: '21°', bg: '#fff', icon: glyph('cloudSun', 22, 'rgba(42,38,34,.55)') },
+        { name: 'Genova', badge: '', badgeColor: t.accent, note: 'Pioggia · mare mosso', temp: '19°', bg: '#fff', icon: glyph('rain', 22, '#4A7FB5') },
+        { name: 'Bormio', badge: '', badgeColor: t.accent, note: 'Neve oltre 1800 m', temp: '6°', bg: '#fff', icon: glyph('cloud', 22, 'rgba(42,38,34,.5)') },
+      ],
+      alerts: [
+        { severity: 'Gialla', severityColor: '#C98A15', tint: '#FBEED2', title: 'Vento forte', body: 'Raffiche fino a 65 km/h sulla pianura lombarda, in attenuazione dopo le 22.', window: 'Oggi 14:00 → 22:00' },
+        { severity: 'Arancione', severityColor: '#C2543A', tint: '#F6D9CE', title: 'Temporali intensi', body: 'Celle temporalesche in arrivo da ovest, possibile grandine di piccole dimensioni.', window: 'Domani 12:00 → 20:00' },
+        { severity: 'Regola tua', severityColor: '#2F7D7D', tint: '#DFEFEF', title: 'Gelo sull\u2019orto', body: 'Minima prevista 1° a Milano: la tua regola avvisa sotto i 3°.', window: 'Sabato 04:00' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
