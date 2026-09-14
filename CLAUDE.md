@@ -266,7 +266,15 @@ cd frontend-web && npm run build
   The backend API is never contacted: every scenario starts from a known response built
   in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
   downloaded. `e2e/` is excluded from Jest
-- iOS has no automated tests. The Lighthouse audit is **blocked in this environment**, not merely
+- iOS tests live in `frontend-ios/smart-meteo/smart-meteoTests/` (XCTest, 6 files: forecast
+  decoding, hourly window, sky, sea, solar, activities + garden). They need a **Unit Testing
+  Bundle target created once in Xcode**, named to match the folder so the synchronized group
+  picks the files up — see that folder's `README.md`. The pbxproj was deliberately not hand-edited
+  here: inventing UUIDs across eight plist sections with no Xcode to verify can leave the project
+  unopenable. The decoding suite is the important one — a wrong snake_case key compiles fine and
+  silently nils a field, which is how `solar`, `sky`, `sea` and `activities` were arriving and
+  being thrown away.
+- The Lighthouse audit is **blocked in this environment**, not merely
   pending: `next build` fails because `next/font` cannot reach `fonts.googleapis.com`. Dev mode
   falls back to a system font, so the E2E suite still runs - it is only the production build that
   is impossible. Both tracked in `docs/TODO_TESTING.md`

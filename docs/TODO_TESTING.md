@@ -29,7 +29,7 @@
 | Frontend Web — E2E | ✅ 25 scenari × 2 viewport | `e2e/` con Playwright, API intercettata |
 | Backend — Unit test | ✅ 171 test | utils (7 suite) + connettori (2 suite) |
 | Backend — Integration test | ✅ 58 test | engine (34) e route con supertest (24) |
-| iOS — Unit test | ❌ Non implementato | Vedi `VALUTAZIONI_TECNICHE.md` §4 |
+| iOS — Unit test | ◑ 6 file scritti, manca il target | `frontend-ios/smart-meteo/smart-meteoTests/README.md` — il target va creato una volta in Xcode |
 | Lighthouse audit | ❌ Non eseguito | Da fare post-deploy, in CI |
 
 **Totale: 229 test backend + 137 web + 25 E2E.**

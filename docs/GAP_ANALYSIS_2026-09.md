@@ -589,7 +589,7 @@ dalle previsioni e usarlo come verità osservata per misurare l'errore reale del
 | 24 | Giardino e suolo: devo innaffiare? | §5.10 | ✅ |
 | 25 | Indici lifestyle (calcolati in casa: il budget AccuWeather non regge) | §5.6 | ✅ |
 | 26 | Alba/tramonto e cielo notturno | §5.12 | ✅ |
-| 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ⏳ |
+| 27 | Test iOS e audit Lighthouse | `VALUTAZIONI_TECNICHE` §2, §4 | ◑ |
 
 ### 6.6 Decisione richiesta: notifiche email
 
@@ -993,7 +993,7 @@ questa motivazione, non silenziosamente saltato.
 `weather-maps.json` incollato a mano. Il resto del lavoro (matematica delle tile, animazione dei
 frame, UI) è indipendente dalla rete e si può fare comunque, una volta fissato il contratto.
 
-### Fase 6E — in corso (8 punti su 9 al 2026-09-13)
+### Fase 6E — in corso (8 punti su 9 chiusi, il nono aperto a metà, al 2026-09-14)
 
 Commit `feat(6E): neve WeatherKit, pannello fonti e banda di incertezza su iOS`.
 
@@ -1302,6 +1302,43 @@ sono scelte ragionevoli, non tarate su dati: nessuno ha misurato a che temperatu
 smette davvero di correre. Sono però tutte costanti esportate e testate, quindi tarabili quando
 un dato ci sarà.
 
+#### 9. Prima suite di test iOS
+
+Chiude il punto 27 per la parte che si può chiudere scrivendo codice. Commit
+`test(ios): prima suite XCTest`.
+
+Sei file in `frontend-ios/smart-meteo/smart-meteoTests/`: decodifica della risposta, finestra
+oraria, cielo, mare, fotovoltaico, indici lifestyle e orto.
+
+**Decisioni**
+
+- **La prova più importante è quella di decodifica.** I modelli Swift traducono a mano decine di
+  chiavi snake_case, e una chiave sbagliata **compila benissimo**: il campo resta nil, il riquadro
+  sparisce, e non c'è alcun errore. È il modo esatto in cui `solar`, `sky`, `sea` e `activities`
+  arrivavano dal backend e venivano buttati via per settimane. La fixture riproduce la risposta
+  intera di `/api/forecast`, ed è il posto dove un'asimmetria fra i client si vede subito.
+- **Si decodifica da JSON, non si costruisce con l'inizializzatore di membro**, ogni volta che la
+  prova riguarda il contratto: costruire un modello in Swift verifica Swift, non l'accordo con il
+  backend.
+- **C'è una prova che una risposta vecchia continui a decodificarsi.** Il backend invalida la
+  cache per versione di schema, ma il telefono può avere in mano una risposta più vecchia: tutti i
+  blocchi nuovi sono opzionali proprio per questo, e ora è scritto da qualche parte.
+- **Le date si costruiscono da `dayKey(offsetDays:)`**, mai a mano. Una data fissa trasforma una
+  prova in una bomba a tempo — è precisamente l'inciampo trovato sulla suite web, che era ancorata
+  ad agosto 2026 e passava solo perché nessuna asserzione dipendeva da «oggi».
+- **Il `project.pbxproj` non è stato modificato a mano**, ed è una scelta, non una dimenticanza:
+  aggiungere un target significa inventare UUID e coordinare otto sezioni di un plist senza Xcode
+  per verificarlo, e un errore lascia il progetto non apribile. In Xcode è invece un'operazione di
+  trenta secondi che genera da sola `TEST_HOST`, il bundle loader e lo schema. Le istruzioni sono
+  nel `README.md` della cartella.
+
+**Limite dichiarato:** niente rendering — nessuno snapshot test, nessun UI test. Le prove stanno
+sulle funzioni pure, che è dove stanno le decisioni. E **non sono state eseguite**: qui non c'è
+toolchain Swift. Sono verificate per ispezione — che ogni membro usato esista e sia accessibile,
+che gli inizializzatori di membro corrispondano per ordine e nome, che ogni funzione che usa `try`
+dichiari `throws` — ma la prima esecuzione vera sarà su Xcode, e va messo in conto un giro di
+correzioni.
+
 ### Audit Lighthouse: ancora bloccato
 
 Riverificato in questa sessione: `next build` fallisce perché `next/font` non riesce a scaricare
@@ -1314,8 +1351,9 @@ sul font di sistema), quindi gli E2E girano lo stesso: è solo la build a essere
 **Le feature della 6E sono finite.** Restano due voci, e nessuna delle due è una feature:
 
 **Fase 6E, punto 27 — test iOS e audit Lighthouse.** L'audit è impossibile da qui (vedi sopra),
-non rinviato. I test iOS non esistono e non possono nascere in questo ambiente: non c'è toolchain
-Swift.
+non rinviato. I test iOS ora **esistono** (§7 → 6E punto 9): sei file XCTest scritti e verificati
+per ispezione, che aspettano un target creato una volta in Xcode. Non sono mai stati eseguiti:
+qui non c'è toolchain Swift.
 **Fase 6D, punto 17 — radar**: bloccato, quando l'ambiente lo consente.
 
 **Il debito iOS è chiuso** (2026-09-14). Due correzioni a quel conto, perché era sbagliato: le
