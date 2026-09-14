@@ -1143,7 +1143,8 @@ non venivano inviati affatto — una sostituzione sul file non aveva agganciato 
 dell'indentazione. Senza quel test, `global_tilted_irradiance` sarebbe silenziosamente tornato
 orizzontale, con una stima sbagliata di circa il 15% e nessun sintomo visibile.
 
-**Limite dichiarato:** solo backend e web. La versione iOS richiede un campo per la potenza
+**Chiuso su iOS il 2026-09-14** (`SolarPanelView.swift`, potenza in `@AppStorage`).
+**Limite dichiarato all'epoca:** solo backend e web. La versione iOS richiede un campo per la potenza
 dell'impianto nelle impostazioni, e aggiungere una quinta schermata Swift non verificata sopra le
 quattro già scritte è la cosa che ho segnalato di non voler fare prima di un passaggio su
 simulatore.
@@ -1193,7 +1194,8 @@ Sostituito con due test che verificano il comportamento reale: il pulsante è in
 località, e un ospite salva regolarmente in locale. La suite completa gira ora verde due volte di
 fila.
 
-**Limite dichiarato:** solo backend e web, come le due voci precedenti.
+**Chiuso su iOS il 2026-09-14** (`SkyPanelView.swift`).
+**Limite dichiarato all'epoca:** solo backend e web, come le due voci precedenti.
 
 **Nota di prodotto:** la dashboard ha ora nove riquadri (allerte, nowcast, corrente, sole e vento,
 narrativa, AQI, pollini, neve, orto, fotovoltaico, cielo, fonti). Sono tutti utili a qualcuno e
@@ -1237,7 +1239,8 @@ Schema di cache alla versione 15.
 **Verifiche:** 567 test backend (27 suite), 246 web (14 suite), 47 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
-**Limite dichiarato:** solo backend e web, come le tre voci precedenti. E il connettore è scritto
+**Chiuso su iOS il 2026-09-14** (`SeaPanelView.swift`).
+**Limite dichiarato all'epoca:** solo backend e web, come le tre voci precedenti. E il connettore è scritto
 contro una forma di risposta non verificabile da qui — `marine-api.open-meteo.com` è negato dalla
 rete dell'ambiente, come tutti gli host Open-Meteo. A differenza del radar, però, il rischio è
 contenuto: la famiglia di API Open-Meteo ha una forma uniforme (`hourly: { time: [], <param>: [] }`)
@@ -1293,7 +1296,8 @@ tiene basso. Schema di cache alla versione 16.
 **Verifiche:** 588 test backend (28 suite), 255 web (15 suite), 50 scenari E2E × 2 viewport,
 typecheck pulito su backend e web, lint web ai soli 2 errori preesistenti.
 
-**Limite dichiarato:** solo backend e web, come le quattro voci precedenti. E i pesi delle soglie
+**Chiuso su iOS il 2026-09-14** (`ActivitiesPanelView.swift`).
+**Limite dichiarato all'epoca:** solo backend e web, come le quattro voci precedenti. E i pesi delle soglie
 sono scelte ragionevoli, non tarate su dati: nessuno ha misurato a che temperatura la gente
 smette davvero di correre. Sono però tutte costanti esportate e testate, quindi tarabili quando
 un dato ci sarà.
@@ -1314,11 +1318,16 @@ non rinviato. I test iOS non esistono e non possono nascere in questo ambiente: 
 Swift.
 **Fase 6D, punto 17 — radar**: bloccato, quando l'ambiente lo consente.
 
-**Il debito iOS, dichiarato e non nascosto:** iOS è indietro di **cinque** feature — orto,
-fotovoltaico, cielo, mare e ora gli indici lifestyle — e porta **cinque schermate Swift mai
-compilate** (`AlertRulesView`, `SnowPanelView`, `SourcesIndicatorView`, `PollenPanelView`,
-`GardenPanelView`, più le modifiche a `HourlyForecastView`). Un passaggio su simulatore viene
-prima di qualunque altra riga di Swift.
+**Il debito iOS è chiuso** (2026-09-14). Due correzioni a quel conto, perché era sbagliato: le
+feature indietro erano **quattro**, non cinque — l'orto era già su iOS, `GardenPanelView` era
+scritta e cablata, e averla contata fra i debiti era un errore di questo documento. E le
+schermate «mai compilate» ora lo sono: il primo giro su Xcode ha trovato quattro errori da due
+chiavi `CodingKeys` orfane, corretti, e da lì il progetto compila.
+
+Chiuse le quattro: `SolarPanelView`, `SkyPanelView`, `SeaPanelView`, `ActivitiesPanelView`, più i
+modelli Swift che ora decodificano `solar`, `sky`, `sea` e `activities` — prima non li portavano
+affatto. La potenza dell'impianto fotovoltaico vive in `@AppStorage`, l'equivalente del
+`localStorage` del web: non tocca il backend, per la stessa ragione.
 
 **Nota di prodotto:** la dashboard web è arrivata a una dozzina di riquadri. Prima di
 aggiungerne altri serve un raggruppamento — oggi neve, orto, fotovoltaico, cielo, mare e indici
