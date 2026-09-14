@@ -27,9 +27,14 @@ struct HourlyDetailView: View {
         self.hourly = hourly
         self.daily = daily
 
+        // Il ripiego parte da oggi, mai dal primo elemento dell'array: `hourly`
+        // può cominciare da ieri sera, e aprire lì mostrerebbe una previsione
+        // già passata.
         let covered = Set(hourly.map { String($0.time.prefix(10)) })
-        let fallback = covered.sorted().first ?? initialDate
-        _selectedDate = State(initialValue: covered.contains(initialDate) ? initialDate : fallback)
+        let today = Self.todayKey
+        let fallback = covered.filter { $0 >= today }.min() ?? today
+        let wanted = initialDate >= today ? initialDate : fallback
+        _selectedDate = State(initialValue: covered.contains(wanted) ? wanted : fallback)
     }
 
     // MARK: - Dati
@@ -42,10 +47,20 @@ struct HourlyDetailView: View {
         var isCovered: Bool { forecast != nil }
     }
 
+    /// I sette giorni della strip, **da oggi in avanti**.
+    ///
+    /// Il filtro sul passato non è cosmetico: senza, il primo chip era ieri —
+    /// una previsione già smentita dai fatti — e il `prefix(7)` mangiava in
+    /// coda un giorno futuro per far posto a uno passato.
     private var days: [String] {
         let fromDaily = daily?.map { String($0.date.prefix(10)) } ?? []
         let fromHourly = hourly.map { String($0.time.prefix(10)) }
-        return Array(Set(fromDaily + fromHourly)).sorted().prefix(7).map { $0 }
+        let today = Self.todayKey
+        return Array(Set(fromDaily + fromHourly))
+            .filter { $0 >= today }
+            .sorted()
+            .prefix(7)
+            .map { $0 }
     }
 
     private var daysWithHours: Set<String> {

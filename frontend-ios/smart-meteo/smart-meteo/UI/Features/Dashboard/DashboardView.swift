@@ -222,17 +222,6 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                             }
 
-                            // Fonti e indice di consenso: quanto le fonti sono
-                            // d'accordo è l'informazione che solo un
-                            // aggregatore possiede, e iOS non la mostrava.
-                            if !forecast.sourcesUsed.isEmpty {
-                                SourcesIndicatorView(
-                                    sources: forecast.sourcesUsed,
-                                    confidence: forecast.confidence
-                                )
-                                .padding(.horizontal)
-                            }
-
                             // Daily Forecast
                             if let daily = forecast.daily {
                                 DailyForecastView(
@@ -241,6 +230,19 @@ struct DashboardView: View {
                                     onPrecipitationTap: { date in precipTarget = PrecipTarget(id: date) }
                                 )
                                     .padding(.horizontal)
+                            }
+
+                            // Fonti e indice di consenso, per ultimo: è
+                            // metadato sulla previsione, non previsione. Chi
+                            // apre l'app vuole sapere che tempo fa; quante
+                            // fonti concordano lo si va a cercare dopo, e
+                            // messo in mezzo separava il meteo dai giorni.
+                            if !forecast.sourcesUsed.isEmpty {
+                                SourcesIndicatorView(
+                                    sources: forecast.sourcesUsed,
+                                    confidence: forecast.confidence
+                                )
+                                .padding(.horizontal)
                             }
                             
                         case .error(let error):

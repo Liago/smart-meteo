@@ -246,7 +246,9 @@ cd frontend-web && npm run build
 
 - Web tests are in `frontend-web/__tests__/` (15 suites: api, components, weather-utils,
   air-quality, narrative, hourly-detail, next-hour, pollen, snow, storm, garden, solar, sky,
-  sea, activities), `npm test` from the repo root
+  sea, activities), `npm test` from the repo root. `hourly-detail` pins the clock with fake
+  timers: since the day strip drops past days, a suite with dates hardcoded in the past would
+  have started failing on a calendar date rather than on a code change
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
 - Backend tests: `cd backend && npm test` - **588 tests in 28 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
@@ -256,7 +258,7 @@ cd frontend-web && npm run build
 - `windUnits.test.ts` checks the m/s convention across **all** connectors at once: a
   per-connector test would not catch a unit mismatch, since each one is self-consistent
 - `cd backend && npm run typecheck` for `tsc --noEmit` (covers the tests too)
-- E2E: `cd frontend-web && npm run test:e2e` - 47 scenarios × 2 viewports (Playwright).
+- E2E: `cd frontend-web && npm run test:e2e` - 50 scenarios × 2 viewports (Playwright).
   The backend API is never contacted: every scenario starts from a known response built
   in `e2e/fixtures/api.ts`. Set `CHROMIUM_PATH` where Playwright browsers cannot be
   downloaded. `e2e/` is excluded from Jest
@@ -294,6 +296,7 @@ cd frontend-web && npm run build
 - **The snow block is omitted when there is nothing to say**: no snow on the ground, no snowfall expected, no frost risk and ordinary rain → no block, so it isn't an empty panel for eight months of the year
 - **Weighted everywhere**: `utils/aggregate.ts` (`weightedMean`, `weightedVote`) is shared by the current, daily and hourly levels. Until Phase 6C the daily and hourly levels used a plain arithmetic mean and ignored `SOURCE_WEIGHTS` entirely — Meteostat (0.8, past observations) counted as much as WeatherKit (1.2) on the 7-day forecast and the hourly curve
 - **A lifestyle score is the worst factor, never the mean** (`backend/utils/activities.ts`): a day that is perfect on temperature, wind and air but pours with rain is not half a good day to run — a mean would return 60 and hide the single factor you actually give up over, so the score is the **minimum** of its factors and the panel names that factor next to the number ("65, limita il vento" tells you whether to postpone or change route; "65" alone tells you nothing). The limiting factor is only named **below 80**, or an ordinary good day would read as having a problem. These indices are computed rather than bought: AccuWeather sells them ready-made, but each index is its **own** call on a 50-call/day plan of which `connectors/accuweather.ts` already spends 3 per cache miss (~16 servable forecasts a day), so three indices would have halved the forecasts to buy three numbers — and a bought index cannot say *why*. Within the window precipitation probability and wind take the **max** (one hour at 90% among eleven clear ones is still an outing to postpone) while millimetres **sum**; the window never straddles two days, so in the evening it rolls to tomorrow as a whole and the response declares which day it scored
+- **The hourly detail opens on today and never offers a past day**: `hourly` can start the evening before — sources in UTC, restated in the location's local hour, hand back a few hours of the previous day — so the day strip filters to `>= today` on both clients, and the entry point passes today's key rather than `hourly.first`, which was opening the sheet on a forecast the day had already disproved. The trim matters twice over: the `slice(0, 7)` was also eating a future day to make room for a past one. On today the default hour is **now**; on any other day it is the peak hour of the metric, which is what makes that day worth looking at
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals

@@ -25,11 +25,22 @@ interface HourSlot {
 export default function HourlyDetail({ hourly, daily, initialDate, metric }: HourlyDetailProps) {
 	const spec = METRICS[metric];
 
-	// Giorni disponibili: dal daily se c'è, altrimenti dedotti dagli orari.
+	// Giorni disponibili **da oggi in avanti**: dal daily se c'è, altrimenti
+	// dedotti dagli orari.
+	//
+	// Il filtro sul passato non è cosmetico. `hourly` può cominciare da ieri
+	// sera — le fonti in UTC, riportate nell'ora locale della località,
+	// consegnano qualche ora del giorno prima — e senza il filtro il primo chip
+	// era ieri: una previsione già smentita dai fatti. In più lo `slice(0, 7)`
+	// mangiava in coda un giorno futuro per far posto a uno passato.
 	const days = useMemo(() => {
+		const now = new Date();
+		const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 		const fromDaily = daily?.map((d) => d.date.slice(0, 10)) ?? [];
 		const fromHourly = hourly.map((h) => h.time.slice(0, 10));
-		const unique = Array.from(new Set([...fromDaily, ...fromHourly])).sort();
+		const unique = Array.from(new Set([...fromDaily, ...fromHourly]))
+			.filter((d) => d >= today)
+			.sort();
 		return unique.slice(0, 7);
 	}, [daily, hourly]);
 
@@ -40,7 +51,11 @@ export default function HourlyDetail({ hourly, daily, initialDate, metric }: Hou
 	}, [hourly]);
 
 	const [selectedDate, setSelectedDate] = useState(() => {
-		if (initialDate && daysWithHours.has(initialDate)) return initialDate;
+		// Un `initialDate` passato non è più nella strip: selezionarlo lascerebbe
+		// la strip senza chip attivo e il grafico su un giorno che non si può
+		// riselezionare.
+		const inStrip = initialDate && days.includes(initialDate);
+		if (inStrip && daysWithHours.has(initialDate)) return initialDate;
 		return days.find((d) => daysWithHours.has(d)) ?? days[0] ?? '';
 	});
 
