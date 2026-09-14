@@ -64,6 +64,23 @@ struct HourlyForecastView: View {
     
     @State private var chartData: ChartData?
     @State private var expandedPeriod: String?
+
+    /// Giorno su cui aprire il dettaglio: **oggi**, non la prima riga oraria.
+    ///
+    /// L'array `hourly` può cominciare da ieri sera — le fonti in UTC, riportate
+    /// nell'ora locale della località, consegnano qualche ora del giorno prima —
+    /// e aprire su quella mostrava all'utente una previsione già passata. Se per
+    /// qualche motivo oggi non fosse coperto, si sceglie il primo giorno
+    /// disponibile **da oggi in poi**, mai uno passato.
+    static func openingDate(for hourly: [HourlyForecast]) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = formatter.string(from: Date())
+
+        let covered = Set(hourly.map { String($0.time.prefix(10)) })
+        if covered.contains(today) { return today }
+        return covered.filter { $0 >= today }.min() ?? today
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -78,8 +95,7 @@ struct HourlyForecastView: View {
                 if let onPrecipitationTap {
                     Button {
                         HapticManager.selection()
-                        let firstDate = hourly.first.map { String($0.time.prefix(10)) } ?? ""
-                        onPrecipitationTap(firstDate)
+                        onPrecipitationTap(Self.openingDate(for: hourly))
                     } label: {
                         Image(systemName: "drop.fill")
                             .font(.system(size: 15))

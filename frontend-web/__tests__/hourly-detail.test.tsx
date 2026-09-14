@@ -8,6 +8,46 @@ import { METRICS, METRIC_ORDER, type MetricId } from '@/lib/metrics';
 
 jest.mock('framer-motion');
 
+/**
+ * Orologio fisso alla vigilia delle fixture (3 agosto 2026).
+ *
+ * Serve da quando la strip dei giorni scarta il passato: senza, queste prove
+ * avrebbero smesso di funzionare il 5 agosto 2026, e nel frattempo passavano
+ * solo perché nessuna asserzione dipendeva da «oggi». Una suite che dipende
+ * dalla data in cui gira non è una suite.
+ *
+ * È la *vigilia*, non il primo giorno: così 4, 5 e 6 agosto restano tutti
+ * futuri e l'ora di default è quella di picco della metrica, che è quello che
+ * questi test verificano. Il ramo «oggi», dove invece vince l'ora corrente, ha
+ * il suo blocco in fondo con il proprio orologio.
+ */
+const VIGILIA = new Date('2026-08-03T09:00:00');
+
+beforeAll(() => {
+  jest.useFakeTimers({
+    now: VIGILIA,
+    // I timer veri servono a userEvent e al debounce di React: qui si finge
+    // solo l'orologio.
+    doNotFake: [
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      'setImmediate',
+      'clearImmediate',
+      'queueMicrotask',
+      'requestAnimationFrame',
+      'cancelAnimationFrame',
+      'nextTick',
+      'performance',
+    ],
+  });
+});
+
+afterAll(() => {
+  jest.useRealTimers();
+});
+
 /** Costruisce le 24 ore di un giorno, con i campi opzionali per ora. */
 function buildDay(
   date: string,
@@ -196,6 +236,67 @@ describe('HourlyDetail — le altre metriche', () => {
     );
     expect(screen.getByText('Mercoledì 5 agosto 2026')).toBeInTheDocument();
     expect(screen.getByText('70%')).toBeInTheDocument();
+  });
+});
+
+describe('HourlyDetail — il passato non è una previsione', () => {
+  // Segnalato dallo screenshot su iOS: aprendo il dettaglio, il primo chip
+  // della strip era *ieri*, e il grafico si apriva lì. L'array `hourly` può
+  // cominciare dalla sera prima — le fonti in UTC, riportate nell'ora locale
+  // della località, consegnano qualche ora del giorno precedente.
+  const IERI = '2026-08-03';
+  const OGGI = '2026-08-04';
+  const DOMANI = '2026-08-05';
+
+  beforeEach(() => {
+    jest.setSystemTime(new Date(`${OGGI}T09:00:00`));
+  });
+
+  afterEach(() => {
+    jest.setSystemTime(VIGILIA);
+  });
+
+  /** I chip della strip, nell'ordine in cui compaiono. */
+  function chipDelleGiornate(): string[] {
+    return screen
+      .getAllByRole('button')
+      .map((b) => b.textContent ?? '')
+      .filter((t) => /\d/.test(t));
+  }
+
+  it('non offre ieri nella strip, anche se ci sono ore di ieri', () => {
+    const hourly = [...buildDay(IERI), ...buildDay(OGGI), ...buildDay(DOMANI)];
+    renderDetail({ hourly, initialDate: OGGI });
+
+    const chip = chipDelleGiornate();
+    expect(chip).toHaveLength(2);
+    expect(chip[0]).toContain('4');
+    expect(chip.some((t) => t.includes('3'))).toBe(false);
+  });
+
+  it('apre su oggi anche se gli viene chiesto un giorno passato', () => {
+    // È esattamente il caso della segnalazione: il chiamante passava la data
+    // della prima riga oraria, che era di ieri.
+    const hourly = [...buildDay(IERI), ...buildDay(OGGI)];
+    renderDetail({ hourly, initialDate: IERI });
+
+    expect(screen.getByText('Martedì 4 agosto 2026')).toBeInTheDocument();
+  });
+
+  it('su oggi mostra l ora corrente, non quella di picco', () => {
+    // Il contrario del ramo verificato sopra: se il giorno è oggi, l'ora che
+    // interessa è adesso, non la più piovosa della giornata.
+    const hourly = buildDay(OGGI, { 9: { humidity: 41 }, 15: { humidity: 99 } }, { humidity: 55 });
+    renderDetail({ hourly, initialDate: OGGI, metric: 'humidity' });
+
+    expect(screen.getByText('41%')).toBeInTheDocument();
+  });
+
+  it('se oggi non è coperto ripiega sul primo giorno futuro, mai su ieri', () => {
+    const hourly = [...buildDay(IERI), ...buildDay(DOMANI)];
+    renderDetail({ hourly, daily: DAILY, initialDate: IERI });
+
+    expect(screen.getByText('Mercoledì 5 agosto 2026')).toBeInTheDocument();
   });
 });
 

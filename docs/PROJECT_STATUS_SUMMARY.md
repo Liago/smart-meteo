@@ -131,6 +131,7 @@
 - **Indici lifestyle** («buona giornata per correre, andare in bici, stendere il bucato»): **calcolati in casa, non comprati**. AccuWeather li vende già pronti, ma ogni indice è una chiamata a sé su un piano da 50 al giorno di cui ne spendiamo già 3 per cache miss: tre indici avrebbero dimezzato le previsioni servibili. I dati che servono li aggreghiamo già tutti
 - **Il punteggio è il fattore peggiore, non la media**: una giornata perfetta sotto il diluvio non è mezza buona, e la media nasconderebbe proprio il motivo per cui si rinuncia. Accanto al numero c'è sempre il fattore che lo limita — «65» non dice niente, «65, limita il vento» dice se rimandare o cambiare percorso
 - **Due errori miei trovati dai miei test**: l'umidità del bucato era `100 - umidità`, che bollava come mediocre qualunque giornata al 50% di umidità; e il vento con aria ferma risultava il fattore limitante di una bella giornata asciutta — il vento è un bonus, non un requisito
+- **Primo giro su simulatore Xcode** (14/09): tre difetti trovati e chiusi. Quattro errori di compilazione da due chiavi `CodingKeys` orfane su `DailyForecast` e `HourlyForecast` — `precipitation_intensity` esiste solo sul blocco `current`, e un case senza proprietà fa fallire la sintesi di `Codable` in entrambe le direzioni. La card «Fonti contribuenti» spostata in fondo: è metadato sulla previsione, e in mezzo separava il meteo dai giorni. **Il dettaglio orario si apriva su ieri**: il chiamante passava la data della prima riga oraria, e `hourly` comincia dalla sera prima perché le fonti in UTC, riportate in ora locale, consegnano qualche ora del giorno precedente. Corretto su iOS e sul web, che aveva lo stesso difetto nella strip dei giorni
 - ⏳ Restano solo test iOS e audit Lighthouse (quest'ultimo **bloccato**: `next build` non scarica i font Google, host negato dalla rete dell'ambiente). Nessuna delle due è una feature: **le feature della 6E sono finite**
 
 ### Fase 6D — Nuove feature utente (2026-09-13, 4 punti su 5)
@@ -204,7 +205,7 @@
 
 | Area | Stato | Piano |
 |------|-------|:-----:|
-| Frontend web unit test | ✅ 255 test (15 suite) | Restano i 3 hook → TODO_TESTING §4 |
+| Frontend web unit test | ✅ 259 test (15 suite) | Restano i 3 hook → TODO_TESTING §4 |
 | Frontend web E2E (Playwright) | ✅ 50 scenari × 2 viewport | Fonti autenticate fuori portata → TODO_TESTING §3.4 |
 | Backend unit/integration test | ✅ **588 test in 28 suite** (utils, 9 connettori, engine, route con supertest, servizi) | Fasi 6B-6D |
 | iOS unit test | ❌ Non implementato | → VALUTAZIONI_TECNICHE §4 |
