@@ -185,7 +185,6 @@ struct DailyForecast: Codable, Identifiable {
         case tempMax = "temp_max"
         case tempMin = "temp_min"
         case precipitationProb = "precipitation_prob"
-        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case uvIndexMax = "uv_index_max"
@@ -250,7 +249,6 @@ struct HourlyForecast: Codable, Identifiable {
         case time
         case temp
         case precipitationProb = "precipitation_prob"
-        case precipitationIntensity = "precipitation_intensity"
         case conditionCode = "condition_code"
         case conditionText = "condition_text"
         case precipitationMm = "precipitation_mm"
