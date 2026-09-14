@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>body{margin:0;background:#EFECE6;font-family:Manrope,system-ui,sans-serif}a{color:#C2543A;text-decoration:none}a:hover{color:#8f3a27}.dv-turn{padding:44px 48px 36px;border-bottom:1px solid rgba(0,0,0,.08)}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}.dv-tid{font:700 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#2A2622;color:#fff;border-radius:4px}.dv-tname{font:700 13px/1.2 Manrope,sans-serif;color:#2A2622}.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}.dv-oid{font:700 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#2A2622;border-radius:5px}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 11.5px/1.4 Manrope,sans-serif;color:rgba(42,38,34,.6);max-width:402px}.dv-opt:target .dv-oid{background:#C2543A;color:#fff}.dv-next{margin:24px 0 0;font:500 12px/1.6 Manrope,sans-serif;color:rgba(42,38,34,.55)}</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><span class="dv-tid">1</span><span class="dv-tname">Ridisegno iOS — due direzioni, prototipi navigabili</span></div>
+
+<div style="max-width:900px;margin:0 0 30px;display:flex;flex-direction:column;gap:12px">
+<div style="font:400 30px/1.15 'Instrument Serif',ui-serif,Georgia,serif;color:#2A2622">Dallo scroll di tredici pannelli a un'unica gerarchia.</div>
+<div style="font:500 13.5px/1.7 Manrope,sans-serif;color:rgba(42,38,34,.7);max-width:660px">Nella versione attuale (<a href="#1c">1c</a>) ogni blocco pesa uguale: nowcast, neve, meteo corrente, orario, orto, solare, cielo, mare, attività, pollini, giorni, fonti, tutti impilati nello stesso ordine indipendentemente da cosa conta adesso. Le due direzioni partono dalla stessa struttura — <strong>hero della condizione + quattro sezioni collassabili</strong> (Ora per ora, Prossimi giorni, Per te, Fonti dati) — e differiscono nel modo di presentare il colpo d'occhio. I pannelli contestuali finiscono tutti dentro «Per te», accesi e spenti dall'utente nelle impostazioni.</div>
+<div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:4px">
+<div style="display:flex;flex-direction:column;gap:5px"><span style="font:600 10px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:rgba(42,38,34,.45)">Palette evoluta</span><div style="display:flex;gap:6px"><span style="width:34px;height:34px;border-radius:9px;background:#FDF7F0;border:1px solid rgba(0,0,0,.06)"></span><span style="width:34px;height:34px;border-radius:9px;background:#FBDFBE"></span><span style="width:34px;height:34px;border-radius:9px;background:#D5E4F3"></span><span style="width:34px;height:34px;border-radius:9px;background:#DFE3EC"></span><span style="width:34px;height:34px;border-radius:9px;background:#E2704F"></span><span style="width:34px;height:34px;border-radius:9px;background:#2A2622"></span></div></div>
+<div style="display:flex;flex-direction:column;gap:5px"><span style="font:600 10px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:rgba(42,38,34,.45)">Tipografia</span><span style="font:400 20px/1.2 'Instrument Serif',serif;color:#2A2622">Instrument Serif</span><span style="font:700 12px/1.2 Manrope;color:#2A2622">Manrope · UI e numeri</span></div>
+</div>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Foglio — hero grande a tinta della condizione, temperatura in serif, il resto sale come un unico foglio bianco con sezioni collassabili.</div>
+<dc-import name="Meteo Phone" variant="sheet" hint-size="402px,874px"></dc-import>
+</div>
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Bento — hero compatta più tessere pastello per i dati che si guardano a colpo d'occhio; sotto, le stesse tre sezioni.</div>
+<dc-import name="Meteo Phone" variant="grid" hint-size="402px,874px"></dc-import>
+</div>
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Stato attuale, ricostruito da <code style="font:600 10.5px ui-monospace,monospace">DashboardView.swift</code> — riferimento, non proposta.</div>
+<dc-import name="Smart Meteo Attuale" hint-size="482px,1010px"></dc-import>
+</div>
+</div>
+
+<p class="dv-next">Nei prototipi: le tre pillole sotto l'hero cambiano la condizione (il colore segue il meteo), le intestazioni di sezione si aprono e chiudono, il grafico orario si trascina, e ricerca / impostazioni / allerte sono raggiungibili dalle icone in alto. Prova a scrivere: «tieni <a class="dv-oid" href="#1a">1a</a> ma con le tessere di <a class="dv-oid" href="#1b">1b</a> dentro Per te» · «aggiungi una tab bar a <a class="dv-oid" href="#1b">1b</a>» · «fai vedere lo stato pioggia con allerta arancione».</p>
+</section>
+</x-dc>
+</body>
+</html>

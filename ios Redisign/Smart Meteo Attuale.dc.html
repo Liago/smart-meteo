@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>body{margin:0;background:#e8e6e1;font-family:system-ui,-apple-system,sans-serif}a{color:#EC685A}a:hover{color:#c8523f}</style></helmet>
+<div style="min-height:100vh;padding:40px;display:flex;flex-direction:column;align-items:center;gap:18px">
+<div style="font:600 12px/1.4 ui-monospace,Menlo,monospace;color:rgba(0,0,0,.45);letter-spacing:.06em;text-transform:uppercase">Ricostruzione — DashboardView.swift (stato attuale)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ frameW }}" height="{{ frameH }}" hint-size="402px,874px">
+<div style="background:rgb(252,249,246);min-height:100%;padding-bottom:50px;display:flex;flex-direction:column;gap:20px">
+
+<div style="display:flex;align-items:center;padding:64px 24px 0;gap:8px">
+<div style="width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.05);display:flex;align-items:center;justify-content:center;color:rgb(236,104,90)">
+<svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.6"></circle><line x1="12.8" y1="12.8" x2="17.5" y2="17.5"></line></svg>
+</div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;color:rgb(236,104,90)">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.6 1.6 7h1.9v7.4h9V7h1.9z"></path></svg>
+<span style="font:700 17px/1.2 system-ui,sans-serif">Milano</span>
+</div>
+<div style="width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.05);display:flex;align-items:center;justify-content:center;position:relative;color:#ff9500">
+<svg width="20" height="18" viewBox="0 0 20 18" fill="currentColor"><path d="M10 1 19 17H1z"></path><rect x="9.1" y="6" width="1.8" height="6" fill="#fff"></rect><rect x="9.1" y="13" width="1.8" height="1.8" fill="#fff"></rect></svg>
+<span style="position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;background:#ff3b30;color:#fff;font:700 11px/20px system-ui,sans-serif;text-align:center">2</span>
+</div>
+<div style="width:44px;height:44px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.05);display:flex;align-items:center;justify-content:center;color:rgb(236,104,90)">
+<svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="2.6"></circle><circle cx="10" cy="10" r="7.2" stroke-dasharray="2.2 2.2"></circle></svg>
+</div>
+</div>
+
+<div style="margin:0 16px;border-radius:14px;background:rgb(242,115,0);box-shadow:0 4px 8px rgba(242,115,0,.4);padding:14px 16px;display:flex;align-items:center;gap:12px">
+<svg width="24" height="22" viewBox="0 0 20 18" fill="#fff"><path d="M10 1 19 17H1z"></path><rect x="9.1" y="6" width="1.8" height="6" fill="rgb(242,115,0)"></rect><rect x="9.1" y="13" width="1.8" height="1.8" fill="rgb(242,115,0)"></rect></svg>
+<div style="flex:1;display:flex;flex-direction:column;gap:3px">
+<div style="display:flex;align-items:center;gap:6px">
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#fff">2 Allerte Meteo</span>
+<span style="padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.9);color:rgb(242,115,0);font:700 11px/1.3 system-ui,sans-serif">Severa</span>
+</div>
+<div style="font:400 12px/1.35 system-ui,sans-serif;color:rgba(255,255,255,.9)">Temporali intensi con possibile grandine sulla pianura lombarda, in att...</div>
+</div>
+<svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.2" stroke-linecap="round"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"></path></svg>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="15" height="15" viewBox="0 0 16 16" fill="#8e8e93"><circle cx="6" cy="6.5" r="3"></circle><circle cx="9.3" cy="5.6" r="3.8"></circle><rect x="3.2" y="7.5" width="9.6" height="2.7" rx="1.35"></rect><rect x="5" y="12" width="1.4" height="3" rx=".7" fill="#3B82F6"></rect><rect x="8" y="12" width="1.4" height="3" rx=".7" fill="#3B82F6"></rect></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Inizia fra 12 minuti</span>
+<span style="font:500 13px/1.2 system-ui,sans-serif;color:#8e8e93">alle 14:57</span>
+</div>
+<div style="font:400 11px/1.3 system-ui,sans-serif;color:#8e8e93">Picco 2,4 mm/h · probabilità max 80%</div>
+<div style="height:64px;display:flex;align-items:flex-end;gap:1px">
+<sc-for list="{{ minutes }}" as="m" hint-placeholder-count="60">
+<div style="flex:1;border-radius:1px;height:{{ m.h }};background:{{ m.color }}"></div>
+</sc-for>
+</div>
+<div style="display:flex;font:400 10px/1.2 system-ui,sans-serif;color:rgba(142,142,147,.8)"><span>Adesso</span><span style="flex:1"></span><span>+30 min</span><span style="flex:1"></span><span>+1 h</span></div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8e8e93" stroke-width="1.4" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="15"></line><line x1="2" y1="4.5" x2="14" y2="11.5"></line><line x1="2" y1="11.5" x2="14" y2="4.5"></line></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Neve e gelate</span>
+<span style="flex:1"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:rgb(61,143,214)"></span>
+</div>
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">Neve prevista in quota, circa 6 cm</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ snowRows }}" as="r" hint-placeholder-count="4">
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">{{ r.label }}</span>
+<span style="flex:1"></span>
+<span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">{{ r.hint }}</span>
+<span style="font:600 12px/1.3 system-ui,sans-serif;color:#000;font-variant-numeric:tabular-nums">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">Previsione sulle prossime 24 ore. La quota neve è stimata dallo zero termico dei modelli.</div>
+</div>
+
+<div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+<div style="font:700 28px/1.1 ui-serif,Georgia,serif;color:#000;padding:0 8px">Adesso</div>
+<div style="display:flex;align-items:center;gap:24px;padding:0 16px">
+<div style="width:100px;height:100px;flex:none;display:flex;align-items:center;justify-content:center">
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" stroke="#ff9500" stroke-width="6" stroke-linecap="round"><circle cx="50" cy="50" r="20" fill="#ff9500" stroke="none"></circle><line x1="50" y1="8" x2="50" y2="20"></line><line x1="50" y1="80" x2="50" y2="92"></line><line x1="8" y1="50" x2="20" y2="50"></line><line x1="80" y1="50" x2="92" y2="50"></line><line x1="20" y1="20" x2="28" y2="28"></line><line x1="72" y1="72" x2="80" y2="80"></line><line x1="20" y1="80" x2="28" y2="72"></line><line x1="72" y1="28" x2="80" y2="20"></line></svg>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="font:400 48px/1 system-ui,sans-serif;color:rgb(51,51,51)">24°</div>
+<div style="font:400 15px/1.3 system-ui,sans-serif;color:#8e8e93">Percepita 26°</div>
+<div style="font:400 15px/1.3 system-ui,sans-serif;color:#8e8e93">Max 30° Min 8°</div>
+<div style="margin-top:2px;display:flex;align-items:center;gap:4px;font:500 15px/1.2 system-ui,sans-serif;color:rgb(236,104,90)">Altro
+<svg width="11" height="7" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1.5 6 6.5 11 1.5"></path></svg>
+</div>
+</div>
+</div>
+</div>
+
+<div style="padding:16px 0;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:baseline;gap:8px;padding:0 24px">
+<div style="font:700 28px/1.1 ui-serif,Georgia,serif;color:#000">Prossime 24 Ore</div>
+<svg width="15" height="19" viewBox="0 0 12 16" fill="rgb(236,104,90)"><path d="M6 0C6 0 1 6.2 1 10a5 5 0 0 0 10 0C11 6.2 6 0 6 0z"></path></svg>
+</div>
+<div style="padding:0 24px;font:400 15px/1.55 system-ui,sans-serif;color:#8e8e93">Giornata serena, massime intorno ai 30°. Nessuna precipitazione attesa nelle prossime ore; brezza leggera da nord-ovest.</div>
+<div style="overflow-x:auto;padding:0 16px">
+<div style="position:relative;width:960px;height:300px">
+{{ hourlyChart }}
+<div style="position:absolute;inset:0;display:flex">
+<sc-for list="{{ hours }}" as="h" hint-placeholder-count="12">
+<div style="width:80px;position:relative">
+<div style="position:absolute;left:0;right:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;top:{{ h.infoTop }}">
+{{ h.icon }}
+<div style="font:700 18px/1 system-ui,sans-serif;color:#000">{{ h.tempLabel }}</div>
+</div>
+<div style="position:absolute;left:0;right:0;text-align:center;top:250px;font:600 14px/1.2 system-ui,sans-serif;color:{{ h.timeColor }}">{{ h.timeLabel }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="#8e8e93"><path d="M14 2C7 2 3 5.5 3 10.5c0 1.3.3 2.4.8 3.3l1.4-1.1C6.8 8.9 9.8 6.6 13 6c-2.6 1.4-4.9 3.6-6.4 6.4l-.9 1.6c1 .4 2 .6 3 .6 5 0 5.3-6.6 5.3-12.6z"></path></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Orto e giardino</span>
+<span style="flex:1"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:#33B34D"></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:3px">
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">Non serve innaffiare</div>
+<div style="font:400 11px/1.35 system-ui,sans-serif;color:#8e8e93">La pioggia attesa copre l'evaporazione</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Terreno</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">28% vol.</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#33B34D">Umidità adeguata</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Evaporazione attesa</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">in 24 ore</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#000">3,4 mm</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Pioggia attesa</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">in 24 ore</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#000">4,2 mm</span></div>
+</div>
+<div style="font:400 11px/1.35 system-ui,sans-serif;color:#8e8e93">Suolo a 14°: si può seminare</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">L'umidità è in percentuale di volume: le soglie dipendono dal tipo di terreno.</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="#8e8e93"><circle cx="8" cy="8" r="3.4"></circle></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Fotovoltaico</span>
+<span style="flex:1"></span>
+<span style="font:500 11px/1.2 system-ui,sans-serif;color:rgb(236,104,90);text-decoration:underline">Imposta impianto</span>
+</div>
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">Giornata migliore: 5,42 kWh/kWp</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ solarDays }}" as="d" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:48px;font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">{{ d.label }}</span>
+<span style="flex:1;height:5px;border-radius:3px;background:rgba(142,142,147,.15);position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:{{ d.bar }};border-radius:3px;background:#F5A623"></span></span>
+<span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">{{ d.sun }}</span>
+<span style="width:88px;text-align:right;font:600 12px/1.3 system-ui,sans-serif;color:#000;font-variant-numeric:tabular-nums">{{ d.yield }}</span>
+</div>
+</sc-for>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">Stima su pannelli a 30° esposti a sud, con 14% di perdite di impianto. Imposta la potenza per vedere i kWh.</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="#8e8e93"><path d="M11 1a6 6 0 1 0 4 10.5A7 7 0 0 1 11 1z"></path></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Cielo</span>
+<span style="flex:1"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:#E8632A"></span>
+</div>
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">Tramonto spettacolare verso le 18:10</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Tramonto</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8);font-variant-numeric:tabular-nums">18:10</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#E8632A">Spettacolare</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Stelle stanotte</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">cielo terso, luna al 35%</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#F5A623">Buona</span></div>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">I tramonti migliori nascono da nuvole alte con l'orizzonte libero.</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="14" height="13" viewBox="0 0 18 14" fill="none" stroke="#8e8e93" stroke-width="1.5" stroke-linecap="round"><path d="M1 4c2-2 3.5-2 5.5 0S10 6 12 4s3-2 5 0"></path><path d="M1 10c2-2 3.5-2 5.5 0S10 12 12 10s3-2 5 0"></path></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Mare</span>
+<span style="flex:1"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:#7FC4E8"></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:3px">
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">Acqua a 24°, mare poco mosso</div>
+<div style="font:400 11px/1.35 system-ui,sans-serif;color:#8e8e93">Verso le 17:00 diventa mosso (1,4 m)</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Acqua</span><span style="flex:1"></span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#000;font-variant-numeric:tabular-nums">24°</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Onda</span><span style="flex:1"></span><span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">da SO</span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#7FC4E8;font-variant-numeric:tabular-nums">0,62 m</span></div>
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font:400 12px/1.3 system-ui,sans-serif;color:#8e8e93">Mare lungo</span><span style="flex:1"></span><span style="font:600 12px/1.3 system-ui,sans-serif;color:#000;font-variant-numeric:tabular-nums">0,40 m</span></div>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">Le maree non sono disponibili sul piano gratuito delle nostre fonti.</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:6px">
+<svg width="13" height="13" viewBox="0 0 16 16" fill="#8e8e93"><circle cx="8" cy="2.6" r="1.9"></circle><rect x="7" y="5" width="2" height="6.5" rx="1"></rect><rect x="6.2" y="10.5" width="1.7" height="5" rx=".85" transform="rotate(8 7 10.5)"></rect><rect x="8.5" y="10.5" width="1.7" height="5" rx=".85" transform="rotate(-8 9.3 10.5)"></rect></svg>
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Buona giornata per…</span>
+<span style="flex:1"></span>
+</div>
+<div style="font:500 13px/1.35 system-ui,sans-serif;color:#000">corsa: condizioni ottime</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ activities }}" as="a" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:16px;height:12px;border-radius:3px;background:{{ a.color }}"></span>
+<span style="font:500 12px/1.3 system-ui,sans-serif;color:#000">{{ a.label }}</span>
+<span style="flex:1"></span>
+<span style="font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8)">{{ a.limiting }}</span>
+<span style="width:56px;height:5px;border-radius:3px;background:rgba(142,142,147,.15);position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:{{ a.bar }};border-radius:3px;background:{{ a.color }}"></span></span>
+<span style="width:24px;text-align:right;font:600 12px/1.3 system-ui,sans-serif;color:#000;font-variant-numeric:tabular-nums">{{ a.score }}</span>
+</div>
+</sc-for>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">Punteggio sulle ore diurne, pari al fattore peggiore: una giornata perfetta sotto la pioggia non è mezza buona.</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:700 15px/1.2 system-ui,sans-serif;color:#000">Pollini</span>
+<span style="flex:1"></span>
+<span style="font:400 11px/1.3 system-ui,sans-serif;color:#8e8e93;text-align:right">Oggi soprattutto graminacee</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ pollen }}" as="p" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:8px;height:8px;border-radius:50%;background:{{ p.color }}"></span>
+<span style="font:500 13px/1.3 system-ui,sans-serif;color:#000">{{ p.label }}</span>
+<span style="flex:1"></span>
+<span style="font:400 11px/1.3 system-ui,sans-serif;color:#8e8e93">{{ p.level }}</span>
+<span style="width:64px;text-align:right;font:400 11px/1.3 system-ui,sans-serif;color:rgba(142,142,147,.8);font-variant-numeric:tabular-nums">{{ p.max }}</span>
+</div>
+</sc-for>
+</div>
+<div style="font:400 10px/1.35 system-ui,sans-serif;color:rgba(142,142,147,.8)">Massimo previsto oggi in granuli/m³. Le soglie sono diverse per ogni specie.</div>
+</div>
+
+<div style="padding:0 16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:center;gap:8px">
+<div style="font:700 26px/1.1 system-ui,sans-serif;color:#000">Prossimi Giorni</div>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8e8e93" stroke-width="1.5"><circle cx="8" cy="8" r="7"></circle><line x1="8" y1="7" x2="8" y2="11.5" stroke-linecap="round"></line><circle cx="8" cy="4.6" r=".9" fill="#8e8e93" stroke="none"></circle></svg>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:12px;padding:12px">
+<div style="width:55px;display:flex;flex-direction:column;align-items:center;gap:2px">
+<div style="font:700 16px/1.2 system-ui,sans-serif;color:#000">{{ d.name }}</div>
+<div style="display:flex;align-items:center;gap:2px;color:{{ d.precipColor }};font:500 12px/1.2 system-ui,sans-serif">
+{{ d.drop }}{{ d.precip }}
+</div>
+</div>
+<div style="width:30px;display:flex;justify-content:center">{{ d.icon }}</div>
+<div style="flex:1;display:flex;align-items:center;gap:8px">
+<div style="width:25px;text-align:right;font:400 14px/1.2 system-ui,sans-serif;color:#8e8e93">{{ d.min }}°</div>
+<div style="flex:1;height:6px;border-radius:3px;background:rgba(142,142,147,.2);position:relative">
+<div style="position:absolute;top:0;bottom:0;left:{{ d.barLeft }};width:{{ d.barWidth }};border-radius:3px;background:linear-gradient(90deg,#32ade6,#ffd60a,#ff9500)"></div>
+</div>
+<div style="width:25px;font:700 14px/1.2 system-ui,sans-serif;color:#000">{{ d.max }}°</div>
+</div>
+<svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="rgba(142,142,147,.6)" stroke-width="2" stroke-linecap="round"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"></path></svg>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="margin:0 16px;border-radius:20px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 10px rgba(0,0,0,.1);padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.6px;color:#8e8e93">FONTI CONTRIBUENTI</span>
+<span style="flex:1"></span>
+<span style="width:6px;height:6px;border-radius:50%;background:#22C55E"></span>
+<span style="font:600 12px/1.2 system-ui,sans-serif;color:#22C55E">6 attive</span>
+</div>
+<div style="border-radius:10px;background:rgba(0,122,255,.07);padding:8px 10px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:6px">
+<span style="width:8px;height:8px;border-radius:50%;background:#22C55E"></span>
+<span style="font:600 13px/1.2 system-ui,sans-serif;color:#000">Fonti concordi</span>
+<span style="font:400 13px/1.2 system-ui,sans-serif;color:#8e8e93">88/100</span>
+</div>
+<div style="font:400 11px/1.3 system-ui,sans-serif;color:#8e8e93">Temperatura prevista fra 23° e 26°</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ sources }}" as="s" hint-placeholder-count="6">
+<span style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:rgba(0,122,255,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:{{ s.color }}"></span>
+<span style="font:500 12px/1.2 system-ui,sans-serif;color:rgba(0,0,0,.75)">{{ s.name }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const el = React.createElement;
+
+function cloudShape(s, fill) {
+  return [el('circle', { key: 'a', cx: s * 0.37, cy: s * 0.5, r: s * 0.19, fill }),
+    el('circle', { key: 'b', cx: s * 0.58, cy: s * 0.44, r: s * 0.24, fill }),
+    el('rect', { key: 'c', x: s * 0.2, y: s * 0.55, width: s * 0.6, height: s * 0.17, rx: s * 0.085, fill })];
+}
+function icon(kind, s) {
+  const c = s / 2;
+  if (kind === 'sun') {
+    const rays = [[0.5, 0.04, 0.5, 0.16], [0.5, 0.84, 0.5, 0.96], [0.04, 0.5, 0.16, 0.5], [0.84, 0.5, 0.96, 0.5],
+      [0.18, 0.18, 0.28, 0.28], [0.72, 0.72, 0.82, 0.82], [0.18, 0.82, 0.28, 0.72], [0.72, 0.28, 0.82, 0.18]];
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}`, fill: 'none', stroke: '#ff9500', strokeWidth: s * 0.07, strokeLinecap: 'round' },
+      el('circle', { cx: c, cy: c, r: s * 0.2, fill: '#ff9500', stroke: 'none' }),
+      rays.map((p, i) => el('line', { key: i, x1: s * p[0], y1: s * p[1], x2: s * p[2], y2: s * p[3] })));
+  }
+  if (kind === 'rain') {
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` }, cloudShape(s, '#737373'),
+      el('g', { stroke: '#4c8bd9', strokeWidth: s * 0.07, strokeLinecap: 'round' },
+        [0.34, 0.5, 0.66].map((x, i) => el('line', { key: i, x1: s * x, y1: s * 0.76, x2: s * (x - 0.03), y2: s * 0.92 }))));
+  }
+  if (kind === 'cloudSun') {
+    return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` },
+      el('circle', { cx: s * 0.7, cy: s * 0.3, r: s * 0.15, fill: '#ff9500' }), cloudShape(s, '#737373'));
+  }
+  return el('svg', { width: s, height: s, viewBox: `0 0 ${s} ${s}` }, cloudShape(s, '#737373'));
+}
+
+const HOURS = [
+  ['Ora', 24, 'sun'], ['15:00', 26, 'sun'], ['16:00', 27, 'sun'], ['17:00', 28, 'cloudSun'],
+  ['18:00', 27, 'cloudSun'], ['19:00', 24, 'cloudSun'], ['20:00', 21, 'cloud'], ['21:00', 19, 'cloud'],
+  ['22:00', 18, 'cloud'], ['23:00', 17, 'cloud'], ['00:00', 16, 'rain'], ['01:00', 15, 'rain'],
+];
+const DAYS = [
+  ['Mer', 9, 28, 0, 'sun'], ['Gio', 11, 27, 20, 'cloudSun'], ['Ven', 12, 23, 70, 'rain'],
+  ['Sab', 10, 21, 40, 'cloudSun'], ['Dom', 8, 24, 10, 'sun'], ['Lun', 9, 26, 0, 'sun'],
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const H = 280, BOTTOM = 50, TOP = 125;
+    const temps = HOURS.map(h => h[1]);
+    const minT = Math.min(...temps) - 2, maxT = Math.max(...temps) + 2;
+    const yStep = (H - TOP - BOTTOM) / (maxT - minT);
+    const y = t => H - BOTTOM - (t - minT) * yStep;
+    const pts = HOURS.map((h, i) => [i * 80 + 40, y(h[1])]);
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      d += ` Q${(x1 + mx) / 2} ${y1} ${mx} ${my} Q${(mx + x2) / 2} ${y2} ${x2} ${y2}`;
+    }
+    const fillPath = `${d} L${pts[pts.length - 1][0]} ${H - BOTTOM} L${pts[0][0]} ${H - BOTTOM} Z`;
+
+    const hourlyChart = el('svg', { width: 960, height: 300, style: { position: 'absolute', inset: 0 } },
+      el('defs', null, el('linearGradient', { id: 'hg', x1: 0, y1: 0, x2: 0, y2: 1 },
+        el('stop', { offset: '0%', stopColor: 'rgba(0,0,0,0.05)' }),
+        el('stop', { offset: '100%', stopColor: 'rgba(0,0,0,0)' }))),
+      el('path', { d: fillPath, fill: 'url(#hg)' }),
+      el('path', { d, fill: 'none', stroke: 'rgba(0,0,0,0.8)', strokeWidth: 3 }),
+      pts.map((p, i) => el('circle', { key: i, cx: p[0], cy: p[1], r: 4, fill: '#fff', stroke: '#000', strokeWidth: 2 })),
+      el('text', { x: 200, y: 26, textAnchor: 'middle', style: { font: '700 16px system-ui' }, fill: '#000' }, 'Pomeriggio'),
+      el('text', { x: 700, y: 26, textAnchor: 'middle', style: { font: '700 16px system-ui' }, fill: '#000' }, 'Sera'),
+      el('line', { x1: 480, y1: 0, x2: 480, y2: 280, stroke: 'rgba(0,0,0,0.08)' })
+    );
+
+    const drop = el('svg', { width: 9, height: 11, viewBox: '0 0 12 16', fill: 'currentColor' },
+      el('path', { d: 'M6 0C6 0 1 6.2 1 10a5 5 0 0 0 10 0C11 6.2 6 0 6 0z' }));
+
+    const minutes = Array.from({ length: 60 }, (_, i) => {
+      const wet = i >= 12 && i <= 40;
+      return { h: wet ? '64px' : '2px', color: wet ? '#3B82F6' : 'rgba(0,0,0,.15)' };
+    });
+
+    return {
+      frameW: 402, frameH: 874,
+      hourlyChart, minutes,
+      hours: HOURS.map((h, i) => ({
+        timeLabel: h[0], tempLabel: `${h[1]}°`, icon: icon(h[2], 26),
+        timeColor: i === 0 ? 'rgb(236,104,90)' : '#8e8e93',
+        infoTop: `${y(h[1]) - 78}px`,
+      })),
+      snowRows: [
+        { label: 'Quota neve', value: '1800 m', hint: 'sei a 122 m' },
+        { label: 'Alla tua quota', value: 'Pioggia', hint: '' },
+        { label: 'Neve prevista', value: '6 cm', hint: 'in 24 ore' },
+        { label: 'Gelate', value: 'Brina possibile', hint: 'minima al suolo 2° alle 05:00' },
+      ],
+      solarDays: [
+        { label: 'Oggi', bar: '100%', sun: '9 h sole', yield: '5,42 kWh/kWp' },
+        { label: 'Domani', bar: '84%', sun: '8 h sole', yield: '4,55 kWh/kWp' },
+        { label: 'Ven', bar: '46%', sun: '4 h sole', yield: '2,49 kWh/kWp' },
+        { label: 'Sab', bar: '67%', sun: '6 h sole', yield: '3,63 kWh/kWp' },
+      ],
+      activities: [
+        { label: 'Corsa', score: 82, bar: '82%', color: '#33B34D', limiting: '' },
+        { label: 'Bici', score: 64, bar: '64%', color: '#EAB308', limiting: 'limita vento' },
+        { label: 'Bucato', score: 38, bar: '38%', color: '#F97316', limiting: 'limita umidità' },
+      ],
+      pollen: [
+        { label: 'Graminacee', level: 'Moderato', max: 'max 38', color: '#CA8A04' },
+        { label: 'Olivo', level: 'Basso', max: 'max 6,4', color: '#33B34D' },
+        { label: 'Betulla', level: 'Basso', max: 'max 3,1', color: '#33B34D' },
+        { label: 'Ambrosia', level: 'Assente', max: 'max —', color: 'rgba(142,142,147,.35)' },
+      ],
+      days: DAYS.map(d2 => ({
+        name: d2[0], min: d2[1], max: d2[2], icon: icon(d2[4], 22), drop: d2[3] > 0 ? drop : null,
+        precip: d2[3] > 0 ? `${d2[3]}%` : '', precipColor: 'rgba(0,122,255,.8)',
+        barLeft: `${((d2[1] + 5) / 45) * 100}%`, barWidth: `${((d2[2] - d2[1]) / 45) * 100}%`,
+      })),
+      sources: [
+        { name: 'Apple WeatherKit', color: '#334155' },
+        { name: 'ICON-D2', color: '#7E22CE' },
+        { name: 'ECMWF', color: '#8B5CF6' },
+        { name: 'GFS', color: '#D946EF' },
+        { name: 'AccuWeather', color: '#EF4444' },
+        { name: 'Tomorrow.io', color: '#3B82F6' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
