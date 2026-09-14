@@ -133,7 +133,10 @@ smart-meteo/
 │           │   ├── Networking/SupabaseClient.swift  # Supabase integration
 │           │   └── State/AppState.swift    # Global state management
 │           └── UI/
-│               ├── DesignSystem/AppColors.swift  # Color palette & theming
+│               ├── DesignSystem/
+│               │   ├── AppColors.swift          # Color(hex:) + legacy gradients
+│               │   ├── WeatherTheme.swift       # Condition themes, Duet tokens, WeatherSymbol
+│               │   └── SmoothCurve.swift        # Shared Path interpolation
 │               ├── Common/
 │               │   ├── DynamicBackground.swift   # Weather-aware backgrounds
 │               │   ├── GlassContainer.swift      # Glassmorphism container
@@ -142,7 +145,14 @@ smart-meteo/
 │               │   └── WeatherChartView.swift    # Chart rendering
 │               ├── Features/
 │               │   ├── Dashboard/
-│               │   │   ├── DashboardView.swift       # Main dashboard
+│               │   │   ├── DashboardView.swift       # Main dashboard (redesign shell)
+│               │   │   ├── DashboardHeroView.swift   # Header, alert pill, both heroes
+│               │   │   ├── CollapsibleSection.swift  # Section + white sheet + divider
+│               │   │   ├── HourlySparklineView.swift # Scrubbable hourly curve
+│               │   │   ├── DailyRowsView.swift       # 7 rows with shared-scale range bar
+│               │   │   ├── ForYouCard.swift          # Card model + builder from the response
+│               │   │   ├── ForYouSectionView.swift   # "Per te" grid + prefs
+│               │   │   ├── SourcesSectionView.swift  # Consensus badge + source chips
 │               │   │   ├── DashboardViewModel.swift  # Dashboard MVVM VM
 │               │   │   ├── CurrentWeatherView.swift  # Current conditions
 │               │   │   ├── HourlyForecastView.swift  # Hourly graph + timeline
@@ -165,6 +175,7 @@ smart-meteo/
 │               │       ├── SourcesView.swift         # Toggle weather sources
 │               │       ├── FavoritesView.swift       # Saved locations
 │               │       ├── AlertRulesView.swift      # Personal threshold rules
+│               │       ├── ForYouSettingsView.swift  # Toggle + reorder the "Per te" cards
 │               │       └── SidebarView.swift
 │               └── Onboarding/SplashView.swift
 │
@@ -310,6 +321,7 @@ cd frontend-web && npm run build
 - **A lifestyle score is the worst factor, never the mean** (`backend/utils/activities.ts`): a day that is perfect on temperature, wind and air but pours with rain is not half a good day to run — a mean would return 60 and hide the single factor you actually give up over, so the score is the **minimum** of its factors and the panel names that factor next to the number ("65, limita il vento" tells you whether to postpone or change route; "65" alone tells you nothing). The limiting factor is only named **below 80**, or an ordinary good day would read as having a problem. These indices are computed rather than bought: AccuWeather sells them ready-made, but each index is its **own** call on a 50-call/day plan of which `connectors/accuweather.ts` already spends 3 per cache miss (~16 servable forecasts a day), so three indices would have halved the forecasts to buy three numbers — and a bought index cannot say *why*. Within the window precipitation probability and wind take the **max** (one hour at 90% among eleven clear ones is still an outing to postpone) while millimetres **sum**; the window never straddles two days, so in the evening it rolls to tomorrow as a whole and the response declares which day it scored
 - **The hourly detail opens on today and never offers a past day**: `hourly` can start the evening before — sources in UTC, restated in the location's local hour, hand back a few hours of the previous day — so the day strip filters to `>= today` on both clients, and the entry point passes today's key rather than `hourly.first`, which was opening the sheet on a forecast the day had already disproved. The trim matters twice over: the `slice(0, 7)` was also eating a future day to make room for a past one. On today the default hour is **now**; on any other day it is the peak hour of the metric, which is what makes that day worth looking at
 - **Alerts on the forecast response ride the same call as the forecast**: WeatherKit and WeatherAPI return alerts inside their forecast response, so a connector that returns `null` (its own error contract) drops its alerts with it, and a source **disabled in `/api/sources` is never fetched at all** — disabling WeatherKit as a forecast source also silences its alerts. The engine now also calls **MeteoAlarm** directly, alongside OpenWeatherMap, in a `Promise.allSettled` that cannot fail the forecast: in Italy MeteoAlarm is the civil-protection feed, so it is normal for it to be the *only* source with a warning on a given day — and while it was missing from the engine, exactly those days produced a forecast response with `alerts: []` while `/api/alerts/active` had two. Both paths now query the same four sources. On a cache hit the engine deliberately **re-fetches alerts live** rather than serving the cached ones: a forecast is good for thirty minutes, an alert issued ten minutes ago is not. All of this is covered by the `allerte` block in the engine suite — until then every mock returned `alerts: []`, so the whole path could break without a single test noticing, and a failure there looks exactly like a calm day
+- **The iOS dashboard is themed by the weather, and everything optional is opt-in** (`ios Redisign/README.md`): page, hero, ink and accent come from `WeatherTheme.of(condition)`, so a rainy day does not wear the same cream as a sunny one — colour is the first information to arrive, before the number. Below one hero sit four collapsible sections (Ora per ora, Prossimi giorni, Per te, Fonti dati) in a single white sheet. The seven contextual panels became **cards inside "Per te" that the user switches on**, persisted in `UserDefaults` like the PV plant size and for the same reason. The rule is still double: a card shows only if the user wants it **and** the backend sent the block, so the sea still disappears inland and the snow in summer. Card text reuses the original panels' static helpers rather than restating it — two screens describing the same datum in two wordings are worse than one screen. Two hero variants ship (`HeroVariant`, switchable in settings) because the handoff offered both and they differ only in the hero: "Foglio" gives the temperature the whole stage, "Tessere" trades some of it for wind, UV, nowcast and sunset at a glance
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals
@@ -358,6 +370,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **iOS redesign** (2026-09-14, from the `ios Redisign/` handoff): thirteen equally-weighted stacked panels became one condition-themed hero plus four collapsible sections. New design system (`WeatherTheme.swift`: five condition themes, `Duet` tokens, `WeatherSymbol` — the WMO→SF Symbol map that had been copy-pasted into four views). New dashboard components, a "Per te" card system with its own settings screen, and `Path.smoothCurve` shared by the sparkline, the hourly detail and the ensemble band. **One deliberate departure from the handoff**: its "Foglio" variant drops the minute-by-minute nowcast entirely, so it was restored as a single accent line in the hero — "Pioggia fra 12 minuti" is the most urgent thing this app knows, and losing it to a layout choice would be a regression wearing a redesign's clothes. The old panel views stay in the repo: their static helpers are the source of the cards' wording, and `SolarPanelView`'s are covered by tests.
 - **iOS parity closed** (2026-09-14): `SolarPanelView`, `SkyPanelView`, `SeaPanelView` and `ActivitiesPanelView` bring the four web-only features to iOS, and the Swift models now decode `solar`, `sky`, `sea` and `activities` — the data was arriving and being thrown away. PV plant size lives in `@AppStorage`, mirroring the web's `localStorage`, for the same reason: in the request it would fragment the forecast cache per user. Two asymmetries remain, both deliberate: personal threshold alerts are iOS-only (the web has no push) and the air-quality detail panel is web-only.
 - **Lifestyle indices** (backend + web): "buona giornata per…" for running, cycling and hanging out the laundry, from the aggregated hourly data we already have — `backend/utils/activities.ts` scores comfort, dryness, wind, UV, humidity and the European AQI over the next daylight window, and `ActivitiesPanel.tsx` / `ActivitiesPanelView.swift` render bar, score and limiting factor. Two of my own design errors were caught by the tests: `dryAirScore` was `100 - humidity`, which scored an ordinary 50% humidity day as mediocre, and the drying-wind floor was low enough that calm air came out as the *limiting* factor of a fine dry day — wind is a bonus for laundry, not a requirement, and `dryingTempScore` was added so the panel doesn't say "stendi pure" at 3 °C. ~~Web only~~ — on iOS since 2026-09-14.
 - **Sea state** (backend + web): a new `connectors/openmeteoMarine.ts` against Open-Meteo Marine for waves, swell and water temperature, turned into a `sea` block by `utils/sea.ts` and rendered by `SeaPanel.tsx` / `SeaPanelView.swift`. The connector **self-excludes inland**, so no coastline test was needed. ~~Web only~~ — on iOS since 2026-09-14.

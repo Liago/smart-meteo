@@ -24,28 +24,28 @@ struct GardenPanelView: View {
 
     // MARK: - Etichette
 
-    private static let moistureLabels = [
+    static let moistureLabels = [
         "very_dry": "Molto secco",
         "dry": "Asciutto",
         "adequate": "Umidità adeguata",
         "wet": "Molto umido",
     ]
 
-    private static let moistureColors: [String: Color] = [
+    static let moistureColors: [String: Color] = [
         "very_dry": Color(hex: "C2410C"),
         "dry": Color(hex: "F59E0B"),
         "adequate": Color(hex: "33B34D"),
         "wet": Color(hex: "0EA5E9"),
     ]
 
-    private static let adviceHeadlines = [
+    static let adviceHeadlines = [
         "rain_expected": "Non innaffiare: ci pensa la pioggia",
         "water_now": "Da innaffiare oggi",
         "water_soon": "Da innaffiare entro un giorno o due",
         "not_needed": "Non serve innaffiare",
     ]
 
-    private static let adviceColors: [String: Color] = [
+    static let adviceColors: [String: Color] = [
         "rain_expected": Color(hex: "0EA5E9"),
         "water_now": Color(hex: "C2410C"),
         "water_soon": Color(hex: "F59E0B"),
