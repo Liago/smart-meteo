@@ -94,11 +94,21 @@ jest.mock('../../connectors/meteostat', () => ({ fetchFromMeteostat: jest.fn(asy
  * mock restituiva `alerts: []`, quindi il motore poteva smettere di propagarle
  * senza che un solo test se ne accorgesse.
  */
-let providerAlerts: { weatherkit: any[]; weatherapi: any[]; owm: any[] } = {
+let providerAlerts: {
+	weatherkit: any[];
+	weatherapi: any[];
+	owm: any[];
+	meteoalarm: any[];
+} = {
 	weatherkit: [],
 	weatherapi: [],
 	owm: [],
+	meteoalarm: [],
 };
+
+jest.mock('../../connectors/meteoalarm', () => ({
+	fetchMeteoAlarmAlerts: jest.fn(async () => providerAlerts.meteoalarm),
+}));
 
 jest.mock('../../connectors/openweathermap', () => ({
 	fetchFromOpenWeather: jest.fn(async () => sourceResponses['openweathermap'] ?? null),
@@ -173,7 +183,7 @@ beforeEach(() => {
 	ensembleBands = [];
 	airQualityResult = null;
 	marineResult = null;
-	providerAlerts = { weatherkit: [], weatherapi: [], owm: [] };
+	providerAlerts = { weatherkit: [], weatherapi: [], owm: [], meteoalarm: [] };
 });
 
 // --------------------------------------------------------------------- tests
@@ -668,6 +678,62 @@ describe('allerte', () => {
 
 		const r = await getSmartForecast(LAT, LON);
 
+		expect(r.alerts).toHaveLength(0);
+	});
+
+
+	it('porta nella risposta le allerte di MeteoAlarm', async () => {
+		// In Italia MeteoAlarm è il feed della protezione civile: è la fonte che
+		// conta, ed è normale che in una giornata sia l'unica ad avere qualcosa.
+		// Restava fuori dal motore, quindi il forecast usciva senza allerte
+		// mentre /api/alerts/active ne aveva due.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		providerAlerts.meteoalarm = [
+			alert({
+				id: 'meteoalarm:IT001-1',
+				areaId: 'IT001',
+				areaName: 'Piemonte',
+				countryCode: 'IT',
+				severity: 'moderate',
+				event: 'Yellow Thunderstorm Warning',
+				headline: 'Yellow Thunderstorm Warning',
+				providerSource: 'meteoalarm',
+			}),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+		expect(r.alerts[0].providerSource).toBe('meteoalarm');
+	});
+
+	it('le allerte di MeteoAlarm arrivano anche su una risposta in cache', async () => {
+		cachedRow = {
+			full_data: {
+				schema_version: FORECAST_SCHEMA_VERSION,
+				current: { temperature: 11.1 },
+				sources_used: ['cached-source'],
+				alerts: [],
+			},
+		};
+		providerAlerts.meteoalarm = [
+			alert({ id: 'meteoalarm:IT001-1', areaId: 'IT001', areaName: 'Piemonte', countryCode: 'IT' }),
+		];
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.alerts).toHaveLength(1);
+	});
+
+	it('una fonte di allerte che non risponde non fa fallire la previsione', async () => {
+		// Un bollettino irraggiungibile non deve portarsi via il meteo.
+		sourceResponses['open-meteo'] = forecast('open-meteo', { temp: 20 });
+		const meteoalarm = require('../../connectors/meteoalarm');
+		meteoalarm.fetchMeteoAlarmAlerts.mockRejectedValueOnce(new Error('feed giù'));
+
+		const r = await getSmartForecast(LAT, LON);
+
+		expect(r.current.temperature).toBeCloseTo(20, 1);
 		expect(r.alerts).toHaveLength(0);
 	});
 
