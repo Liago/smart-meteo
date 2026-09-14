@@ -199,8 +199,8 @@ export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', ti
 					preserveAspectRatio="none"
 					style={{ display: 'block', minWidth: '100%' }}
 				>
-					<line x1="0" y1={chartData.gridY1} x2={chartData.width} y2={chartData.gridY1} stroke="#eef2f6" strokeWidth="1" />
-					<line x1="0" y1={chartData.gridY2} x2={chartData.width} y2={chartData.gridY2} stroke="#eef2f6" strokeWidth="1" />
+					<line x1="0" y1={chartData.gridY1} x2={chartData.width} y2={chartData.gridY1} stroke="var(--color-duet-border)" strokeWidth="1" />
+					<line x1="0" y1={chartData.gridY2} x2={chartData.width} y2={chartData.gridY2} stroke="var(--color-duet-border)" strokeWidth="1" />
 					<path d={chartData.areaD} fill="var(--color-duet-accent-soft)" />
 					{/* Banda 10°-90° percentile fra i membri dell'ensemble: quanto la
 					    previsione è incerta, non solo quale valore è più probabile. */}

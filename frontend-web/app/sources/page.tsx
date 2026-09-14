@@ -40,28 +40,28 @@ export default function SourcesPage() {
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/"
-            className="dt-icon-btn p-2 rounded-lg glass transition-colors"
-            style={{ color: 'var(--color-duet-muted)' }}
+            className="dt-icon-btn flex items-center justify-center w-10 h-10 rounded-full glass transition-colors"
+            style={{ color: 'var(--color-duet-accent)' }}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-duet-ink)' }}>Gestione Fonti</h1>
-            <p className="text-sm" style={{ color: 'var(--color-duet-muted)' }}>Abilita o disabilita le fonti meteo</p>
+            <h1 className="hig-title-1" style={{ color: 'var(--color-duet-ink)' }}>Gestione Fonti</h1>
+            <p className="hig-subhead" style={{ color: 'var(--color-duet-muted)' }}>Abilita o disabilita le fonti meteo</p>
           </div>
         </div>
 
         {toggleError && (
-          <div className="glass p-3 mb-4 text-sm" style={{ color: '#c62828', borderColor: '#f3b4b4' }}>
+          <div className="glass p-3 mb-4 text-sm" style={{ color: 'var(--color-duet-red-ink)', borderColor: 'var(--color-duet-red-border)' }}>
             {toggleError}
           </div>
         )}
 
         {error && (
           <div className="glass p-6 text-center" style={{ color: 'var(--color-duet-ink)' }}>
-            <p className="mb-2" style={{ color: '#c62828' }}>Impossibile caricare le fonti</p>
+            <p className="mb-2" style={{ color: 'var(--color-duet-red)' }}>Impossibile caricare le fonti</p>
             <p className="text-sm" style={{ color: 'var(--color-duet-muted)' }}>{error.message}</p>
           </div>
         )}
@@ -99,7 +99,7 @@ export default function SourcesPage() {
                           <span>Latenza: {source.lastResponseMs}ms</span>
                         )}
                         {source.lastError && (
-                          <span style={{ color: '#c62828' }}>Errore: {source.lastError}</span>
+                          <span style={{ color: 'var(--color-duet-red)' }}>Errore: {source.lastError}</span>
                         )}
                       </div>
                     </div>

@@ -9,17 +9,22 @@ interface WeatherAlertsProps {
 	alerts: WeatherAlert[];
 }
 
+// Stessa gerarchia cromatica delle System Colors iOS per la severity:
+// rosso (critico) → arancione → giallo → blu (informativo). I token si
+// adattano da soli alla dark mode, quindi qui non ci sono più hex fissi.
 function getSeverityStyles(severity: string) {
 	switch (severity) {
 		case 'extreme':
-			return { bg: '#fde8e8', border: '#f3b4b4', icon: '#8c2323', text: '#5c1717', badge: '#c62828' };
+			return { bg: 'var(--color-duet-red-bg)', border: 'var(--color-duet-red-border)', icon: 'var(--color-duet-red-ink)', text: 'var(--color-duet-ink)', badge: 'var(--color-duet-red)', badgeInk: '#ffffff' };
 		case 'severe':
-			return { bg: '#ffedd9', border: '#f5c98a', icon: '#8a4c0a', text: '#5c3406', badge: '#d9720a' };
+			return { bg: 'var(--color-duet-orange-bg)', border: 'var(--color-duet-orange-border)', icon: 'var(--color-duet-orange-ink)', text: 'var(--color-duet-ink)', badge: 'var(--color-duet-orange)', badgeInk: '#ffffff' };
 		case 'moderate':
-			return { bg: '#fff7dd', border: '#ffd978', icon: '#7e5710', text: '#513709', badge: '#f7b228' };
+			// Il badge giallo resta sempre saturo (non segue il tema): il testo
+			// bianco perderebbe troppo contrasto sopra un giallo chiaro.
+			return { bg: 'var(--color-duet-amber-bg)', border: 'var(--color-duet-amber-border)', icon: 'var(--color-duet-amber-strong)', text: 'var(--color-duet-ink)', badge: 'var(--color-duet-amber-badge)', badgeInk: 'var(--color-duet-amber-badge-ink)' };
 		case 'minor':
 		default:
-			return { bg: '#f0f7fa', border: '#d9ecf5', icon: '#00619b', text: '#0a3a57', badge: '#0077b3' };
+			return { bg: 'var(--color-duet-accent-soft)', border: 'var(--color-duet-accent-border)', icon: 'var(--color-duet-accent)', text: 'var(--color-duet-ink)', badge: 'var(--color-duet-accent)', badgeInk: '#ffffff' };
 	}
 }
 
@@ -69,7 +74,7 @@ export default function WeatherAlerts({ alerts }: WeatherAlertsProps) {
 							initial={{ opacity: 0, y: -10 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-							className="border rounded-lg overflow-hidden"
+							className="border rounded-[14px] overflow-hidden"
 							style={{ background: styles.bg, borderColor: styles.border }}
 						>
 							<div className="flex items-start gap-3 p-4">
@@ -78,8 +83,8 @@ export default function WeatherAlerts({ alerts }: WeatherAlertsProps) {
 								<div className="flex-1 min-w-0">
 									<div className="flex items-center gap-2 flex-wrap">
 										<span
-											className="text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
-											style={{ background: styles.badge }}
+											className="text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide"
+											style={{ background: styles.badge, color: styles.badgeInk }}
 										>
 											{getSeverityLabel(alert.severity)}
 										</span>
@@ -154,8 +159,8 @@ export function AlertBadge({ count, onClick }: { count: number; onClick?: () => 
 	return (
 		<button
 			onClick={onClick}
-			className="relative inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full text-[13px] font-semibold hover:brightness-95 transition-all"
-			style={{ background: '#fff7dd', color: '#7e5710', border: '1px solid #ffd978' }}
+			className="dt-icon-btn relative inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full text-[13px] font-semibold transition-all"
+			style={{ background: 'var(--color-duet-amber-bg)', color: 'var(--color-duet-amber-strong)', border: '1px solid var(--color-duet-amber-border)' }}
 		>
 			<Shield className="w-3.5 h-3.5" />
 			{count}

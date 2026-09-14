@@ -48,7 +48,7 @@ export default function ForecastDetails({ daily, hourly, onPrecipitationClick }:
 				  7 giorni totali dal backend restano esattamente i 6 del titolo.
 				*/}
 				{daily.slice(1).map((day) => (
-					<div key={day.date} style={{ borderTop: '1px solid #eef2f6' }}>
+					<div key={day.date} style={{ borderTop: '1px solid var(--color-duet-border)' }}>
 						<div className="w-full flex items-center justify-between gap-2">
 							<button
 								onClick={() => toggleDay(day.date)}

@@ -4,8 +4,8 @@
   "description": "Previsioni meteo aggregate da 5 fonti professionali",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e293b",
-  "theme_color": "#1e293b",
+  "background_color": "#f2f2f7",
+  "theme_color": "#007aff",
   "orientation": "portrait-primary",
   "icons": [
     {

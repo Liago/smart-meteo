@@ -119,11 +119,16 @@ export default function Home() {
 		<div className="min-h-screen" style={{ background: 'var(--color-duet-bg)' }}>
 			<header
 				className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 lg:h-16 lg:flex-nowrap lg:gap-x-6 lg:px-7 lg:py-0"
-				style={{ background: 'var(--color-duet-surface)', borderBottom: '1px solid var(--color-duet-border)' }}
+				style={{
+					background: 'var(--color-material-thick)',
+					backdropFilter: 'blur(20px) saturate(180%)',
+					WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+					borderBottom: '0.5px solid var(--color-duet-border)',
+				}}
 			>
 				<Link href="/" className="order-1 flex shrink-0 items-center gap-2.5">
 					<span
-						className="flex items-center justify-center w-[34px] h-[34px] rounded-lg text-white"
+						className="flex items-center justify-center w-[34px] h-[34px] rounded-[10px] text-white shadow-sm"
 						style={{ background: 'var(--color-duet-accent)' }}
 					>
 						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -131,7 +136,7 @@ export default function Home() {
 							<path strokeLinecap="round" d="M9 12l1.5 2 2-3" />
 						</svg>
 					</span>
-					<span className="font-bold text-[19px] tracking-tight" style={{ color: 'var(--color-duet-ink)' }}>Smart Meteo</span>
+					<span className="hig-headline tracking-tight" style={{ color: 'var(--color-duet-ink)' }}>Smart Meteo</span>
 				</Link>
 
 				{/*
@@ -151,14 +156,14 @@ export default function Home() {
 					/>
 				</div>
 
-				<div className="order-2 ml-auto flex items-center gap-1.5 lg:order-3 lg:ml-0">
+				<div className="order-2 ml-auto flex items-center gap-1 lg:order-3 lg:ml-0">
 					{allAlerts.length > 0 && <AlertBadge count={allAlerts.length} />}
 
 					<button
 						onClick={handleToggleHome}
 						disabled={!coords}
-						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-lg disabled:opacity-40"
-						style={{ color: currentIsHome ? 'var(--color-duet-accent)' : 'var(--color-duet-muted)' }}
+						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-full disabled:opacity-40"
+						style={{ color: currentIsHome ? 'var(--color-duet-accent)' : 'var(--color-duet-muted)', background: currentIsHome ? 'var(--color-duet-accent-soft)' : 'transparent' }}
 						title={currentIsHome ? 'Rimuovi da Home' : 'Imposta come Home'}
 					>
 						<svg width="19" height="19" viewBox="0 0 24 24" fill={currentIsHome ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5">
@@ -168,8 +173,8 @@ export default function Home() {
 					<button
 						onClick={handleToggleSave}
 						disabled={!coords}
-						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-lg disabled:opacity-40"
-						style={{ color: currentIsSaved ? 'var(--color-duet-accent)' : 'var(--color-duet-muted)' }}
+						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-full disabled:opacity-40"
+						style={{ color: currentIsSaved ? 'var(--color-duet-accent)' : 'var(--color-duet-muted)', background: currentIsSaved ? 'var(--color-duet-accent-soft)' : 'transparent' }}
 						title={currentIsSaved ? 'Rimuovi dai preferiti' : 'Salva nei preferiti'}
 					>
 						<svg width="19" height="19" viewBox="0 0 24 24" fill={currentIsSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5">
@@ -178,7 +183,7 @@ export default function Home() {
 					</button>
 					<Link
 						href="/sources"
-						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-lg"
+						className="dt-icon-btn inline-flex items-center justify-center w-10 h-10 rounded-full"
 						style={{ color: 'var(--color-duet-muted)' }}
 						title="Gestione fonti"
 					>
@@ -193,11 +198,16 @@ export default function Home() {
 
 			<main className="max-w-[1320px] mx-auto px-4 sm:px-7 py-5 sm:py-7 flex flex-col gap-5">
 				{!coords && !data && (
-					<div className="glass p-8 text-center" style={{ color: 'var(--color-duet-ink)' }}>
-						<div className="text-5xl mb-4">{'🌤️'}</div>
-						<h2 className="text-xl font-semibold mb-2">Benvenuto su Smart Meteo</h2>
-						<p className="text-sm" style={{ color: 'var(--color-duet-muted)' }}>
-							Cerca una localita o usa la geolocalizzazione per vedere le previsioni aggregate da 5 fonti meteo professionali.
+					<div className="glass p-10 text-center" style={{ color: 'var(--color-duet-ink)' }}>
+						<div
+							className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
+							style={{ background: 'var(--color-duet-accent-soft)' }}
+						>
+							<span className="text-4xl" aria-hidden>{'🌤️'}</span>
+						</div>
+						<h2 className="hig-title-2 mb-2">Benvenuto su Smart Meteo</h2>
+						<p className="hig-subhead max-w-sm mx-auto" style={{ color: 'var(--color-duet-muted)' }}>
+							Cerca una località o usa la geolocalizzazione per vedere le previsioni aggregate da 5 fonti meteo professionali.
 						</p>
 					</div>
 				)}

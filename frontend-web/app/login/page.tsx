@@ -71,7 +71,7 @@ function LoginForm() {
 						value={email}
 						onChange={(e) => setEmail(e.target.value)}
 						required
-						className="dt-input w-full px-4 py-2 rounded-lg outline-none"
+						className="dt-input w-full px-4 py-2 rounded-[10px] outline-none"
 						style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)', color: 'var(--color-duet-ink)' }}
 						placeholder="tuo@email.com"
 					/>
@@ -85,20 +85,20 @@ function LoginForm() {
 						onChange={(e) => setPassword(e.target.value)}
 						required
 						minLength={6}
-						className="dt-input w-full px-4 py-2 rounded-lg outline-none"
+						className="dt-input w-full px-4 py-2 rounded-[10px] outline-none"
 						style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)', color: 'var(--color-duet-ink)' }}
 						placeholder="••••••••"
 					/>
 				</div>
 
 				{error && (
-					<div className="p-3 rounded-lg text-sm" style={{ background: '#fde8e8', border: '1px solid #f3b4b4', color: '#8c2323' }}>
+					<div className="p-3 rounded-[10px] text-sm" style={{ background: 'var(--color-duet-red-bg)', border: '1px solid var(--color-duet-red-border)', color: 'var(--color-duet-red-ink)' }}>
 						{error}
 					</div>
 				)}
 
 				{message && (
-					<div className="p-3 rounded-lg text-sm" style={{ background: 'var(--color-duet-green-bg)', border: '1px solid #b6e3cc', color: 'var(--color-duet-green-ink)' }}>
+					<div className="p-3 rounded-[10px] text-sm" style={{ background: 'var(--color-duet-green-bg)', border: '1px solid var(--color-duet-green)', color: 'var(--color-duet-green-ink)' }}>
 						{message}
 					</div>
 				)}
@@ -106,7 +106,7 @@ function LoginForm() {
 				<button
 					type="submit"
 					disabled={loading}
-					className="dt-primary w-full py-3 px-4 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					className="dt-primary w-full py-3 px-4 text-white font-semibold rounded-[10px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 					style={{ background: 'var(--color-duet-accent)' }}
 				>
 					{loading ? 'Elaborazione...' : mode === 'signin' ? 'Accedi' : 'Registrati'}

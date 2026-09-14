@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Figtree } from 'next/font/google';
 import './globals.css';
-
-const figtree = Figtree({ subsets: ['latin'], variable: '--font-sans', weight: ['400', '500', '600', '700'] });
 
 export const metadata: Metadata = {
 	title: 'Smart Meteo - Previsioni Aggregate Intelligenti',
@@ -25,7 +22,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
 	width: 'device-width',
 	initialScale: 1,
-	themeColor: '#0077b3',
+	// systemBlue: la stessa tinta dell'accento HIG, letta dalla UI (barra di stato,
+	// splash PWA) invece del vecchio blu "Duet". Il colore reale si adatta al tema
+	// dell'utente via CSS (var(--color-duet-accent)); qui serve un valore statico.
+	themeColor: [
+		{ media: '(prefers-color-scheme: light)', color: '#007aff' },
+		{ media: '(prefers-color-scheme: dark)', color: '#0a84ff' },
+	],
 };
 
 export default function RootLayout({
@@ -38,7 +41,13 @@ export default function RootLayout({
 			<head>
 				<link rel="manifest" href="/manifest.json" />
 			</head>
-			<body className={`${figtree.variable} antialiased font-sans`}>
+			{/*
+			  Nessun font Google: lo stack di sistema (-apple-system, SF Pro, ...)
+			  definito in globals.css risolve nativamente a San Francisco sui
+			  dispositivi Apple, il font della stessa Human Interface Guidelines,
+			  senza il costo di un web font scaricato.
+			*/}
+			<body className="antialiased font-sans">
 				{children}
 			</body>
 		</html>

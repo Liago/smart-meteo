@@ -40,7 +40,7 @@ export default function AuthButton() {
 	};
 
 	if (loading) {
-		return <div className="h-9 w-20 rounded-lg animate-pulse" style={{ background: 'var(--color-duet-bg)' }}></div>;
+		return <div className="h-9 w-20 rounded-[10px] animate-pulse" style={{ background: 'var(--color-duet-bg)' }}></div>;
 	}
 
 	if (user) {
@@ -51,7 +51,7 @@ export default function AuthButton() {
 				</span>
 				<button
 					onClick={handleSignOut}
-					className="dt-secondary px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors"
+					className="dt-secondary px-3 py-1.5 text-xs font-semibold rounded-[10px] transition-colors"
 					style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)', color: 'var(--color-duet-accent)' }}
 				>
 					Logout
@@ -63,7 +63,7 @@ export default function AuthButton() {
 	return (
 		<Link
 			href="/login"
-			className="dt-primary px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
+			className="dt-primary px-4 py-2 text-sm font-semibold text-white rounded-[10px] transition-colors"
 			style={{ background: 'var(--color-duet-accent)' }}
 		>
 			Accedi
