@@ -88,6 +88,14 @@ struct ForecastResponse: Codable {
     let snow: SnowOutlook?
     /// Orto: presente ovunque Open-Meteo dia i dati agronomici.
     let garden: GardenOutlook?
+    /// Resa fotovoltaica sui prossimi giorni.
+    let solar: SolarOutlook?
+    /// Tramonti e cielo notturno.
+    let sky: SkyOutlook?
+    /// Mare: solo sulle località costiere.
+    let sea: SeaOutlook?
+    /// Indici lifestyle sulla prossima finestra diurna.
+    let activities: ActivitiesOutlook?
     /// Nowcast al minuto per la prossima ora. Presente solo dove Apple WeatherKit
     /// copre il dataset `forecastNextHour` (Italia inclusa).
     let forecastNextHour: ForecastNextHour?
@@ -106,6 +114,10 @@ struct ForecastResponse: Codable {
         case pollen
         case snow
         case garden
+        case solar
+        case sky
+        case sea
+        case activities
         case forecastNextHour
     }
 }
@@ -424,6 +436,151 @@ struct GardenOutlook: Codable {
         case advice
         case sowingOk = "sowing_ok"
     }
+}
+
+// MARK: - Fotovoltaico
+
+/// Un giorno di resa fotovoltaica.
+struct SolarDay: Codable, Identifiable {
+    var id: String { date }
+    let date: String
+    /// Resa specifica: kWh prodotti per ogni kWp installato.
+    ///
+    /// È il backend a fermarsi qui e a non moltiplicare per la potenza
+    /// dell'impianto: quella è un dato dell'utente, e se entrasse nella
+    /// richiesta la cache della previsione si frammenterebbe per utente invece
+    /// di servire tutti quelli sulla stessa località.
+    let kwhPerKwp: Double
+    /// Ore di sole effettive previste.
+    let sunshineHours: Double?
+    /// Picco di potenza atteso per kWp, in watt.
+    let peakW: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case kwhPerKwp = "kwh_per_kwp"
+        case sunshineHours = "sunshine_hours"
+        case peakW = "peak_w"
+    }
+}
+
+/// Resa fotovoltaica prevista sui prossimi giorni.
+struct SolarOutlook: Codable {
+    /// "tilted" | "horizontal": su quale piano è stata calcolata la radiazione.
+    ///
+    /// Viaggia fino all'utente perché cambia il numero: d'inverno un impianto
+    /// inclinato produce parecchio più di una stima sul piano orizzontale, e
+    /// non dirlo renderebbe la differenza inspiegabile.
+    let plane: String
+    let tiltDeg: Double
+    let azimuthDeg: Double
+    /// Perdite di impianto già scontate nella resa (0-1).
+    let performanceRatio: Double
+    let days: [SolarDay]
+
+    enum CodingKeys: String, CodingKey {
+        case plane
+        case tiltDeg = "tilt_deg"
+        case azimuthDeg = "azimuth_deg"
+        case performanceRatio = "performance_ratio"
+        case days
+    }
+}
+
+// MARK: - Cielo
+
+/// Qualità di un alba o di un tramonto.
+struct SkyEvent: Codable {
+    /// Slot orario, nella stessa chiave locale degli hourly.
+    let at: String
+    /// 0-100.
+    let score: Double
+    /// "plain" | "fair" | "good" | "excellent"
+    let level: String
+}
+
+/// Osservazione astronomica di stanotte.
+struct StargazingOutlook: Codable {
+    let score: Double
+    let level: String
+    /// Copertura nuvolosa media della notte, %.
+    let cloudCover: Double
+    /// Illuminazione lunare, %: penalizza senza azzerare.
+    let moonIllumination: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case score, level
+        case cloudCover = "cloud_cover"
+        case moonIllumination = "moon_illumination"
+    }
+}
+
+/// Tramonti, albe e cielo notturno.
+struct SkyOutlook: Codable {
+    let sunset: SkyEvent?
+    let sunrise: SkyEvent?
+    let stargazing: StargazingOutlook?
+}
+
+// MARK: - Mare
+
+/// Onde e temperatura dell'acqua.
+///
+/// Presente **solo sulle località costiere**, e il criterio non è nostro: il
+/// modello d'onda copre soltanto i punti di griglia sul mare, quindi
+/// nell'entroterra il backend non manda affatto il blocco.
+struct SeaOutlook: Codable {
+    let seaTemperature: Double?
+    /// Altezza d'onda attuale, metri.
+    let waveHeight: Double?
+    /// Provenienza dell'onda in gradi.
+    let waveDirection: Double?
+    let wavePeriod: Double?
+    /// Mare lungo: l'onda che arriva da lontano, metri.
+    let swellHeight: Double?
+    /// "calm" | "slight" | "moderate" | "rough"
+    let state: String
+    /// Massimo atteso nelle prossime 24 ore, metri.
+    let maxWave24h: Double?
+    let maxWaveAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case seaTemperature = "sea_temperature"
+        case waveHeight = "wave_height"
+        case waveDirection = "wave_direction"
+        case wavePeriod = "wave_period"
+        case swellHeight = "swell_height"
+        case state
+        case maxWave24h = "max_wave_24h"
+        case maxWaveAt = "max_wave_at"
+    }
+}
+
+// MARK: - Indici lifestyle
+
+/// Punteggio di un'attività sulla prossima finestra diurna.
+struct ActivityScore: Codable, Identifiable {
+    /// "running" | "cycling" | "laundry"
+    let id: String
+    let label: String
+    /// 0-100, pari al **peggiore** dei fattori: una giornata perfetta sotto il
+    /// diluvio non è mezza buona, e la media nasconderebbe proprio il fattore
+    /// per cui si rinuncia.
+    let score: Double
+    /// Il fattore che tiene basso il punteggio, quando ce n'è uno. È ciò che
+    /// rende utile il numero: «65» non dice niente, «65, limita il vento» dice
+    /// se rimandare o cambiare percorso.
+    let limiting: String?
+}
+
+/// «Oggi è una buona giornata per…»
+struct ActivitiesOutlook: Codable {
+    /// Giorno locale valutato: di sera la finestra è già quella di domani, e
+    /// il pannello lo dichiara invece di lasciarlo intuire.
+    let date: String
+    let from: String
+    let to: String
+    let activities: [ActivityScore]
 }
 
 // MARK: - Next Hour Precipitation

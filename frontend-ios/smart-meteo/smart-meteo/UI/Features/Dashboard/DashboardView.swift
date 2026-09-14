@@ -216,6 +216,32 @@ struct DashboardView: View {
                                     .padding(.horizontal)
                             }
 
+                            // Fotovoltaico: la potenza dell'impianto la mette
+                            // l'utente e resta sul telefono.
+                            if let solar = forecast.solar, !solar.days.isEmpty {
+                                SolarPanelView(solar: solar)
+                                    .padding(.horizontal)
+                            }
+
+                            // Cielo: tramonti e osservazione astronomica.
+                            if let sky = forecast.sky {
+                                SkyPanelView(sky: sky)
+                                    .padding(.horizontal)
+                            }
+
+                            // Mare: solo sulle località costiere — nell'entroterra
+                            // il backend non manda affatto il blocco.
+                            if let sea = forecast.sea {
+                                SeaPanelView(sea: sea)
+                                    .padding(.horizontal)
+                            }
+
+                            // Indici lifestyle: corsa, bici, bucato.
+                            if let activities = forecast.activities, !activities.activities.isEmpty {
+                                ActivitiesPanelView(activities: activities)
+                                    .padding(.horizontal)
+                            }
+
                             // Pollini: solo dove il modello CAMS copre.
                             if let pollen = forecast.pollen, !pollen.isEmpty {
                                 PollenPanelView(pollen: pollen)
