@@ -236,25 +236,40 @@ export default function Home() {
 							<SunWindCard astronomy={data.astronomy} current={data.current} />
 						</div>
 
-						<div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5 items-start">
-							<DayNarrative
-								current={data.current}
-								hourly={data.hourly}
-								daily={data.daily}
-								astronomy={data.astronomy}
-							/>
-							<div className="flex flex-col gap-5">
-								<AirQualitySummary data={data.current} sourcesCount={data.sources_used.length} />
-								<SnowPanel snow={data.snow} />
-								<GardenPanel garden={data.garden} />
-								<SolarPanel solar={data.solar} />
-								<SkyPanel sky={data.sky} />
-								<SeaPanel sea={data.sea} />
+						{/*
+						  Il racconto della giornata occupa tutta la larghezza: prima era
+						  incastrato in una colonna 1.7fr accanto a nove schede impilate,
+						  che diventavano una colonna più alta di tutto il resto della
+						  pagina e senza alcun criterio di lettura. Le schede di
+						  approfondimento ora vivono in una griglia responsive a sé,
+						  ordinate da quella più utile ogni giorno (attività, aria,
+						  giardino) a quella più di nicchia o stagionale (neve, mare).
+						*/}
+						<DayNarrative
+							current={data.current}
+							hourly={data.hourly}
+							daily={data.daily}
+							astronomy={data.astronomy}
+						/>
+
+						<section className="flex flex-col gap-4">
+							{/*
+							  Nessun sottotitolo elenca le singole schede: userebbe per forza
+							  gli stessi nomi ("Cielo", "Giardino"...) dei titoli qui sotto,
+							  ambigui per i test (e per chi legge) quando compaiono due volte.
+							*/}
+							<h2 className="hig-title-3 px-1" style={{ color: 'var(--color-duet-ink)' }}>Approfondimenti</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
 								<ActivitiesPanel activities={data.activities} />
+								<AirQualitySummary data={data.current} sourcesCount={data.sources_used.length} />
+								<GardenPanel garden={data.garden} />
 								<PollenPanel pollen={data.pollen} />
-								<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
+								<SnowPanel snow={data.snow} />
+								<SkyPanel sky={data.sky} />
+								<SolarPanel solar={data.solar} />
+								<SeaPanel sea={data.sea} />
 							</div>
-						</div>
+						</section>
 
 						{data.hourly && (
 							<HourlyForecast
@@ -271,6 +286,16 @@ export default function Home() {
 							astronomy={data.astronomy}
 							onPrecipitationClick={(date) => setPrecipDate(date)}
 						/>
+
+						{/*
+						  Le fonti contribuenti sono un dato diagnostico ("quante fonti,
+						  quanto sono d'accordo"), non un approfondimento meteo: prima
+						  chiudeva la colonna di destra fra Attività e Polline, mescolata
+						  a schede che invece rispondono a una domanda dell'utente. In
+						  fondo alla pagina, accanto al timestamp di aggiornamento, sta
+						  con l'altro metadato della previsione.
+						*/}
+						<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
 
 						{/* Il modale vive in un portal su document.body: la posizione qui è indifferente */}
 						<Modal
