@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi, seedHomeLocation, startAsNewVisitor } from './fixtures/api';
+import { dashboardReady, mockApi, openSection, seedHomeLocation, startAsNewVisitor } from './fixtures/api';
 
 /**
  * Dashboard: quello che l'utente vede al primo caricamento.
@@ -37,6 +37,7 @@ test('mostra la temperatura corrente e la condizione', async ({ page }) => {
 test('mostra le fonti che hanno contribuito', async ({ page }) => {
 	await mockApi(page);
 	await page.goto('/');
+	await openSection(page, 'Fonti');
 
 	await expect(page.getByText('Fonti contribuenti')).toBeVisible();
 	await expect(page.getByText('5 attive')).toBeVisible();
@@ -46,6 +47,7 @@ test('mostra le fonti che hanno contribuito', async ({ page }) => {
 test('mostra i sette giorni di previsione', async ({ page }) => {
 	await mockApi(page);
 	await page.goto('/');
+	await openSection(page, 'Settimana');
 
 	await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
 });
@@ -73,6 +75,7 @@ test.describe('indice di consenso', () => {
 	test('fonti concordi: badge verde con il punteggio', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Fonti');
 
 		await expect(page.getByText('Fonti concordi')).toBeVisible();
 		await expect(page.getByText('88/100')).toBeVisible();
@@ -89,6 +92,7 @@ test.describe('indice di consenso', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Fonti');
 
 		await expect(page.getByText('Fonti in disaccordo')).toBeVisible();
 		await expect(page.getByText(/fra 18° e 26°/)).toBeVisible();
@@ -98,6 +102,7 @@ test.describe('indice di consenso', () => {
 		// Succede leggendo una riga di cache scritta prima della Fase 6A.
 		await mockApi(page, { confidence: null });
 		await page.goto('/');
+		await openSection(page, 'Fonti');
 
 		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
 		await expect(page.getByText('Fonti concordi')).toHaveCount(0);
@@ -124,7 +129,7 @@ test.describe('nowcast al minuto', () => {
 		await mockApi(page, { withoutNextHour: true });
 		await page.goto('/');
 
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await dashboardReady(page);
 		await expect(page.getByText(/prossima ora/)).toHaveCount(0);
 	});
 });
@@ -133,8 +138,7 @@ test.describe('banda di incertezza', () => {
 	test('il grafico orario disegna la banda quando i percentili ci sono', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await dashboardReady(page);
 		// La banda è l'unico path decorativo del grafico orario.
 		const banda = page.locator('svg path[aria-hidden="true"]');
 		await expect(banda.first()).toBeAttached();
@@ -144,7 +148,7 @@ test.describe('banda di incertezza', () => {
 		await mockApi(page, { withoutBand: true });
 		await page.goto('/');
 
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await dashboardReady(page);
 		await expect(page.locator('svg path[aria-hidden="true"]')).toHaveCount(0);
 	});
 });
@@ -153,6 +157,7 @@ test.describe('pollini', () => {
 	test('mostra le specie con la più rilevante in cima', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Pollini')).toBeVisible();
 		await expect(page.getByText(/Oggi soprattutto graminacee/i)).toBeVisible();
@@ -162,8 +167,7 @@ test.describe('pollini', () => {
 	test('fuori dalla copertura del modello il pannello non compare', async ({ page }) => {
 		await mockApi(page, { withoutPollen: true });
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Pollini')).toHaveCount(0);
 	});
 });
@@ -181,6 +185,7 @@ test.describe('neve e gelate', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Neve e gelate')).toBeVisible();
 		await expect(page.getByText('Neve prevista, circa 12 cm')).toBeVisible();
@@ -202,6 +207,7 @@ test.describe('neve e gelate', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		// "al suolo" non è pedanteria: fra la superficie e i due metri ci sono
 		// tre o quattro gradi, e il backend le giudica con soglie diverse.
@@ -212,8 +218,7 @@ test.describe('neve e gelate', () => {
 	test('in una giornata mite il riquadro non compare', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Neve e gelate')).toHaveCount(0);
 	});
 });
@@ -222,6 +227,7 @@ test.describe('orto e giardino', () => {
 	test('mostra il consiglio, il motivo e il dato grezzo del terreno', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Orto e giardino')).toBeVisible();
 		await expect(page.getByText('Da innaffiare entro un giorno o due')).toBeVisible();
@@ -244,6 +250,7 @@ test.describe('orto e giardino', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Non innaffiare: ci pensa la pioggia')).toBeVisible();
 		await expect(page.getByText(/Attesi 14,0 mm/)).toBeVisible();
@@ -252,8 +259,7 @@ test.describe('orto e giardino', () => {
 	test('senza dati agronomici il riquadro non compare', async ({ page }) => {
 		await mockApi(page, { garden: null });
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Orto e giardino')).toHaveCount(0);
 	});
 });
@@ -262,6 +268,7 @@ test.describe('fotovoltaico', () => {
 	test('senza impianto impostato mostra la resa specifica', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Fotovoltaico')).toBeVisible();
 		await expect(page.getByText('Imposta impianto')).toBeVisible();
@@ -274,6 +281,7 @@ test.describe('fotovoltaico', () => {
 	test('salvata la potenza, i kWh compaiono e restano al ricaricamento', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await page.getByText('Imposta impianto').click();
 		await page.getByLabel('Potenza impianto').fill('3');
@@ -286,14 +294,14 @@ test.describe('fotovoltaico', () => {
 		// La potenza vive in localStorage: deve sopravvivere al ricaricamento
 		// senza aver mai toccato il backend.
 		await page.reload();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('15,6 kWh').first()).toBeVisible();
 	});
 
 	test('senza dati di radiazione il riquadro non compare', async ({ page }) => {
 		await mockApi(page, { solar: null });
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Fotovoltaico')).toHaveCount(0);
 	});
 });
@@ -302,6 +310,7 @@ test.describe('cielo', () => {
 	test('mette in cima il tramonto e mostra gli ingredienti della notte', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Cielo')).toBeVisible();
 		await expect(page.getByText('Tramonto spettacolare verso le 20:00')).toBeVisible();
@@ -319,6 +328,7 @@ test.describe('cielo', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Notte ottima per le stelle')).toBeVisible();
 		await expect(page.getByText('cielo terso, luna quasi nuova')).toBeVisible();
@@ -327,8 +337,7 @@ test.describe('cielo', () => {
 	test('senza nuvolosità per quota il riquadro non compare', async ({ page }) => {
 		await mockApi(page, { sky: null });
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Cielo')).toHaveCount(0);
 	});
 });
@@ -348,6 +357,7 @@ test.describe('mare', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Mare', { exact: true })).toBeVisible();
 		await expect(page.getByText('Acqua a 25°, mare calmo')).toBeVisible();
@@ -368,6 +378,7 @@ test.describe('mare', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText(/Verso le 17:00 diventa mosso/)).toBeVisible();
 	});
@@ -376,8 +387,7 @@ test.describe('mare', () => {
 		// Il modello d'onda si auto-esclude: il backend non manda il blocco.
 		await mockApi(page);
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Mare', { exact: true })).toHaveCount(0);
 	});
 });
@@ -386,6 +396,7 @@ test.describe('buona giornata per…', () => {
 	test('elenca le attività con il punteggio e il fattore che lo limita', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Buona giornata per…')).toBeVisible();
 		// La migliore apre il riquadro, in minuscolo dentro la frase.
@@ -413,6 +424,7 @@ test.describe('buona giornata per…', () => {
 			},
 		});
 		await page.goto('/');
+		await openSection(page, 'Per te');
 
 		await expect(page.getByText('Buona giornata per…')).toBeVisible();
 		await expect(page.getByText('domani', { exact: true })).toBeVisible();
@@ -421,8 +433,7 @@ test.describe('buona giornata per…', () => {
 	test('senza ore diurne davanti il riquadro non compare', async ({ page }) => {
 		await mockApi(page, { activities: null });
 		await page.goto('/');
-
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await openSection(page, 'Per te');
 		await expect(page.getByText('Buona giornata per…')).toHaveCount(0);
 	});
 });
@@ -431,6 +442,7 @@ test.describe('dettaglio orario', () => {
 	test('un click su una cella di pioggia apre il modale con il selettore di metrica', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Settimana');
 
 		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
 		// Il terzo giorno della fixture è quello piovoso (80%, 8.4 mm).
@@ -448,6 +460,7 @@ test.describe('dettaglio orario', () => {
 	test('la metrica temporali mostra indice, CAPE e probabilità di tuono', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Settimana');
 
 		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
 		await page.getByText('80%').first().click();
@@ -466,6 +479,7 @@ test.describe('dettaglio orario', () => {
 		// Uno zero direbbe «nessun temporale», la verità è «non lo sappiamo».
 		await mockApi(page, { withoutStorm: true });
 		await page.goto('/');
+		await openSection(page, 'Settimana');
 
 		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
 		await page.getByText('80%').first().click();
@@ -480,6 +494,7 @@ test.describe('dettaglio orario', () => {
 	test('il modale si chiude con Escape', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
+		await openSection(page, 'Settimana');
 
 		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
 		await page.getByText('80%').first().click();
@@ -517,7 +532,89 @@ test.describe('allerte meteo', () => {
 		await mockApi(page);
 		await page.goto('/');
 
-		await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+		await dashboardReady(page);
 		await expect(page.getByText(/allerta/i)).toHaveCount(0);
+	});
+});
+
+test.describe('sezioni della dashboard', () => {
+	/*
+	  Il riordino della dashboard, verificato dal lato dell'utente: che la zona
+	  a colpo d'occhio non costi un clic, che le sezioni siano navigabili e che
+	  quella aperta stia nell'URL. Gli altri scenari di questo file attraversano
+	  le sezioni per arrivare al contenuto che verificano; qui la navigazione è
+	  il soggetto.
+	*/
+
+	test('la zona a colpo d occhio sta fuori dalle sezioni', async ({ page }) => {
+		// Meteo di adesso e nowcast si vedono senza toccare niente: se piove
+		// fra dodici minuti non deve costare un clic saperlo.
+		await mockApi(page, { rainStartsInMinutes: 12 });
+		await page.goto('/');
+
+		await expect(page.getByText('Percepita: 25°C')).toBeVisible();
+		await expect(page.getByText(/Inizia fra 1[12] minuti/)).toBeVisible();
+		await expect(page.getByText('Sole & Vento')).toBeVisible();
+	});
+
+	test('all arrivo si apre Oggi e le altre sezioni restano chiuse', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByRole('tab', { name: /^Oggi/ })).toHaveAttribute('aria-selected', 'true');
+		await expect(page.getByText('Andamento orario')).toBeVisible();
+		await expect(page.getByText('Prossimi 6 giorni')).toHaveCount(0);
+		await expect(page.getByText('Fonti contribuenti')).toHaveCount(0);
+	});
+
+	test('la sezione scelta finisce nell URL e sopravvive al ricaricamento', async ({ page }) => {
+		// È quello che rende una sezione condivisibile per link: senza, il
+		// ricaricamento riporterebbe sempre su «Oggi».
+		await mockApi(page);
+		await page.goto('/');
+
+		await openSection(page, 'Per te');
+		await expect(page).toHaveURL(/#perte$/);
+
+		await page.reload();
+		await expect(page.getByRole('tab', { name: /^Per te/ })).toHaveAttribute('aria-selected', 'true');
+	});
+
+	test('un ancora verso una sezione che la località non ha ricade su Oggi', async ({ page }) => {
+		// Milano non ha il mare, e un link che punta a una sezione inesistente
+		// deve aprire qualcosa, non il vuoto.
+		await mockApi(page);
+		await page.goto('/#inventata');
+
+		await expect(page.getByRole('tab', { name: /^Oggi/ })).toHaveAttribute('aria-selected', 'true');
+		await expect(page.getByText('Andamento orario')).toBeVisible();
+	});
+
+	test('le frecce della tastiera scorrono le sezioni', async ({ page }) => {
+		// Nel pattern tablist ci si sposta con le frecce: senza, arrivare al
+		// contenuto da tastiera costerebbe un Tab per ogni linguetta.
+		await mockApi(page);
+		await page.goto('/');
+
+		await page.getByRole('tab', { name: /^Oggi/ }).focus();
+		await page.keyboard.press('ArrowRight');
+
+		await expect(page.getByRole('tab', { name: /^Settimana/ })).toHaveAttribute('aria-selected', 'true');
+		await expect(page.getByText('Prossimi 6 giorni')).toBeVisible();
+	});
+
+	test('il contatore della linguetta dice quante schede ci sono davvero', async ({ page }) => {
+		// Se il contatore e la griglia divergessero, il badge prometterebbe
+		// schede che poi non ci sono.
+		await mockApi(page);
+		await page.goto('/');
+
+		const perTe = page.getByRole('tab', { name: /^Per te/ });
+		await perTe.click();
+
+		// Milano di settembre: aria, pollini, orto, fotovoltaico, cielo e
+		// attività. Niente neve, niente mare.
+		await expect(perTe).toContainText('6');
+		await expect(page.locator('#dashboard-panel-perte h3')).toHaveCount(6);
 	});
 });

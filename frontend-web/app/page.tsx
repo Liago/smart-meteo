@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import CurrentWeather from '@/components/CurrentWeather';
@@ -9,14 +9,7 @@ import ForecastDetails from '@/components/ForecastDetails';
 import HourlyForecast from '@/components/HourlyForecast';
 import SunWindCard from '@/components/SunWindCard';
 import NextHourPrecipitation from '@/components/NextHourPrecipitation';
-import AirQualitySummary from '@/components/AirQualitySummary';
-import PollenPanel from '@/components/PollenPanel';
-import SnowPanel from '@/components/SnowPanel';
-import GardenPanel from '@/components/GardenPanel';
-import SolarPanel from '@/components/SolarPanel';
-import SkyPanel from '@/components/SkyPanel';
-import SeaPanel from '@/components/SeaPanel';
-import ActivitiesPanel from '@/components/ActivitiesPanel';
+import InsightsGrid from '@/components/dashboard/InsightsGrid';
 import SourcesIndicator from '@/components/SourcesIndicator';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import ErrorFallback from '@/components/ErrorFallback';
@@ -25,10 +18,40 @@ import WeatherAlerts, { AlertBadge } from '@/components/WeatherAlerts';
 import HourlyDetail from '@/components/HourlyDetail';
 import Modal from '@/components/ui/Modal';
 import MetricSelect from '@/components/ui/MetricSelect';
+import SegmentedTabs from '@/components/ui/SegmentedTabs';
 import type { MetricId } from '@/lib/metrics';
+import { availableTabs } from '@/lib/dashboard';
+import { useDashboardTab } from '@/lib/useDashboardTab';
 import { useForecast, useAlerts } from '@/lib/hooks';
 import type { WeatherAlert } from '@/lib/types';
 import { useLocations } from '@/lib/useLocations';
+
+/**
+ * Altezza dell'intestazione appiccicata in cima.
+ *
+ * Serve a dare alla barra delle sezioni il suo `top`: senza, si fermerebbe a
+ * zero e finirebbe *sotto* l'intestazione, invisibile proprio quando serve. Non
+ * è una costante perché l'intestazione va a capo sotto i 1024 px — la ricerca
+ * prende una riga tutta sua — e passa da 64 a un centinaio di pixel.
+ */
+function useHeaderHeight(ref: React.RefObject<HTMLElement | null>): number {
+	const [height, setHeight] = useState(64);
+
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const measure = () => setHeight(el.getBoundingClientRect().height);
+		measure();
+		// jsdom non implementa ResizeObserver: la misura iniziale basta, e i
+		// test non hanno un viewport che cambia.
+		if (typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [ref]);
+
+	return height;
+}
 
 export default function Home() {
 	const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -37,6 +60,9 @@ export default function Home() {
 	const [precipDate, setPrecipDate] = useState<string | null>(null);
 	/** Metrica mostrata nel modale. Gli entry point sono sulla pioggia, quindi si parte da lì. */
 	const [metric, setMetric] = useState<MetricId>('precipitation');
+	const headerRef = useRef<HTMLElement>(null);
+	const headerHeight = useHeaderHeight(headerRef);
+
 	const { data, error, isLoading, mutate } = useForecast(
 		coords?.lat ?? null,
 		coords?.lon ?? null
@@ -115,9 +141,20 @@ export default function Home() {
 		);
 	})();
 
+	/*
+	  Le sezioni dipendono dalla risposta: una località di montagna ha la
+	  scheda neve e non quella mare, una senza dati agronomici può non avere
+	  affatto «Per te». Memoizzate sull'oggetto della risposta, altrimenti ogni
+	  render ne creerebbe una lista nuova e l'effetto che sorveglia la sezione
+	  scomparsa girerebbe a vuoto ad ogni battito.
+	*/
+	const tabs = useMemo(() => (data ? availableTabs(data) : []), [data]);
+	const [tab, setTab] = useDashboardTab(tabs);
+
 	return (
 		<div className="min-h-screen" style={{ background: 'var(--color-duet-bg)' }}>
 			<header
+				ref={headerRef}
 				className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 lg:h-16 lg:flex-nowrap lg:gap-x-6 lg:px-7 lg:py-0"
 				style={{
 					background: 'var(--color-material-thick)',
@@ -223,79 +260,119 @@ export default function Home() {
 
 				{data && !isLoading && (
 					<>
+						{/*
+						  ZONA SEMPRE VISIBILE.
+
+						  Allerte, condizioni attuali e nowcast al minuto stanno fuori
+						  dalle sezioni perché sono la risposta a colpo d'occhio: se
+						  piove fra dodici minuti non deve costare un clic saperlo.
+						  Tutto il resto — le ore, i giorni, gli approfondimenti, le
+						  fonti — è approfondimento e vive nelle sezioni qui sotto.
+						*/}
 						{allAlerts.length > 0 && <WeatherAlerts alerts={allAlerts} />}
 
-						<NextHourPrecipitation data={data.forecastNextHour} />
-
-						<div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-5 items-start">
+						<div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1.7fr_1fr]">
 							<CurrentWeather
 								data={data.current}
 								locationName={locationName}
 								sourcesCount={data.sources_used.length}
 							/>
-							<SunWindCard astronomy={data.astronomy} current={data.current} />
+							<div className="flex flex-col gap-5">
+								<NextHourPrecipitation data={data.forecastNextHour} />
+								<SunWindCard astronomy={data.astronomy} current={data.current} />
+							</div>
 						</div>
 
 						{/*
-						  Il racconto della giornata occupa tutta la larghezza: prima era
-						  incastrato in una colonna 1.7fr accanto a nove schede impilate,
-						  che diventavano una colonna più alta di tutto il resto della
-						  pagina e senza alcun criterio di lettura. Le schede di
-						  approfondimento ora vivono in una griglia responsive a sé,
-						  ordinate da quella più utile ogni giorno (attività, aria,
-						  giardino) a quella più di nicchia o stagionale (neve, mare).
+						  BARRA DELLE SEZIONI.
+
+						  Appiccicata sotto l'intestazione, così restare orientati non
+						  richiede di risalire la pagina: era il difetto principale della
+						  versione precedente, tredici schede in una colonna alta cinque
+						  schermate e nessun modo di saltare da una parte all'altra.
+						  Il `top` è misurato, non costante: l'intestazione va a capo
+						  sotto i 1024 px.
 						*/}
-						<DayNarrative
-							current={data.current}
-							hourly={data.hourly}
-							daily={data.daily}
-							astronomy={data.astronomy}
-						/>
+						<div
+							className="sticky z-[5] py-2"
+							style={{
+								top: headerHeight,
+								/*
+								  Lo sfondo deve arrivare ai bordi della finestra, o
+								  scorrendo si vedrebbero le schede passare negli
+								  spazi laterali: `main` però è centrato e largo al
+								  massimo 1320 px. L'ombra piatta estesa oltre il
+								  riquadro, ritagliata solo in verticale, allarga il
+								  fondo senza toccare il layout — un `100vw`
+								  comprenderebbe la barra di scorrimento e
+								  aggiungerebbe uno scorrimento orizzontale.
 
-						<section className="flex flex-col gap-4">
-							{/*
-							  Nessun sottotitolo elenca le singole schede: userebbe per forza
-							  gli stessi nomi ("Cielo", "Giardino"...) dei titoli qui sotto,
-							  ambigui per i test (e per chi legge) quando compaiono due volte.
-							*/}
-							<h2 className="hig-title-3 px-1" style={{ color: 'var(--color-duet-ink)' }}>Approfondimenti</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
-								<ActivitiesPanel activities={data.activities} />
-								<AirQualitySummary data={data.current} sourcesCount={data.sources_used.length} />
-								<GardenPanel garden={data.garden} />
-								<PollenPanel pollen={data.pollen} />
-								<SnowPanel snow={data.snow} />
-								<SkyPanel sky={data.sky} />
-								<SolarPanel solar={data.solar} />
-								<SeaPanel sea={data.sea} />
-							</div>
-						</section>
-
-						{data.hourly && (
-							<HourlyForecast
-								hourly={data.hourly}
-								astronomy={data.astronomy}
-								onPrecipitationClick={(isoTime) => setPrecipDate(isoTime.slice(0, 10))}
+								  Il colore è quello opaco della pagina e non il
+								  materiale traslucido dell'intestazione: la
+								  sfocatura si applica al solo riquadro dell'elemento
+								  e non all'ombra, e la giuntura si vedrebbe.
+								*/
+								background: 'var(--color-duet-bg)',
+								boxShadow: '0 0 0 100vmax var(--color-duet-bg)',
+								clipPath: 'inset(0 -100vmax)',
+							}}
+						>
+							<SegmentedTabs
+								items={tabs}
+								value={tab}
+								onChange={setTab}
+								idPrefix="dashboard"
+								aria-label="Sezioni della dashboard"
 							/>
-						)}
+						</div>
 
-						<ForecastDetails
-							data={data.current}
-							daily={data.daily}
-							hourly={data.hourly}
-							astronomy={data.astronomy}
-							onPrecipitationClick={(date) => setPrecipDate(date)}
-						/>
+						<div
+							role="tabpanel"
+							id={`dashboard-panel-${tab}`}
+							aria-labelledby={`dashboard-tab-${tab}`}
+							tabIndex={-1}
+							className="flex flex-col gap-5"
+						>
+							{tab === 'oggi' && (
+								<>
+									<DayNarrative
+										current={data.current}
+										hourly={data.hourly}
+										daily={data.daily}
+										astronomy={data.astronomy}
+									/>
+									{data.hourly && (
+										<HourlyForecast
+											hourly={data.hourly}
+											astronomy={data.astronomy}
+											onPrecipitationClick={(isoTime) => setPrecipDate(isoTime.slice(0, 10))}
+										/>
+									)}
+								</>
+							)}
 
-						{/*
-						  Le fonti contribuenti sono un dato diagnostico ("quante fonti,
-						  quanto sono d'accordo"), non un approfondimento meteo: prima
-						  chiudeva la colonna di destra fra Attività e Polline, mescolata
-						  a schede che invece rispondono a una domanda dell'utente. In
-						  fondo alla pagina, accanto al timestamp di aggiornamento, sta
-						  con l'altro metadato della previsione.
-						*/}
-						<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
+							{tab === 'settimana' && (
+								<ForecastDetails
+									data={data.current}
+									daily={data.daily}
+									hourly={data.hourly}
+									astronomy={data.astronomy}
+									onPrecipitationClick={(date) => setPrecipDate(date)}
+								/>
+							)}
+
+							{tab === 'perte' && <InsightsGrid data={data} />}
+
+							{/*
+							  Le fonti contribuenti sono un dato diagnostico — quante
+							  fonti, quanto sono d'accordo — non una previsione: hanno
+							  una sezione loro invece di chiudere la colonna in mezzo a
+							  schede che rispondono a una domanda dell'utente.
+							*/}
+							{tab === 'fonti' && (
+								<SourcesIndicator sources={data.sources_used} confidence={data.confidence} />
+							)}
+						</div>
 
 						{/* Il modale vive in un portal su document.body: la posizione qui è indifferente */}
 						<Modal
