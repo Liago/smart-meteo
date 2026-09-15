@@ -14,6 +14,9 @@ private func precipitationColor(for prob: Double) -> Color {
 }
 
 struct HourlyForecastView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let hourly: [HourlyForecast]
     let astronomy: AstronomyData?
     let current: ForecastCurrent?
@@ -480,6 +483,9 @@ struct ChartPath: View {
 }
 
 struct ChartPointView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let item: HourlyForecastView.TimelineItem
     let index: Int
     let total: Int
@@ -505,7 +511,7 @@ struct ChartPointView: View {
                     switch item.type {
                     case .weather(let h):
                         WeatherIcon(systemName: iconName(for: h.conditionCode), font: .title2)
-                        Text("\(Int(round(item.temp)))°")
+                        Text(Units.temp(item.temp))
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.black)
                     case .sun(let label, let icon):

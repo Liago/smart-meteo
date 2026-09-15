@@ -12,6 +12,9 @@ import Charts
 /// trascinamento, che `.chartXSelection` risolve con un hit-testing corretto,
 /// mentre a mano andrebbe costruita dentro una ScrollView orizzontale.
 struct HourlyDetailView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let hourly: [HourlyForecast]
     let daily: [DailyForecast]?
     /// La tinta della condizione, passata dalla dashboard.

@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct SunWindCard: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let astronomy: AstronomyData?
     let current: ForecastCurrent?
     
@@ -134,10 +137,10 @@ struct SunWindCard: View {
                                     .tracking(1)
                                 
                                 HStack(alignment: .lastTextBaseline, spacing: 4) {
-                                    Text("\(Int(round((current?.windSpeed ?? 0) * 3.6)))")
+                                    Text(Units.windValue(fromMs: current?.windSpeed))
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.white)
-                                    Text("km/h")
+                                    Text(Units.windSymbol)
                                         .font(.caption)
                                         .foregroundColor(.white.opacity(0.8))
                                     Text("• \(current?.windDirectionLabel ?? "--")")

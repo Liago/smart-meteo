@@ -8,6 +8,9 @@ import SwiftUI
 /// blocco. È più accurato di qualunque soglia sulla distanza dal mare che
 /// avremmo potuto scegliere.
 struct SeaPanelView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let sea: SeaOutlook
 
     private struct Row: Identifiable {
@@ -63,8 +66,7 @@ struct SeaPanelView: View {
 
     /// Gradi interi: mezzo grado sull'acqua è precisione finta.
     static func formatSeaTemp(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 
     static func formatHour(_ slot: String?) -> String? {

@@ -38,6 +38,14 @@ struct AlertRuleMetric: Codable, Identifiable {
     let metricId: String
     let label: String
     /// Unità mostrata accanto alla soglia ("°", " km/h", " mm"…).
+    ///
+    /// **Non segue le preferenze di `UnitPrefs`, ed è voluto.** La soglia è
+    /// archiviata sul server nell'unità che l'utente ha digitato, e il poller
+    /// la confronta così com'è: seguire il selettore rileggerebbe «50» come
+    /// nodi una regola scritta in km/h, cioè cambierebbe di nascosto un avviso
+    /// già configurato. Qui l'unità è **scritta accanto al numero** in ogni
+    /// punto della schermata, quindi non c'è ambiguità da risolvere — mentre
+    /// nel resto dell'app il grado è nudo e l'unità la decide il selettore.
     let unit: String
     /// "min" | "max" | "sum" | "current"
     let aggregation: String

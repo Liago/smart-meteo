@@ -16,6 +16,9 @@ import SwiftUI
 ///
 /// Riferimento: `ios Redisign/README.md`.
 struct DashboardView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     @EnvironmentObject var appState: AppState
 
     // Navigazione
@@ -434,7 +437,7 @@ struct DashboardView: View {
                 }
 
             HStack(spacing: 0) {
-                SidebarView(isPresented: $isSidebarPresented)
+                SidebarView(isPresented: $isSidebarPresented, theme: theme)
                     .frame(width: UIScreen.main.bounds.width * 0.85)
                     .transition(.move(edge: .leading))
 
@@ -472,7 +475,7 @@ struct DashboardView: View {
         guard !hours.isEmpty else { return nil }
         let temps = hours.map(\.temp)
         guard let hi = temps.max(), let lo = temps.min() else { return nil }
-        return "max \(Int(hi.rounded()))° · min \(Int(lo.rounded()))°"
+        return "max \(Units.temp(hi)) · min \(Units.temp(lo))"
     }
 
     /// «aggiornato 2 min fa», dalla data ISO della risposta.

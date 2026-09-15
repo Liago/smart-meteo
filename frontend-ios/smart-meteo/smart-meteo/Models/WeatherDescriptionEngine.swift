@@ -221,7 +221,7 @@ struct WeatherDescriptionEngine {
 
         // --- TEMPERATURA E PERCEPITA ---
         if overallMaxTemp > -100 {
-            var tempDesc = "Temperature tra \(Int(round(overallMinTemp)))° e \(Int(round(overallMaxTemp)))°"
+            var tempDesc = "Temperature tra \(Units.temp(overallMinTemp)) e \(Units.temp(overallMaxTemp))"
             if let cur = current, let temp = cur.temperature, let feelsLike = cur.feelsLike {
                 let diff = feelsLike - temp
                 if diff <= -3 {
@@ -247,8 +247,19 @@ struct WeatherDescriptionEngine {
         }
 
         // --- VENTO ---
-        if let cur = current, let windSpeed = cur.windSpeed, windSpeed >= 12 {
-            let windDesc = buildWindDescription(speed: windSpeed, gust: cur.windGust, direction: cur.windDirectionLabel)
+        //
+        // `windSpeed` e `windGust` sono in METRI AL SECONDO, come su tutto il
+        // filo: qui venivano passati a una funzione le cui soglie (30, 50, 75)
+        // e la cui etichetta sono in km/h. Il racconto parlava quindi di vento
+        // solo sopra i 43 km/h reali, e chiamava «moderato» una burrasca —
+        // mentre le raffiche uscivano scritte «km/h» con il numero dei m/s,
+        // cioè divise per 3,6.
+        if let cur = current, let windSpeed = cur.windSpeed, windSpeed * 3.6 >= 12 {
+            let windDesc = buildWindDescription(
+                speed: windSpeed * 3.6,
+                gust: cur.windGust.map { $0 * 3.6 },
+                direction: cur.windDirectionLabel
+            )
             parts.append(windDesc)
         }
 
@@ -308,16 +319,25 @@ struct WeatherDescriptionEngine {
 
     // MARK: - Builder vento
 
+    /// La raffica nell'unità scelta, partendo dai km/h con cui arriva qui.
+    ///
+    /// Le soglie di `buildWindDescription` restano in km/h: «vento forte» sopra
+    /// i 30 è una classificazione, non un'etichetta, e seguire l'unità di
+    /// lettura la sposterebbe.
+    private static func gustText(_ kmh: Double) -> String {
+        "\(Units.number(Units.wind(fromKmh: kmh), decimals: 0)) \(Units.windSymbol)"
+    }
+
     private static func buildWindDescription(speed: Double, gust: Double?, direction: String?) -> String {
         let dir = direction.map { " da \($0)" } ?? ""
 
         if speed >= 75 {
             return "Vento di tempesta\(dir)."
         } else if speed >= 50 {
-            let gustStr = gust.map { ", raffiche fino a \(Int(round($0))) km/h" } ?? ""
+            let gustStr = gust.map { ", raffiche fino a \(Self.gustText($0))" } ?? ""
             return "Vento molto forte\(dir)\(gustStr)."
         } else if speed >= 30 {
-            let gustStr = gust.map { ", raffiche fino a \(Int(round($0))) km/h" } ?? ""
+            let gustStr = gust.map { ", raffiche fino a \(Self.gustText($0))" } ?? ""
             return "Vento forte\(dir)\(gustStr)."
         } else {
             return "Vento moderato\(dir)."
@@ -377,7 +397,7 @@ struct WeatherDescriptionEngine {
                 } else {
                     tomorrowDesc += " con temperature stabili"
                 }
-                tomorrowDesc += ", massima \(Int(round(tomorrowMax)))°."
+                tomorrowDesc += ", massima \(Units.temp(tomorrowMax))."
             } else {
                 tomorrowDesc += "."
             }
@@ -394,9 +414,9 @@ struct WeatherDescriptionEngine {
             var dayAfterDesc = "Dopodomani \(condLabel)"
 
             if let maxT = dayAfter.tempMax, let minT = dayAfter.tempMin {
-                dayAfterDesc += ", \(Int(round(minT)))°-\(Int(round(maxT)))°."
+                dayAfterDesc += ", \(Units.temp(minT))-\(Units.temp(maxT))."
             } else if let maxT = dayAfter.tempMax {
-                dayAfterDesc += ", massima \(Int(round(maxT)))°."
+                dayAfterDesc += ", massima \(Units.temp(maxT))."
             } else {
                 dayAfterDesc += "."
             }

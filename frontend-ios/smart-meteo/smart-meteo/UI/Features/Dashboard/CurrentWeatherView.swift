@@ -5,6 +5,7 @@ struct CurrentWeatherView: View {
     let today: DailyForecast?
     let astronomy: AstronomyData?
 
+    @ObservedObject private var units = UnitPrefs.shared
     @State private var showMore = false
     @State private var showAirQuality = false
     @State private var sunProgress: Double = 0.0
@@ -22,16 +23,16 @@ struct CurrentWeatherView: View {
                     .symbolEffect(.bounce, value: current.condition)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(Int(current.temperature ?? 0))°")
+                    Text(Units.temp(current.temperature))
                         .font(.system(size: 48, weight: .regular))
                         .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
                     
-                    Text("Percepita \(Int(current.feelsLike ?? 0))°")
+                    Text("Percepita \(Units.temp(current.feelsLike))")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
                     if let today = today {
-                        Text("Max \(Int(today.tempMax ?? 0))° Min \(Int(today.tempMin ?? 0))°")
+                        Text("Max \(Units.temp(today.tempMax)) Min \(Units.temp(today.tempMin))")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
@@ -60,9 +61,9 @@ struct CurrentWeatherView: View {
                         // Wind -> Gusts
                         FlipWeatherDetail(
                             icon: "wind",
-                            mainValue: "\(Int((current.windSpeed ?? 0) * 3.6)) km/h",
+                            mainValue: Units.windSpeed(fromMs: current.windSpeed),
                             mainLabel: "Vento",
-                            altValue: "\(Int((current.windGust ?? 0) * 3.6)) km/h",
+                            altValue: Units.windSpeed(fromMs: current.windGust),
                             altLabel: current.windDirectionLabel != nil ? "Raffica \(current.windDirectionLabel!)" : "Raffica",
                             altIcon: "wind"
                         )
@@ -72,7 +73,7 @@ struct CurrentWeatherView: View {
                             icon: "humidity",
                             mainValue: "\(Int(current.humidity ?? 0))%",
                             mainLabel: "Umidità",
-                            altValue: "\(Int(current.dewPoint ?? 0))°",
+                            altValue: Units.temp(current.dewPoint),
                             altLabel: "Punto rugiada",
                             altIcon: "drop.triangle"
                         )

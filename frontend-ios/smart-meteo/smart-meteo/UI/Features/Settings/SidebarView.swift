@@ -1,179 +1,186 @@
 import SwiftUI
 
+/// Il menu laterale.
+///
+/// Ristilizzato sul linguaggio della schermata Impostazioni: sfondo crema,
+/// etichette di gruppo in maiuscoletto spaziato, righe dentro una card bianca.
+/// Prima erano righe nude su fondo crema con una fascia grigia in testa, in SF
+/// Pro: la stessa app in due tipografie, e la sidebar era la prima cosa che si
+/// apriva.
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
     @Binding var isPresented: Bool
     @State private var showingLogin = false
-    
+
+    var theme: WeatherTheme = WeatherTheme.of(.clear)
+
     var body: some View {
         ZStack {
-            // Background Layer
-            Color(red: 252/255, green: 249/255, blue: 246/255).ignoresSafeArea() // Off-white for light theme
-            
-            VStack(alignment: .leading, spacing: 0) {
-                // Header (User Profile)
-                VStack(alignment: .leading, spacing: 16) {
-                    if appState.isAuthenticated {
-                        HStack(spacing: 16) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                                .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(appState.currentUser?.email ?? "Utente")
-                                    .font(.headline)
-                                    .foregroundColor(.black)
-                                Text("Premium")
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(Color(red: 236/255, green: 104/255, blue: 90/255).opacity(0.1)) // Light Red bg
-                                    .foregroundColor(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
-                                    .cornerRadius(8)
-                            }
-                        }
-                    }
-                }
-                .padding(.top, 60)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-                .background(Color.black.opacity(0.05))
-                
-                // Menu Items
+            theme.page.ignoresSafeArea()
+
+            VStack(spacing: 0) {
                 ScrollView {
-                    VStack(spacing: 8) {
-                        // Section: Meteo
-                        Text("METEO")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 24)
-                            .padding(.bottom, 8)
-                        
-                        NavigationLink(destination: SourcesView()) {
-                            SidebarRow(icon: "server.rack", title: "Gestione Fonti", subtitle: "Configura provider dati")
-                        }
-                        
-                        NavigationLink(destination: FavoritesView(isSidebarPresented: $isPresented)) {
-                            SidebarRow(icon: "star.fill", title: "Località Preferite", subtitle: "Gestisci i tuoi luoghi salvati")
+                    VStack(alignment: .leading, spacing: 18) {
+                        if appState.isAuthenticated {
+                            account
                         }
 
-                        NavigationLink(destination: AlertRulesView()) {
-                            SidebarRow(icon: "bell.badge", title: "Avvisi Personali", subtitle: "Soglie di gelo, vento, pioggia")
+                        SettingsCard("Meteo") {
+                            NavigationLink(destination: SourcesView(theme: theme)) {
+                                SettingsRowContent(
+                                    title: "Gestione fonti",
+                                    note: "Quali provider entrano nella media",
+                                    icon: "antenna.radiowaves.left.and.right"
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsSeparator()
+
+                            NavigationLink(
+                                destination: FavoritesView(
+                                    isSidebarPresented: $isPresented,
+                                    theme: theme
+                                )
+                            ) {
+                                SettingsRowContent(
+                                    title: "Località preferite",
+                                    note: "I luoghi salvati, e quello di casa",
+                                    icon: "star"
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsSeparator()
+
+                            NavigationLink(destination: AlertRulesView()) {
+                                SettingsRowContent(
+                                    title: "Avvisi personali",
+                                    note: "Soglie su gelate, pioggia, vento",
+                                    icon: "bell"
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        
-                        // Section: App
-                        Text("APP")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 24)
-                            .padding(.bottom, 8)
-                        
-                        NavigationLink(destination: GeneralSettingsView()) {
-                            SidebarRow(icon: "gearshape", title: "Impostazioni Generali", subtitle: "Unità, notifiche, lingua")
-                        }
-                        
-                        if appState.isAuthenticated {
-                            Button(action: {
-                                Task { try? await AuthService.shared.signOut() }
-                            }) {
-                                SidebarRow(icon: "rectangle.portrait.and.arrow.right", title: "Esci", subtitle: nil, color: .red)
+
+                        SettingsCard("App") {
+                            NavigationLink(destination: GeneralSettingsView(theme: theme)) {
+                                SettingsRowContent(
+                                    title: "Impostazioni",
+                                    note: "Unità di misura, notifiche, schede",
+                                    icon: "gearshape"
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            if appState.isAuthenticated {
+                                SettingsSeparator()
+
+                                SettingsRow(
+                                    title: "Esci",
+                                    icon: "rectangle.portrait.and.arrow.right",
+                                    tint: Duet.orangeRed,
+                                    showsChevron: false
+                                ) {
+                                    Task { try? await AuthService.shared.signOut() }
+                                }
                             }
                         }
                     }
-                    .padding(.vertical)
-                }
-                
-
-                
-                Spacer()
-                
-                // Moved Login/Register Button to bottom
-                if !appState.isAuthenticated {
-                    Button(action: { showingLogin = true }) {
-                        HStack {
-                            Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.title3)
-                            Text("Accedi / Registrati")
-                                .font(.headline)
-                        }
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(red: 236/255, green: 104/255, blue: 90/255)) // Red Accent
-                        .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 60)
                     .padding(.bottom, 16)
                 }
-                
-                // Footer
-                VStack(spacing: 4) {
-                    Text("Smart Meteo v1.0.2")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                    Text("Build 2024.11.20")
-                        .font(.caption2)
-                        .foregroundColor(.gray.opacity(0.5))
+
+                if !appState.isAuthenticated {
+                    loginButton
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 24)
+
+                footer
             }
         }
         .sheet(isPresented: $showingLogin) {
             LoginView()
         }
     }
-}
 
-struct SidebarRow: View {
-    let icon: String
-    let title: String
-    let subtitle: String?
-    var color: Color = .black
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .frame(width: 30)
-                .foregroundColor(color == .black ? Color(red: 0.2, green: 0.2, blue: 0.2) : color) // Dark gray for default icons
-            
+    // MARK: - Account
+
+    /// Chi sei, quando l'app lo sa.
+    ///
+    /// Il badge «Premium» è sparito: era scritto a mano su ogni utente
+    /// autenticato, quindi non diceva niente di vero — e un'etichetta che
+    /// afferma un piano che non esiste è peggio di nessuna etichetta.
+    private var account: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 38))
+                .foregroundColor(theme.accent.opacity(0.85))
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body)
-                    .foregroundColor(color)
-                
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
+                Text(appState.currentUser?.email ?? "Utente")
+                    .font(.duetUI(13.5, .bold))
+                    .foregroundColor(Duet.ink)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text("Preferite e località sincronizzate")
+                    .font(.duetUI(11))
+                    .foregroundColor(Duet.ink.opacity(0.5))
             }
-            
-            Spacer()
-            
-            if subtitle != nil {
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray.opacity(0.5))
-            }
+
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 24).fill(Duet.surface))
+        .shadow(color: Duet.shadowCard, radius: 10, x: 0, y: 2)
+    }
+
+    private var loginButton: some View {
+        Button {
+            HapticManager.light()
+            showingLogin = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.duetUI(15, .semibold))
+                Text("Accedi o registrati")
+                    .font(.duetUI(14, .bold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: Duet.rSmall).fill(theme.accent))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+    }
+
+    /// Versione e build dal bundle, come nella schermata Impostazioni.
+    ///
+    /// Erano «v1.0.2» e «Build 2024.11.20» scritte a mano: sbagliate dalla
+    /// prima build successiva, e in due punti diversi dell'app — quindi
+    /// sbagliate in due modi diversi.
+    private var footer: some View {
+        VStack(spacing: 2) {
+            Text("Smart Meteo \(GeneralSettingsView.version)")
+                .font(.duetUI(10.5, .semibold))
+                .foregroundColor(Duet.ink.opacity(0.4))
+
+            Text("Build \(GeneralSettingsView.build)")
+                .font(.duetUI(10))
+                .foregroundColor(Duet.ink.opacity(0.28))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 24)
     }
 }
 
-
-
 #Preview {
-    SidebarView(isPresented: .constant(true))
-        .environmentObject(AppState.shared)
+    NavigationStack {
+        SidebarView(isPresented: .constant(true))
+            .environmentObject(AppState.shared)
+    }
 }
