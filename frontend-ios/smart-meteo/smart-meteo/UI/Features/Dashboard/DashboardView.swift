@@ -107,12 +107,12 @@ struct DashboardView: View {
             }
         }
         .sheet(isPresented: $isSearchPresented) {
-            SearchView()
+            SearchView(theme: theme)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isAlertsPresented) {
-            WeatherAlertsView(alerts: appState.activeAlerts)
+            WeatherAlertsView(alerts: appState.activeAlerts, theme: theme)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -125,6 +125,7 @@ struct DashboardView: View {
             HourlyDetailView(
                 hourly: currentForecast?.hourly ?? [],
                 daily: currentForecast?.daily,
+                theme: theme,
                 initialDate: target.id
             )
             .presentationDetents([.large])

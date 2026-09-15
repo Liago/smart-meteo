@@ -125,7 +125,9 @@ struct AlertPillView: View {
     /// Il titolo dell'allerta più grave, con il conteggio quando ce n'è più di
     /// una: «e altre 2» dice che vale la pena aprire.
     static func headline(_ alert: WeatherAlert, total: Int) -> String {
-        let titolo = alert.description.isEmpty ? alert.severityLabel : alert.description
+        // Stesso titolo della card nella schermata allerte: il banner e la
+        // schermata che apre devono chiamare la stessa allerta allo stesso modo.
+        let titolo = AlertCardView.title(alert)
         guard total > 1 else { return titolo }
         return "\(titolo) · e altre \(total - 1)"
     }

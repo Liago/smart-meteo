@@ -16,6 +16,16 @@ struct WeatherAlert: Codable, Identifiable, Equatable {
     let source: String?
     let urgency: String?
     let detailsUrl: String?
+    /// Fonte provider ("weatherkit", "meteoalarm"…): il backend la marca su
+    /// ogni allerta, e con quattro fonti serve sapere chi ha emesso cosa.
+    let providerSource: String?
+    /// Tipo di evento ("Yellow Thunderstorm Warning").
+    ///
+    /// Arrivava dal backend e veniva buttato via: senza, il titolo della card
+    /// ripiegava sulla descrizione, che sul feed EUMETNET è lunga un paragrafo.
+    let event: String?
+    /// Titolo breve, quando il provider lo fornisce.
+    let headline: String?
 
     static func == (lhs: WeatherAlert, rhs: WeatherAlert) -> Bool {
         lhs.id == rhs.id
