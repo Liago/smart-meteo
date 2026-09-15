@@ -23,7 +23,7 @@ struct HourlyDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate: String
     @State private var selectedHour: Int?
-    @State private var metric: HourlyMetric = .precipitation
+    @State private var metric: HourlyMetric
 
     private let cream = Color(red: 252 / 255, green: 249 / 255, blue: 246 / 255)
     private let coral = Color(red: 236 / 255, green: 104 / 255, blue: 90 / 255)
@@ -32,11 +32,16 @@ struct HourlyDetailView: View {
         hourly: [HourlyForecast],
         daily: [DailyForecast]?,
         theme: WeatherTheme = WeatherTheme.of(.clear),
-        initialDate: String
+        initialDate: String,
+        // Chi arriva dalla curva oraria vuole la temperatura; chi tocca una
+        // cella di pioggia nei sette giorni vuole i millimetri. Aprire sempre
+        // sulla stessa metrica dava ragione a metà degli utenti.
+        initialMetric: HourlyMetric = .precipitation
     ) {
         self.hourly = hourly
         self.daily = daily
         self.theme = theme
+        _metric = State(initialValue: initialMetric)
 
         // Il ripiego parte da oggi, mai dal primo elemento dell'array: `hourly`
         // può cominciare da ieri sera, e aprire lì mostrerebbe una previsione
@@ -315,9 +320,17 @@ struct HourlyDetailView: View {
     @ViewBuilder
     private func chartSection(_ section: MetricSection) -> some View {
         let values = points.compactMap { $0.forecast.flatMap(section.valueOf) }
-        let secondaries = section.secondaryOf.map { extract in
+        var secondaries = section.secondaryOf.map { extract in
             points.compactMap { $0.forecast.flatMap(extract) }
         } ?? []
+
+        // I percentili entrano nel dominio come le raffiche: se restassero
+        // fuori, la banda verrebbe tagliata dal bordo del grafico proprio dove
+        // è più larga, cioè dove l'incertezza è maggiore.
+        if let low = section.bandLowOf, let high = section.bandHighOf {
+            secondaries += points.compactMap { $0.forecast.flatMap(low) }
+            secondaries += points.compactMap { $0.forecast.flatMap(high) }
+        }
 
         if values.isEmpty {
             // Cache scritta prima dell'introduzione del campo, o nessuna fonte
@@ -344,7 +357,31 @@ struct HourlyDetailView: View {
                 ZStack {
                     Chart {
                         ForEach(points) { p in
-                            if let value = p.forecast.flatMap(section.valueOf) {
+                            if section.kind == .lineWithBand {
+                                // La banda per prima: sta dietro alla linea.
+                                if let low = section.bandLowOf,
+                                   let high = section.bandHighOf,
+                                   let lo = p.forecast.flatMap(low),
+                                   let hi = p.forecast.flatMap(high) {
+                                    AreaMark(
+                                        x: .value("Ora", p.hour),
+                                        yStart: .value("p10", lo),
+                                        yEnd: .value("p90", hi)
+                                    )
+                                    .foregroundStyle(theme.accent.opacity(0.14))
+                                    .interpolationMethod(.catmullRom)
+                                }
+
+                                if let value = p.forecast.flatMap(section.valueOf) {
+                                    LineMark(
+                                        x: .value("Ora", p.hour),
+                                        y: .value(section.id, value)
+                                    )
+                                    .foregroundStyle(theme.accent)
+                                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                    .interpolationMethod(.catmullRom)
+                                }
+                            } else if let value = p.forecast.flatMap(section.valueOf) {
                                 BarMark(
                                     x: .value("Ora", p.hour),
                                     y: .value(section.id, value),

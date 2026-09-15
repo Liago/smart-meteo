@@ -1,170 +1,206 @@
 import SwiftUI
 
+/// Impostazioni generali.
+///
+/// Ristilizzata sul linguaggio del ridisegno — e ripulita da **tre controlli
+/// che non facevano niente**. Il selettore °C/°F, quello delle unità del vento
+/// e l'interruttore «Email Alerts» erano legati a `.constant(...)`: si potevano
+/// toccare, si muovevano, e non cambiava nulla. Un comando finto è peggio di un
+/// comando assente — il primo fa credere di aver scelto qualcosa.
+///
+/// Al loro posto: le unità **dichiarate** (informazione vera), e i collegamenti
+/// alle due cose che l'utente può davvero configurare.
+///
+/// Riferimento: `ios Redisign/README.md`, schermata 4.
 struct GeneralSettingsView: View {
-    @Environment(\.dismiss) var dismiss
     @StateObject private var pushService = PushNotificationService.shared
-    
+    @State private var isForYouPresented = false
+
+    var theme: WeatherTheme = WeatherTheme.of(.clear)
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Section: Unità di Misura
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Unità di Misura")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gray)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 8)
-                    
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Temperatura")
-                                .foregroundColor(.black)
-                            Spacer()
-                            Picker("", selection: .constant(0)) {
-                                Text("Celsius (°C)").tag(0)
-                                Text("Fahrenheit (°F)").tag(1)
-                            }
-                            .labelsHidden()
-                            .tint(.gray)
+        ZStack {
+            theme.page.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    card(title: "Personalizzazione") {
+                        row(
+                            "Sezione «Per te»",
+                            note: "Quali schede vedi in dashboard, e in che ordine"
+                        ) {
+                            isForYouPresented = true
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        
-                        Divider()
-                            .padding(.leading, 16)
-                        
-                        HStack {
-                            Text("Vento")
-                                .foregroundColor(.black)
-                            Spacer()
-                            Picker("", selection: .constant(0)) {
-                                Text("km/h").tag(0)
-                                Text("m/s").tag(1)
-                                Text("mph").tag(2)
-                            }
-                            .labelsHidden()
-                            .tint(.gray)
+
+                        separator
+
+                        NavigationLink(destination: AlertRulesView()) {
+                            rowContent(
+                                "Avvisi personali",
+                                note: "Soglie su gelate, pioggia, vento, temporali"
+                            )
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
+                        .buttonStyle(.plain)
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-                    )
-                }
-                
-                // Section: Notifiche
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Notifiche")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gray)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 8)
-                    
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Push Notifications")
-                                .foregroundColor(.black)
-                            Spacer()
+
+                    card(title: "Notifiche") {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Allerte push")
+                                    .font(.duetUI(13.5, .bold))
+                                    .foregroundColor(Duet.ink)
+
+                                Text(pushService.isAuthorized
+                                     ? "Attive. Per disattivarle, Impostazioni di iOS"
+                                     : "Tocca per consentire le notifiche")
+                                    .font(.duetUI(11))
+                                    .foregroundColor(Duet.ink.opacity(0.5))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 8)
+
                             Toggle("", isOn: Binding(
                                 get: { pushService.isAuthorized },
-                                set: { newValue in
-                                    if newValue {
-                                        pushService.requestAuthorization()
-                                    } else {
-                                        // To turn off push notifications completely, 
-                                        // the user must go to iOS Settings.
-                                        // Here we could just call unregisterDeviceToken()
-                                        // but for UX we can show an alert or just revert the toggle if unauthorized
-                                    }
+                                set: { nuovo in
+                                    // Il consenso si revoca solo da iOS: un
+                                    // interruttore che finge di spegnerle
+                                    // lascerebbe l'utente convinto di averle
+                                    // tolte mentre continuano ad arrivare.
+                                    if nuovo { pushService.requestAuthorization() }
                                 }
                             ))
                             .labelsHidden()
-                            .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
-                            .disabled(pushService.isAuthorized) // Once authorized via OS prompt, disable the toggle so they can't flip it off without going to Settings app
+                            .tint(theme.accent)
+                            .disabled(pushService.isAuthorized)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        
-                        Divider()
-                            .padding(.leading, 16)
-                        
-                        HStack {
-                            Text("Email Alerts")
-                                .foregroundColor(.black)
-                            Spacer()
-                            Toggle("", isOn: .constant(false))
-                                .labelsHidden()
-                                .tint(Color(red: 236/255, green: 104/255, blue: 90/255))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 12)
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-                    )
-                }
-                
-                // Section: App Info
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("App Info")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gray)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 8)
-                    
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("Versione")
-                                .foregroundColor(.black)
-                            Spacer()
-                            Text("1.0.2")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        
-                        Divider()
-                            .padding(.leading, 16)
-                        
-                        HStack {
-                            Text("Build")
-                                .foregroundColor(.black)
-                            Spacer()
-                            Text("2024.11.20")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
+
+                    card(title: "Unità") {
+                        // Dichiarate, non scelte: l'app calcola e formatta tutto
+                        // in gradi Celsius e km/h. Il giorno in cui i Fahrenheit
+                        // esisteranno davvero, questa riga tornerà un comando.
+                        infoRow("Temperatura", "Gradi Celsius")
+                        separator
+                        infoRow("Vento", "km/h")
+                        separator
+                        infoRow("Precipitazioni", "Millimetri")
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-                    )
+
+                    card(title: "App") {
+                        infoRow("Versione", Self.version)
+                        separator
+                        infoRow("Build", Self.build)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+            }
+        }
+        .navigationTitle("Impostazioni")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isForYouPresented) {
+            ForYouSettingsView()
+        }
+    }
+
+    // MARK: - Mattoni
+
+    private func card<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .font(.duetUI(10.5, .semibold))
+                .tracking(1.2)
+                .foregroundColor(Duet.ink.opacity(0.45))
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                content()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 16)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 24).fill(Duet.surface))
+            .shadow(color: Duet.shadowCard, radius: 10, x: 0, y: 2)
         }
-        .background(Color(red: 252/255, green: 249/255, blue: 246/255).ignoresSafeArea())
-        .navigationTitle("Impostazioni Generali")
-        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var separator: some View {
+        Rectangle()
+            .fill(Duet.ink.opacity(0.06))
+            .frame(height: 1)
+    }
+
+    private func row(_ title: String, note: String, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticManager.light()
+            action()
+        } label: {
+            rowContent(title, note: note)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func rowContent(_ title: String, note: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.duetUI(13.5, .bold))
+                    .foregroundColor(Duet.ink)
+                Text(note)
+                    .font(.duetUI(11))
+                    .foregroundColor(Duet.ink.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.duetUI(12, .semibold))
+                .foregroundColor(Duet.ink.opacity(0.25))
+        }
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    private func infoRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.duetUI(13))
+                .foregroundColor(Duet.ink)
+
+            Spacer(minLength: 8)
+
+            Text(value)
+                .font(.duetUI(13, .semibold))
+                .foregroundColor(Duet.ink.opacity(0.5))
+        }
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - Versione
+
+    /// Letta dal bundle, non scritta a mano.
+    ///
+    /// Prima erano due stringhe fisse («1.0.2», «2024.11.20»): diventano
+    /// sbagliate alla prima build e nessuno se ne accorge, perché nessuno
+    /// guarda la schermata «App info» finché non deve segnalare un problema —
+    /// che è esattamente il momento in cui quel numero deve essere giusto.
+    static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
+    static var build: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     }
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         GeneralSettingsView()
     }
 }
