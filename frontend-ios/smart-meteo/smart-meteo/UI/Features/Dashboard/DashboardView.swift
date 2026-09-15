@@ -227,7 +227,7 @@ struct DashboardView: View {
         case .sheet:
             HeroSheetView(
                 current: forecast.current,
-                today: forecast.daily?.first,
+                today: DailyRowsView.today(forecast.daily),
                 nextHour: forecast.forecastNextHour,
                 condition: condition,
                 theme: theme
@@ -235,7 +235,7 @@ struct DashboardView: View {
         case .bento:
             HeroBentoView(
                 current: forecast.current,
-                today: forecast.daily?.first,
+                today: DailyRowsView.today(forecast.daily),
                 astronomy: forecast.astronomy,
                 nextHour: forecast.forecastNextHour,
                 condition: condition,
@@ -280,11 +280,14 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func dailySection(_ forecast: ForecastResponse) -> some View {
-        let days = forecast.daily ?? []
+        // Filtrati qui, non solo dentro la riga: il riepilogo della sezione
+        // contava anche ieri, e con l'elenco chiuso «7 giorni» era l'unica
+        // cosa visibile — quindi l'unica cosa sbagliata visibile.
+        let days = DailyRowsView.upcoming(forecast.daily ?? [])
 
         CollapsibleSection(
             title: "Prossimi giorni",
-            summary: days.isEmpty ? nil : "\(min(days.count, 7)) giorni",
+            summary: days.isEmpty ? nil : "\(days.count) giorni",
             isOpen: binding(for: .daily)
         ) {
             if days.isEmpty {

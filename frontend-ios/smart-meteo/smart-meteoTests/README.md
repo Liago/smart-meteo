@@ -27,7 +27,7 @@ Poi `⌘U`.
 | File | Copre |
 |------|-------|
 | `ForecastDecodingTests` | Il contratto con il backend: tutte le chiavi snake_case |
-| `HourlyWindowTests` | Su quale giorno si apre il dettaglio orario |
+| `HourlyWindowTests` | Su quale giorno si apre il dettaglio orario, e quali giorni entrano in «Prossimi giorni» |
 | `SkyPanelViewTests` | Quale indice prende il titolo, gli ingredienti della notte |
 | `SeaPanelViewTests` | Soglie dello stato del mare, avviso di peggioramento, rosa a 8 punti |
 | `SolarPanelViewTests` | Potenza dell'impianto, resa specifica → kWh, assunzioni |

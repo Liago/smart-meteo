@@ -44,3 +44,14 @@ func makeHourly(days: [String]) throws -> [HourlyForecast] {
     let json = "[" + days.map { hourlyJSON(day: $0) }.joined(separator: ",") + "]"
     return try Fixture.decode([HourlyForecast].self, from: json)
 }
+
+/// Un array di `DailyForecast` sui giorni indicati.
+func makeDaily(days: [String]) throws -> [DailyForecast] {
+    let json = "[" + days.map { day in
+        """
+        {"date":"\(day)","temp_max":24,"temp_min":12,\
+        "precipitation_prob":20,"condition_code":"1","condition_text":"Poco nuvoloso"}
+        """
+    }.joined(separator: ",") + "]"
+    return try Fixture.decode([DailyForecast].self, from: json)
+}

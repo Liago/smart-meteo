@@ -23,9 +23,48 @@ struct DailyRowsView: View {
     static let scaleMin: Double = -5
     static let scaleMax: Double = 40
 
+    /// I giorni da oggi in avanti, al massimo sette.
+    ///
+    /// Il filtro sul passato non è cosmetico, ed è lo stesso che la strip del
+    /// dettaglio orario ha già: `daily` può cominciare da **ieri** — le fonti
+    /// ragionano in UTC e il primo cassetto del giorno locale cade il giorno
+    /// prima — e la prima riga mostrava allora una previsione che i fatti
+    /// hanno già smentito.
+    ///
+    /// Il taglio costa due volte: il `prefix(7)` mangiava anche un giorno
+    /// futuro per far posto a quello passato, quindi la settimana finiva un
+    /// giorno prima del dovuto.
+    static func upcoming(_ days: [DailyForecast], now: Date = Date()) -> [DailyForecast] {
+        let oggi = todayKey(now)
+        return Array(days.filter { String($0.date.prefix(10)) >= oggi }.prefix(7))
+    }
+
+    /// Il giorno di **oggi**, scelto per data e non per posizione.
+    ///
+    /// `daily.first` sembrava oggi e spesso lo era; quando `daily` apre da ieri
+    /// era ieri — e quel valore alimenta il massimo e il minimo dell'hero, cioè
+    /// il blocco di numeri più grande della schermata. Sbagliato lì vale più
+    /// che sbagliato in una riga della settimana, e si nota meno: 21°/10° è
+    /// perfettamente plausibile, solo che è la giornata di ieri.
+    ///
+    /// Senza oggi ripiega sul primo giorno futuro: una previsione di domani
+    /// dichiara almeno qualcosa di vero, una di ieri no.
+    static func today(_ days: [DailyForecast]?, now: Date = Date()) -> DailyForecast? {
+        guard let days else { return nil }
+        let oggi = todayKey(now)
+        return days.first { String($0.date.prefix(10)) == oggi }
+            ?? days.first { String($0.date.prefix(10)) > oggi }
+    }
+
+    static func todayKey(_ now: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: now)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(days.prefix(7), id: \.date) { day in
+            ForEach(Self.upcoming(days), id: \.date) { day in
                 Button {
                     HapticManager.light()
                     onTapDay(day.date)
@@ -123,9 +162,7 @@ struct DailyRowsView: View {
     /// interpreterebbe come UTC e in Italia mostrerebbe il giorno prima per
     /// tutta la sera.
     static func dayLabel(_ date: String, now: Date = Date()) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        if date == formatter.string(from: now) { return "Oggi" }
+        if date == todayKey(now) { return "Oggi" }
 
         let parts = date.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return date }

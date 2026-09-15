@@ -175,6 +175,32 @@ enum WidgetDateFormatters {
     }
 
     /// Formatta il giorno come "Lun", "Mar", etc.
+    /// I giorni da oggi in avanti, al massimo `limite`.
+    ///
+    /// `daily` può cominciare da IERI: le fonti ragionano in UTC e il primo
+    /// cassetto del giorno locale cade il giorno prima. Sul widget pesa più
+    /// che nell'app — poche righe in un riquadro piccolo, lette di sfuggita e
+    /// mai messe in dubbio.
+    ///
+    /// Gemella di `DailyRowsView.upcoming` nell'app: il widget è un target
+    /// separato e non ne vede il codice. Se cambia una, cambiano entrambe.
+    static func upcoming(
+        _ days: [WidgetDailyForecast],
+        limit: Int = 7,
+        now: Date = Date()
+    ) -> [WidgetDailyForecast] {
+        let oggi = dateOnlyFormatter.string(from: now)
+        return Array(days.filter { String($0.date.prefix(10)) >= oggi }.prefix(limit))
+    }
+
+    /// Il giorno di **oggi**, scelto per data e non per posizione.
+    ///
+    /// Alimenta massimo e minimo del widget: con `first` su un array che apre
+    /// da ieri erano quelli di ieri — plausibili, quindi invisibili.
+    static func today(_ days: [WidgetDailyForecast]?, now: Date = Date()) -> WidgetDailyForecast? {
+        upcoming(days ?? [], limit: 1, now: now).first
+    }
+
     static func dayString(from dateString: String) -> String {
         guard let date = dateOnlyFormatter.date(from: String(dateString.prefix(10))) else {
             return "--"
