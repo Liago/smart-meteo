@@ -109,7 +109,7 @@ struct CurrentWeatherProvider: TimelineProvider {
 
     private func makeEntry(from forecast: WidgetForecastResponse, locationName: String) -> WeatherEntry {
         let current = forecast.current
-        let todayDaily = forecast.daily?.first
+        let todayDaily = WidgetDateFormatters.today(forecast.daily)
 
         // Formatta sunrise/sunset
         var sunriseStr: String?

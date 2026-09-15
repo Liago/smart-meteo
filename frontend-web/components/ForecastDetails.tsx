@@ -30,6 +30,19 @@ export default function ForecastDetails({ daily, hourly, onPrecipitationClick }:
 
 	if (!daily || daily.length === 0) return null;
 
+	/*
+	  Da DOMANI in avanti, scelto per data e non per posizione.
+	  Lo `slice(1)` di prima saltava il primo elemento dando per scontato che
+	  fosse oggi: quando il backend apre `daily` con IERI — le fonti ragionano
+	  in UTC e il primo cassetto del giorno locale cade il giorno prima — quel
+	  taglio saltava ieri e lasciava oggi, che questo riquadro non deve
+	  mostrare perché sta già, per esteso, in `CurrentWeather`.
+	*/
+	const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD locale
+	const upcoming = daily.filter(day => day.date.slice(0, 10) > today).slice(0, 6);
+
+	if (upcoming.length === 0) return null;
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 20 }}
@@ -39,15 +52,11 @@ export default function ForecastDetails({ daily, hourly, onPrecipitationClick }:
 			style={{ color: 'var(--color-duet-ink)' }}
 		>
 			<h3 className="text-[13px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-duet-muted)' }}>
-				Prossimi 6 giorni
+				{upcoming.length === 1 ? 'Domani' : `Prossimi ${upcoming.length} giorni`}
 			</h3>
 
 			<div className="flex flex-col">
-				{/*
-				  Skippa oggi (già dettagliato in CurrentWeather): partendo da domani su
-				  7 giorni totali dal backend restano esattamente i 6 del titolo.
-				*/}
-				{daily.slice(1).map((day) => (
+				{upcoming.map((day) => (
 					<div key={day.date} style={{ borderTop: '1px solid #eef2f6' }}>
 						<div className="w-full flex items-center justify-between gap-2">
 							<button

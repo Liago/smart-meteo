@@ -101,14 +101,21 @@ struct WeeklyForecastProvider: TimelineProvider {
     }
 
     private func makeEntry(from forecast: WidgetForecastResponse, locationName: String) -> WeeklyForecastEntry {
-        let dailyData = forecast.daily ?? []
+        // Da oggi in avanti: `daily` può cominciare da IERI, perché le fonti
+        // ragionano in UTC e il primo cassetto del giorno locale cade il giorno
+        // prima. Sul widget pesa più che nell'app — sette righe in un riquadro
+        // piccolo, e la prima è quella che si legge di sfuggita.
+        //
+        // Il filtro sta PRIMA del range delle barre: la minima di ieri
+        // allargherebbe la scala di una settimana che non la contiene più.
+        let dailyData = WidgetDateFormatters.upcoming(forecast.daily ?? [])
 
         // Calcola range globale per le barre temperatura
         let temps = dailyData.compactMap { [$0.tempMin, $0.tempMax] }.flatMap { $0 }.compactMap { $0 }
         let globalMin = temps.min() ?? 0
         let globalMax = temps.max() ?? 30
 
-        let dayEntries: [WeeklyForecastEntry.DayEntry] = dailyData.prefix(7).map { daily in
+        let dayEntries: [WeeklyForecastEntry.DayEntry] = dailyData.map { daily in
             let dayLabel = WidgetDateFormatters.dayString(from: daily.date)
             let isToday = dayLabel == "Oggi"
             return WeeklyForecastEntry.DayEntry(
