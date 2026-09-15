@@ -1,5 +1,10 @@
 import Foundation
 import SwiftUI
+// Serve per `ObservableObject`: `@Published` si risolve anche solo con
+// SwiftUI, ma la sintesi di `objectWillChange` no, e senza questo import
+// il compilatore dice «Type 'UnitPrefs' does not conform to protocol
+// 'ObservableObject'» segnalandolo sul punto d'uso invece che qui.
+import Combine
 
 /// Le unità di misura scelte dall'utente, e la formattazione che ne consegue.
 ///
