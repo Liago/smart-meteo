@@ -134,7 +134,12 @@ function parseForecastNextHour(data: any): ForecastNextHour | undefined {
         ? nextHour.summary.map((s: any) => ({
             condition: s.condition || 'clear',
             startTime: s.startTime,
-            endTime: s.endTime,
+            // La chiave viene OMESSA quando Apple non la manda, invece di
+            // finire a `undefined`. In JSON il risultato è lo stesso - la
+            // chiave sparisce - ma così il tipo non promette una stringa
+            // che non c'è, ed è esattamente quella promessa che i client
+            // hanno creduto.
+            ...(s.endTime ? { endTime: s.endTime } : {}),
         }))
         : [];
 

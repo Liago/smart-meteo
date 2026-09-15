@@ -87,7 +87,13 @@ export interface MinutelyPrecipitation {
 }
 
 export interface ForecastNextHour {
-	summary: { condition: string; startTime: string; endTime: string }[];
+	/**
+	 * `endTime` è OPZIONALE: Apple lo omette sull'ultimo segmento, che quando
+	 * l'ora è uniforme (il caso più frequente) è anche l'unico. Dichiararlo
+	 * obbligatorio ha fatto fallire per mesi la decodifica dell'intera risposta
+	 * su iOS, dove `let endTime: String` trovava la chiave assente.
+	 */
+	summary: { condition: string; startTime: string; endTime?: string }[];
 	minutes: MinutelyPrecipitation[];
 }
 

@@ -609,12 +609,41 @@ struct MinutelyPrecipitation: Codable, Identifiable {
 struct ForecastNextHourSummary: Codable {
     let condition: String
     let startTime: String
-    let endTime: String
+    /// **Opzionale**: Apple lo omette sull'ultimo segmento per dire «fino alla
+    /// fine della finestra», e quando l'ora è uniforme — il caso più frequente,
+    /// un'ora sola di «clear» — l'ultimo segmento è anche il primo. Dichiarato
+    /// `String` faceva fallire la decodifica dell'**intera** risposta.
+    let endTime: String?
 }
 
+/// Il nowcast al minuto.
+///
+/// Decodifica **tollerante**, ed è una scelta, non una svista: il blocco arriva
+/// da una sola delle nove fonti, è già opzionale (`ForecastNextHour?`), e nessuna
+/// delle due schermate che lo usano è la previsione. Con la decodifica sintetizzata
+/// un campo mancante qui dentro non spegneva il nowcast: spegneva la dashboard,
+/// perché l'errore risale fino a `ForecastResponse`. Un pannello in meno è un
+/// degrado, una schermata di errore al posto della previsione è un guasto.
 struct ForecastNextHour: Codable {
     let summary: [ForecastNextHourSummary]
     let minutes: [MinutelyPrecipitation]
+
+    /// Esplicito perché dichiarare `init(from:)` toglie quello di membro, che
+    /// serve alle preview e ai test.
+    init(summary: [ForecastNextHourSummary], minutes: [MinutelyPrecipitation]) {
+        self.summary = summary
+        self.minutes = minutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // `summary` non lo legge nessuno dei due client: il titolo del pannello
+        // si deduce dai minuti, che dicono *quando* inizia e smette invece di
+        // descrivere l'ora in generale. Se un giorno cambia forma, che sparisca
+        // in silenzio è il comportamento giusto.
+        summary = (try? container.decode([ForecastNextHourSummary].self, forKey: .summary)) ?? []
+        minutes = (try? container.decode([MinutelyPrecipitation].self, forKey: .minutes)) ?? []
+    }
 }
 
 // MARK: - Confidence

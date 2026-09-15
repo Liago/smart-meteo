@@ -403,6 +403,31 @@ export function weatherKitResponse(overrides?: { currentWeather?: Overrides }) {
 				},
 			],
 		},
+		forecastNextHour: {
+			// Due segmenti: il primo con `endTime`, il secondo SENZA, che è
+			// come Apple chiude l'elenco - l'ultimo vale «fino alla fine della
+			// finestra». Quando l'ora è uniforme l'unico segmento è anche
+			// l'ultimo, quindi il caso senza `endTime` è la norma, non il caso
+			// limite.
+			summary: [
+				{
+					condition: 'clear',
+					startTime: '2026-09-12T14:00:00Z',
+					endTime: '2026-09-12T14:30:00Z',
+				},
+				{
+					condition: 'rain',
+					startTime: '2026-09-12T14:30:00Z',
+				},
+			],
+			minutes: [
+				{
+					startTime: '2026-09-12T14:00:00Z',
+					precipitationChance: 0.4, // frazione 0-1
+					precipitationIntensity: 1.2, // mm/h
+				},
+			],
+		},
 	};
 }
 

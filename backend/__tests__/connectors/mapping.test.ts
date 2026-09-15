@@ -439,6 +439,42 @@ describe('weatherkit', () => {
 		expect(f.condition_code).toBe('rain');
 	});
 
+	it('non emette endTime quando Apple non lo manda', async () => {
+		// Il bug che ha rotto iOS: `endTime: undefined` sparisce da JSON, ma il
+		// tipo continuava a prometterlo, e `let endTime: String` faceva fallire
+		// la decodifica dell'INTERA risposta - non del nowcast, della
+		// previsione. L'asserzione è sulla chiave, non sul valore: `toBeUndefined`
+		// passerebbe anche con la chiave presente a null.
+		mockWeatherKitFetch(weatherKitResponse());
+		const f = (await fetchFromWeatherKit(LAT, LON))!;
+
+		const summary = f.forecastNextHour!.summary;
+		expect(summary).toHaveLength(2);
+		expect(summary[0]!.endTime).toBe('2026-09-12T14:30:00Z');
+		expect(Object.keys(summary[1]!)).toEqual(['condition', 'startTime']);
+	});
+
+	it('converte le frazioni di probabilità del nowcast in percentuali', async () => {
+		mockWeatherKitFetch(weatherKitResponse());
+		const f = (await fetchFromWeatherKit(LAT, LON))!;
+
+		const minute = f.forecastNextHour!.minutes[0]!;
+		expect(minute.precipitationChance).toBeCloseTo(40, 5);
+		expect(minute.precipitationIntensity).toBeCloseTo(1.2, 5);
+	});
+
+	it('senza il dataset forecastNextHour il blocco non compare', async () => {
+		// Apple non copre tutto il pianeta con il nowcast: l'assenza è normale,
+		// e un blocco vuoto farebbe apparire un pannello che non ha niente da
+		// dire.
+		const senzaNowcast: any = weatherKitResponse();
+		delete senzaNowcast.forecastNextHour;
+		mockWeatherKitFetch(senzaNowcast);
+
+		const f = (await fetchFromWeatherKit(LAT, LON))!;
+		expect(f.forecastNextHour).toBeUndefined();
+	});
+
 	it('senza le variabili Apple non tenta la chiamata', async () => {
 		delete process.env.APPLE_PRIVATE_KEY;
 		mockWeatherKitFetch(weatherKitResponse());
