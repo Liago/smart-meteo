@@ -140,7 +140,9 @@ export interface MinutelyPrecipitation {
 }
 
 export interface ForecastNextHour {
-	summary: { condition: string; startTime: string; endTime: string }[];
+	// `endTime` assente sull'ultimo segmento: Apple lo omette per dire
+	// «fino alla fine della finestra».
+	summary: { condition: string; startTime: string; endTime?: string }[];
 	minutes: MinutelyPrecipitation[];
 }
 

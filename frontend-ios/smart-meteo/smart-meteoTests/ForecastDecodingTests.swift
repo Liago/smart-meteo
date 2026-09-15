@@ -114,7 +114,13 @@ final class ForecastDecodingTests: XCTestCase {
         ]
       },
       "forecastNextHour": {
-        "summary": [],
+        "summary": [
+          { "condition": "clear",
+            "startTime": "2026-09-14T08:00:00Z",
+            "endTime": "2026-09-14T08:30:00Z" },
+          { "condition": "rain",
+            "startTime": "2026-09-14T08:30:00Z" }
+        ],
         "minutes": [
           { "startTime": "2026-09-14T08:00:00Z",
             "precipitationChance": 0, "precipitationIntensity": 0 }
@@ -193,6 +199,46 @@ final class ForecastDecodingTests: XCTestCase {
         XCTAssertEqual(hour.soilTemperatureRoot, 18)
         XCTAssertEqual(hour.freezingLevel, 3800)
         XCTAssertEqual(hour.liftedIndex, -4)
+    }
+
+    /// Il nowcast senza `endTime`.
+    ///
+    /// Apple omette `endTime` sull'ultimo segmento di `summary` per dire «fino
+    /// alla fine della finestra», e quando l'ora è uniforme quell'ultimo
+    /// segmento è anche l'unico: il caso è la norma, non il limite. Con
+    /// `endTime` dichiarato `String` l'errore non fermava il nowcast, fermava
+    /// la decodifica dell'INTERA risposta — la dashboard mostrava
+    /// «keyNotFound: endTime» al posto della previsione.
+    ///
+    /// Questa suite non l'aveva visto perché la sua fixture aveva
+    /// `"summary": []`: un array vuoto non decodifica nessun elemento, quindi
+    /// nessun campo, quindi nessun errore. Una fixture che evita la forma
+    /// difficile è una fixture che non prova niente.
+    func testDecodesANowcastSummaryWithoutEndTime() throws {
+        let nextHour = try XCTUnwrap(try decodeResponse().forecastNextHour)
+
+        XCTAssertEqual(nextHour.summary.count, 2)
+        XCTAssertEqual(nextHour.summary.first?.endTime, "2026-09-14T08:30:00Z")
+        XCTAssertNil(nextHour.summary.last?.endTime)
+        XCTAssertEqual(nextHour.minutes.count, 1)
+    }
+
+    /// Un `forecastNextHour` di forma ignota degrada a blocco vuoto.
+    ///
+    /// La decodifica del blocco è volutamente tollerante: arriva da una fonte
+    /// sola su nove ed è già opzionale, quindi un campo che cambia forma deve
+    /// costare un pannello, non la schermata. Il resto della risposta —
+    /// temperatura compresa — continua a decodificare.
+    func testAMalformedNowcastDoesNotTakeDownTheResponse() throws {
+        let rotto = Self.responseJSON.replacingOccurrences(
+            of: "\"minutes\": [",
+            with: "\"minutes\": [ 42, "
+        )
+
+        let forecast = try Fixture.decode(ForecastResponse.self, from: rotto)
+
+        XCTAssertEqual(forecast.current.conditionText, "CLEAR")
+        XCTAssertEqual(forecast.forecastNextHour?.minutes.count, 0)
     }
 
     /// Una risposta vecchia in cache non deve far fallire la decodifica.
