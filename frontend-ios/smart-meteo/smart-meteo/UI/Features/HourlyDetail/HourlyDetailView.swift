@@ -317,10 +317,17 @@ struct HourlyDetailView: View {
 
     // MARK: - Sezione di grafico
 
-    @ViewBuilder
-    private func chartSection(_ section: MetricSection) -> some View {
-        let values = points.compactMap { $0.forecast.flatMap(section.valueOf) }
-        var secondaries = section.secondaryOf.map { extract in
+    /// I valori che, oltre alla serie principale, devono stare dentro il
+    /// dominio dell'asse Y: la serie secondaria (le raffiche) e i due
+    /// percentili della banda d'incertezza.
+    ///
+    /// Sta qui e non dentro `chartSection` perché quello è un `@ViewBuilder`:
+    /// un assegnamento vale `()`, e `()` non può conformarsi a `View`. La
+    /// regola generale è che in un corpo `@ViewBuilder` stanno espressioni e
+    /// dichiarazioni `let`, non istruzioni — ogni calcolo che ne ha bisogno
+    /// diventa una funzione a parte.
+    private func axisCompanions(_ section: MetricSection) -> [Double] {
+        var extra = section.secondaryOf.map { extract in
             points.compactMap { $0.forecast.flatMap(extract) }
         } ?? []
 
@@ -328,9 +335,16 @@ struct HourlyDetailView: View {
         // fuori, la banda verrebbe tagliata dal bordo del grafico proprio dove
         // è più larga, cioè dove l'incertezza è maggiore.
         if let low = section.bandLowOf, let high = section.bandHighOf {
-            secondaries += points.compactMap { $0.forecast.flatMap(low) }
-            secondaries += points.compactMap { $0.forecast.flatMap(high) }
+            extra += points.compactMap { $0.forecast.flatMap(low) }
+            extra += points.compactMap { $0.forecast.flatMap(high) }
         }
+        return extra
+    }
+
+    @ViewBuilder
+    private func chartSection(_ section: MetricSection) -> some View {
+        let values = points.compactMap { $0.forecast.flatMap(section.valueOf) }
+        let secondaries = axisCompanions(section)
 
         if values.isEmpty {
             // Cache scritta prima dell'introduzione del campo, o nessuna fonte
