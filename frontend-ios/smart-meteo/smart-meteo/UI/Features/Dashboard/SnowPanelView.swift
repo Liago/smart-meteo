@@ -24,20 +24,20 @@ struct SnowPanelView: View {
 
     // MARK: - Etichette
 
-    private static let phaseLabels = [
+    static let phaseLabels = [
         "snow": "Neve",
         "sleet": "Neve mista a pioggia",
         "rain": "Pioggia",
     ]
 
-    private static let frostLabels = [
+    static let frostLabels = [
         "none": "Nessun rischio",
         "possible": "Brina possibile",
         "likely": "Gelata probabile",
         "severe": "Gelata forte",
     ]
 
-    private static let frostColors: [String: Color] = [
+    static let frostColors: [String: Color] = [
         "none": Color.gray.opacity(0.4),
         "possible": Color(red: 0.50, green: 0.77, blue: 0.91),
         "likely": Color(red: 0.24, green: 0.56, blue: 0.84),

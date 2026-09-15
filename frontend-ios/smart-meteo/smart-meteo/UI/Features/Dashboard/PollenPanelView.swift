@@ -13,7 +13,7 @@ struct PollenPanelView: View {
     let pollen: [PollenReading]
 
     /// Ordine di gravità, per portare in cima la specie che pesa oggi.
-    private static let rank: [String: Int] = [
+    static let rank: [String: Int] = [
         "very_high": 4,
         "high": 3,
         "moderate": 2,
@@ -21,7 +21,7 @@ struct PollenPanelView: View {
         "none": 0,
     ]
 
-    private static let labels: [String: String] = [
+    static let labels: [String: String] = [
         "none": "Assente",
         "low": "Basso",
         "moderate": "Moderato",
@@ -29,7 +29,7 @@ struct PollenPanelView: View {
         "very_high": "Molto alto",
     ]
 
-    private static let colors: [String: Color] = [
+    static let colors: [String: Color] = [
         "none": Color.gray.opacity(0.35),
         "low": Color(hex: "33B34D"),
         "moderate": Color(hex: "CA8A04"),

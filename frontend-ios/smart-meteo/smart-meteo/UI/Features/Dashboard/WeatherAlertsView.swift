@@ -1,218 +1,239 @@
 import SwiftUI
 
-// MARK: - Lista allerte meteo (modale)
+/// L'elenco delle allerte attive.
+///
+/// La barra colorata in cima a ogni card è l'unico elemento che fa capire la
+/// gravità **prima** di leggere: in un elenco di tre allerte, sapere quale
+/// guardare per prima conta più del testo di ognuna.
+///
+/// Riferimento: `ios Redisign/README.md`, schermata 5.
 struct WeatherAlertsView: View {
     let alerts: [WeatherAlert]
+    var theme: WeatherTheme = WeatherTheme.of(.clear)
+
     @Environment(\.dismiss) private var dismiss
     @State private var expandedAlertId: String?
 
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Icona header
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 44))
-                            .foregroundColor(.orange)
+    /// Le più gravi in cima: l'ordine di lettura deve seguire l'urgenza, non
+    /// l'ordine in cui i provider hanno risposto.
+    private var ordered: [WeatherAlert] {
+        let rank = ["extreme": 0, "severe": 1, "moderate": 2, "minor": 3]
+        return alerts.sorted {
+            (rank[$0.severity.lowercased()] ?? 4) < (rank[$1.severity.lowercased()] ?? 4)
+        }
+    }
 
-                        Text("\(alerts.count) Allert\(alerts.count == 1 ? "a" : "e") Meteo")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.primary)
-                    }
-                    .padding(.top, 8)
+    var body: some View {
+        ZStack {
+            theme.page.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
 
                     if alerts.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 48))
-                                .foregroundColor(.green)
-                            Text("Nessuna allerta attiva")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 40)
+                        empty
                     } else {
-                        ForEach(alerts) { alert in
-                            WeatherAlertCard(
+                        ForEach(ordered) { alert in
+                            AlertCardView(
                                 alert: alert,
                                 isExpanded: expandedAlertId == alert.id,
                                 onTap: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                    HapticManager.light()
+                                    withAnimation(Duet.section) {
                                         expandedAlertId = expandedAlertId == alert.id ? nil : alert.id
                                     }
                                 }
                             )
+                            .padding(.horizontal, 16)
                         }
                     }
                 }
-                .padding()
-            }
-            .background(Color(UIColor.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                .padding(.vertical, 16)
             }
         }
     }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Button {
+                HapticManager.light()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.duetUI(16, .semibold))
+                    .foregroundColor(theme.ink.opacity(0.8))
+                    .frame(width: 38, height: 38)
+                    .background(
+                        RoundedRectangle(cornerRadius: 13).fill(Color.white.opacity(0.8))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Chiudi")
+
+            Text("Allerte")
+                .font(.duetDisplay(26))
+                .foregroundColor(Duet.ink)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var empty: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 40))
+                .foregroundColor(Duet.green)
+
+            Text("Nessuna allerta attiva")
+                .font(.duetUI(14, .semibold))
+                .foregroundColor(Duet.ink)
+
+            Text("Le allerte arrivano dalla protezione civile e dai provider meteo, e compaiono qui appena vengono emesse.")
+                .font(.duetUI(11.5))
+                .foregroundColor(Duet.ink.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+    }
 }
 
-// MARK: - Card singola allerta
-struct WeatherAlertCard: View {
+// MARK: - Card
+
+struct AlertCardView: View {
     let alert: WeatherAlert
     let isExpanded: Bool
     let onTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header card
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    // Icona severity
-                    Image(systemName: alert.severityIcon)
-                        .font(.title2)
-                        .foregroundColor(Color(
-                            red: alert.severityColor.red,
-                            green: alert.severityColor.green,
-                            blue: alert.severityColor.blue
-                        ))
+            // La barra è lo stato di gravità reso leggibile di sfuggita.
+            Rectangle()
+                .fill(Self.severityColor(alert.severity))
+                .frame(height: 5)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(alert.source ?? alert.eventSource ?? "Allerta Meteo")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text(alert.severityLabel.uppercased())
+                        .font(.duetUI(9.5, .heavy))
+                        .tracking(0.95)
+                        .foregroundColor(Self.severityColor(alert.severity))
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Self.severityTint(alert.severity))
+                        )
 
-                        HStack(spacing: 6) {
-                            Text(alert.severityLabel)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule().fill(Color(
-                                        red: alert.severityColor.red,
-                                        green: alert.severityColor.green,
-                                        blue: alert.severityColor.blue
-                                    ))
-                                )
-
-                            if let area = alert.areaName {
-                                Text(area)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
+                    if let area = alert.areaName {
+                        Text(area)
+                            .font(.duetUI(10.5, .semibold))
+                            .foregroundColor(Duet.ink.opacity(0.45))
+                            .lineLimit(1)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 4)
 
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Image(systemName: "chevron.down")
+                        .font(.duetUI(11, .semibold))
+                        .foregroundColor(Duet.ink.opacity(0.3))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding(16)
-            }
-            .buttonStyle(.plain)
 
-            // Dettaglio espanso
-            if isExpanded {
-                Divider()
-                    .padding(.horizontal, 16)
+                Text(Self.title(alert))
+                    .font(.duetUI(14, .bold))
+                    .foregroundColor(Duet.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    // Descrizione
+                if !alert.description.isEmpty {
                     Text(alert.description)
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
+                        .font(.duetUI(12))
+                        .foregroundColor(Duet.ink.opacity(0.6))
                         .fixedSize(horizontal: false, vertical: true)
-
-                    // Tempi
-                    VStack(alignment: .leading, spacing: 6) {
-                        alertTimeRow(label: "Inizio", time: alert.effectiveTime)
-                        alertTimeRow(label: "Scadenza", time: alert.expireTime)
-                    }
-
-                    // Info aggiuntive
-                    if let certainty = alert.certainty {
-                        HStack {
-                            Text("Certezza:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(certaintyLabel(certainty))
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                    }
-
-                    if let urgency = alert.urgency {
-                        HStack {
-                            Text("Urgenza:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(urgencyLabel(urgency))
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                    }
+                        // Chiusa mostra tre righe: il bollettino della
+                        // protezione civile è lungo, e un muro di testo in un
+                        // elenco di allerte si salta invece di leggerlo.
+                        .lineLimit(isExpanded ? nil : 3)
                 }
-                .padding(16)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+
+                if let finestra = Self.window(alert) {
+                    Text(finestra.uppercased())
+                        .font(.duetUI(10.5, .semibold))
+                        .tracking(0.6)
+                        .foregroundColor(Duet.ink.opacity(0.38))
+                }
+
+                if isExpanded, let fonte = alert.source ?? alert.eventSource {
+                    Text("Fonte: \(fonte)")
+                        .font(.duetUI(10.5))
+                        .foregroundColor(Duet.ink.opacity(0.38))
+                }
             }
+            .padding(16)
         }
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+        .background(RoundedRectangle(cornerRadius: 22).fill(Duet.surface))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: Duet.shadowCard, radius: 12, x: 0, y: 2)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 
-    private func alertTimeRow(label: String, time: String) -> some View {
-        HStack {
-            Text("\(label):")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Text(formatAlertTime(time))
-                .font(.caption)
-                .fontWeight(.medium)
+    // MARK: - Testi
+
+    /// Il titolo: l'evento quando c'è, altrimenti la gravità.
+    ///
+    /// `event` è in inglese sui feed EUMETNET («Yellow Thunderstorm Warning»),
+    /// ma è quello che descrive il fenomeno: meglio una parola inglese esatta
+    /// di un'etichetta italiana generica.
+    static func title(_ alert: WeatherAlert) -> String {
+        if let event = alert.event, !event.isEmpty { return event }
+        if !alert.description.isEmpty { return alert.description }
+        return "Allerta \(alert.severityLabel.lowercased())"
+    }
+
+    /// «fino alle 22:00 di oggi», o la finestra intera quando non è in corso.
+    static func window(_ alert: WeatherAlert, now: Date = Date()) -> String? {
+        guard let fine = parse(alert.expireTime) else { return nil }
+
+        let inizio = parse(alert.effectiveTime)
+        if let inizio, inizio > now {
+            return "dalle \(clock(inizio)) alle \(clock(fine))"
+        }
+        return "fino alle \(clock(fine))"
+    }
+
+    private static func parse(_ iso: String) -> Date? {
+        let conFrazioni = ISO8601DateFormatter()
+        conFrazioni.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return conFrazioni.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+    }
+
+    private static func clock(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "it_IT")
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
+    }
+
+    // MARK: - Colori
+
+    static func severityColor(_ severity: String) -> Color {
+        switch severity.lowercased() {
+        case "extreme", "severe": return Duet.orangeRed
+        case "moderate": return Duet.yellow
+        default: return Color(hex: "2F7D7D")
         }
     }
 
-    private func formatAlertTime(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
-        guard let date else { return isoString }
-
-        let display = DateFormatter()
-        display.locale = Locale(identifier: "it_IT")
-        display.dateFormat = "d MMM, HH:mm"
-        return display.string(from: date)
-    }
-
-    private func certaintyLabel(_ value: String) -> String {
-        switch value.lowercased() {
-        case "observed": return "Osservata"
-        case "likely": return "Probabile"
-        case "possible": return "Possibile"
-        case "unlikely": return "Improbabile"
-        default: return value.capitalized
-        }
-    }
-
-    private func urgencyLabel(_ value: String) -> String {
-        switch value.lowercased() {
-        case "immediate": return "Immediata"
-        case "expected": return "Prevista"
-        case "future": return "Futura"
-        default: return value.capitalized
+    static func severityTint(_ severity: String) -> Color {
+        switch severity.lowercased() {
+        case "extreme", "severe": return Duet.tintOrange
+        case "moderate": return Duet.tintYellow
+        default: return Duet.tintTeal
         }
     }
 }

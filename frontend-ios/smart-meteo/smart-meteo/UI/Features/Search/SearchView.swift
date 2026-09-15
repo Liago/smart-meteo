@@ -73,170 +73,316 @@ class SearchViewModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
     }
 }
 
+/// Località: ricerca e preferiti nella stessa schermata.
+///
+/// Prima erano due posti diversi — si cercava qui e si gestivano i preferiti
+/// nelle impostazioni — il che è esattamente il contrario di come si usa: nove
+/// volte su dieci si apre la lente per tornare su una località che si ha già
+/// salvato, non per cercarne una nuova. Ora i preferiti sono la **prima** cosa
+/// che si vede, e il campo di ricerca serve al caso meno frequente.
+///
+/// Riferimento: `ios Redisign/README.md`, schermata 3.
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    
-    private let accentColor = Color(red: 236/255, green: 104/255, blue: 90/255)
-    private let bgColor = Color(red: 252/255, green: 249/255, blue: 246/255)
-    
+
+    var theme: WeatherTheme = WeatherTheme.of(.clear)
+
+    private var isBrowsing: Bool {
+        viewModel.searchQuery.isEmpty && !viewModel.isSearching
+    }
+
     var body: some View {
-        NavigationStack {
-            ZStack {
-                bgColor.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Empty state
-                        if viewModel.results.isEmpty && viewModel.searchQuery.isEmpty && !viewModel.isSearching {
-                            emptyStateView
-                        }
-                        
-                        // Searching spinner
-                        if viewModel.isSearching {
-                            VStack(spacing: 14) {
-                                ProgressView()
-                                    .scaleEffect(1.1)
-                                    .tint(accentColor)
-                                Text("Ricerca in corso...")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)
-                        }
-                        
-                        // No results
-                        if viewModel.results.isEmpty && !viewModel.searchQuery.isEmpty && !viewModel.isSearching {
-                            VStack(spacing: 12) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.gray.opacity(0.3))
-                                Text("Nessun risultato per \"\(viewModel.searchQuery)\"")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)
-                            .padding(.horizontal, 32)
-                        }
-                        
-                        // Results
-                        if !viewModel.results.isEmpty {
-                            LazyVStack(spacing: 8) {
-                                ForEach(viewModel.results, id: \.self) { result in
-                                    Button {
-                                        HapticManager.selection()
-                                        viewModel.selectLocation(result) {
-                                            dismiss()
-                                        }
-                                    } label: {
-                                        HStack(spacing: 14) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(accentColor.opacity(0.1))
-                                                    .frame(width: 40, height: 40)
-                                                Image(systemName: "mappin")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(accentColor)
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(result.title)
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(.black)
-                                                if !result.subtitle.isEmpty {
-                                                    Text(result.subtitle)
-                                                        .font(.system(size: 13))
-                                                        .foregroundColor(.gray)
-                                                }
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .font(.caption)
-                                                .foregroundColor(.gray.opacity(0.4))
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 14)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .fill(Color.white)
-                                                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
-                                        )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                        }
+        ZStack {
+            theme.page.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    searchField
+
+                    if isBrowsing {
+                        favourites
+                    } else if viewModel.isSearching {
+                        searching
+                    } else if viewModel.results.isEmpty {
+                        noResults
+                    } else {
+                        results
                     }
                 }
-                
-                // Selection overlay
-                if viewModel.isSelecting {
-                    Color.black.opacity(0.2)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                    
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .tint(accentColor)
-                        
-                        if let city = viewModel.selectedCityName {
-                            Text(city)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.black)
-                        }
-                        
-                        Text("Caricamento previsioni...")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(32)
+                .padding(.vertical, 16)
+            }
+
+            if viewModel.isSelecting {
+                selectionOverlay
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.isSelecting)
+    }
+
+    // MARK: - Intestazione e campo
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Button {
+                HapticManager.light()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.duetUI(16, .semibold))
+                    .foregroundColor(theme.ink.opacity(0.8))
+                    .frame(width: 38, height: 38)
                     .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(Color.white)
-                            .shadow(color: .black.opacity(0.12), radius: 24, x: 0, y: 12)
+                        RoundedRectangle(cornerRadius: 13).fill(Color.white.opacity(0.8))
                     )
-                    .transition(.scale.combined(with: .opacity))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Chiudi")
+
+            Text("Località")
+                .font(.duetDisplay(26))
+                .foregroundColor(Duet.ink)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.duetUI(16, .medium))
+                .foregroundColor(Duet.ink.opacity(0.4))
+
+            TextField("Cerca città o CAP", text: $viewModel.searchQuery)
+                .font(.duetUI(14, .semibold))
+                .foregroundColor(Duet.ink)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
+                .tint(theme.accent)
+
+            if !viewModel.searchQuery.isEmpty {
+                Button {
+                    viewModel.searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.duetUI(15))
+                        .foregroundColor(Duet.ink.opacity(0.25))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancella la ricerca")
+            }
+        }
+        .padding(.vertical, 13)
+        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Duet.surface))
+        .shadow(color: Duet.shadowCard, radius: 10, x: 0, y: 2)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Preferiti
+
+    @ViewBuilder
+    private var favourites: some View {
+        if appState.favoriteLocations.isEmpty {
+            emptyState
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PREFERITI")
+                    .font(.duetUI(10.5, .semibold))
+                    .tracking(1.25)
+                    .foregroundColor(Duet.ink.opacity(0.45))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+
+                ForEach(ordinati) { location in
+                    Button {
+                        HapticManager.selection()
+                        appState.selectLocation(coordinate: location.coordinate, name: location.name)
+                        dismiss()
+                    } label: {
+                        favouriteRow(location)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: viewModel.isSelecting)
-            .navigationTitle("Cerca Località")
-            .searchable(text: $viewModel.searchQuery, prompt: "Cerca città...")
         }
     }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(accentColor.opacity(0.08))
-                    .frame(width: 80, height: 80)
-                Image(systemName: "location.magnifyingglass")
-                    .font(.system(size: 32))
-                    .foregroundColor(accentColor.opacity(0.5))
+
+    /// Casa per prima: è la località che si riapre più spesso.
+    private var ordinati: [SavedLocation] {
+        let casa = appState.homeLocation
+        let altre = appState.favoriteLocations.filter { $0.name != casa?.name }
+        if let casa, appState.favoriteLocations.contains(where: { $0.name == casa.name }) {
+            return [casa] + altre
+        }
+        return altre
+    }
+
+    private func favouriteRow(_ location: SavedLocation) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: appState.isHome(location: location) ? "house.fill" : "mappin")
+                .font(.duetUI(15, .medium))
+                .foregroundColor(theme.accent)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(location.name)
+                        .font(.duetUI(14, .bold))
+                        .foregroundColor(Duet.ink)
+                        .lineLimit(1)
+
+                    if appState.isHome(location: location) {
+                        Text("CASA")
+                            .font(.duetUI(9, .bold))
+                            .tracking(0.5)
+                            .foregroundColor(theme.accent)
+                    }
+                }
+
+                // Nessuna temperatura accanto al nome, a differenza del mockup:
+                // richiederebbe una chiamata per ogni preferito, e inventarla
+                // sarebbe peggio che non mostrarla.
+                Text(Self.coordinates(location.coordinate))
+                    .font(.duetUI(11.5))
+                    .foregroundColor(Duet.ink.opacity(0.45))
             }
-            
-            VStack(spacing: 6) {
-                Text("Cerca una città")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.black.opacity(0.7))
-                Text("Digita il nome per trovare le previsioni meteo")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
+
+            Spacer(minLength: 4)
+
+            Image(systemName: "chevron.right")
+                .font(.duetUI(12, .semibold))
+                .foregroundColor(Duet.ink.opacity(0.25))
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: Duet.rCard).fill(Duet.surface))
+        .contentShape(Rectangle())
+    }
+
+    static func coordinates(_ coordinate: Coordinate) -> String {
+        String(format: "%.2f, %.2f", coordinate.lat, coordinate.lon)
+            .replacingOccurrences(of: ".", with: ",")
+    }
+
+    // MARK: - Risultati
+
+    private var results: some View {
+        VStack(spacing: 8) {
+            ForEach(viewModel.results, id: \.self) { result in
+                Button {
+                    HapticManager.selection()
+                    viewModel.selectLocation(result) { dismiss() }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin")
+                            .font(.duetUI(15, .medium))
+                            .foregroundColor(theme.accent)
+                            .frame(width: 22)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(result.title)
+                                .font(.duetUI(14, .bold))
+                                .foregroundColor(Duet.ink)
+                                .lineLimit(1)
+
+                            if !result.subtitle.isEmpty {
+                                Text(result.subtitle)
+                                    .font(.duetUI(11.5))
+                                    .foregroundColor(Duet.ink.opacity(0.45))
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Image(systemName: "chevron.right")
+                            .font(.duetUI(12, .semibold))
+                            .foregroundColor(Duet.ink.opacity(0.25))
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .background(RoundedRectangle(cornerRadius: Duet.rCard).fill(Duet.surface))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 16)
+    }
+
+    private var searching: some View {
+        VStack(spacing: 12) {
+            ProgressView().tint(theme.accent)
+            Text("Ricerca in corso…")
+                .font(.duetUI(12))
+                .foregroundColor(Duet.ink.opacity(0.5))
+        }
         .frame(maxWidth: .infinity)
-        .padding(.top, 80)
+        .padding(.top, 60)
+    }
+
+    private var noResults: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 30))
+                .foregroundColor(Duet.ink.opacity(0.2))
+            Text("Nessun risultato per «\(viewModel.searchQuery)»")
+                .font(.duetUI(13))
+                .foregroundColor(Duet.ink.opacity(0.5))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+        .padding(.horizontal, 32)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "location.magnifyingglass")
+                .font(.system(size: 30))
+                .foregroundColor(theme.accent.opacity(0.5))
+
+            Text("Nessun preferito")
+                .font(.duetUI(14, .semibold))
+                .foregroundColor(Duet.ink)
+
+            Text("Cerca una città qui sopra, poi tieni premuto il nome sulla dashboard per salvarla.")
+                .font(.duetUI(11.5))
+                .foregroundColor(Duet.ink.opacity(0.5))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
         .padding(.horizontal, 40)
+    }
+
+    private var selectionOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.2).ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                ProgressView().scaleEffect(1.1).tint(theme.accent)
+
+                if let city = viewModel.selectedCityName {
+                    Text(city)
+                        .font(.duetUI(16, .bold))
+                        .foregroundColor(Duet.ink)
+                }
+
+                Text("Caricamento previsioni…")
+                    .font(.duetUI(12))
+                    .foregroundColor(Duet.ink.opacity(0.5))
+            }
+            .padding(28)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Duet.surface))
+            .shadow(color: .black.opacity(0.12), radius: 24, x: 0, y: 12)
+        }
+        .transition(.opacity)
     }
 }
 

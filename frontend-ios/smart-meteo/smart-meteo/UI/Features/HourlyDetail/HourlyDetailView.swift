@@ -14,6 +14,11 @@ import Charts
 struct HourlyDetailView: View {
     let hourly: [HourlyForecast]
     let daily: [DailyForecast]?
+    /// La tinta della condizione, passata dalla dashboard.
+    ///
+    /// Non ricalcolata qui: due schermate che deducono lo stesso tema per conto
+    /// proprio finiscono prima o poi per dedurlo diverso.
+    let theme: WeatherTheme
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate: String
@@ -23,9 +28,15 @@ struct HourlyDetailView: View {
     private let cream = Color(red: 252 / 255, green: 249 / 255, blue: 246 / 255)
     private let coral = Color(red: 236 / 255, green: 104 / 255, blue: 90 / 255)
 
-    init(hourly: [HourlyForecast], daily: [DailyForecast]?, initialDate: String) {
+    init(
+        hourly: [HourlyForecast],
+        daily: [DailyForecast]?,
+        theme: WeatherTheme = WeatherTheme.of(.clear),
+        initialDate: String
+    ) {
         self.hourly = hourly
         self.daily = daily
+        self.theme = theme
 
         // Il ripiego parte da oggi, mai dal primo elemento dell'array: `hourly`
         // può cominciare da ieri sera, e aprire lì mostrerebbe una previsione
@@ -121,30 +132,42 @@ struct HourlyDetailView: View {
 
     var body: some View {
         ZStack {
-            cream.ignoresSafeArea()
+            theme.page.ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     header
                     dayStrip
-                    Text(longDateLabel)
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity, alignment: .center)
 
-                    if !hasAnyHour {
-                        Text("Dati orari non disponibili per questa data")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    } else {
-                        ForEach(metric.sections) { section in
-                            chartSection(section)
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(longDateLabel)
+                            .font(.duetUI(12, .medium))
+                            .foregroundColor(Duet.ink.opacity(0.45))
+                            .frame(maxWidth: .infinity, alignment: .center)
+
+                        if !hasAnyHour {
+                            Text("Dati orari non disponibili per questa data")
+                                .font(.duetUI(13))
+                                .foregroundColor(Duet.ink.opacity(0.5))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                        } else {
+                            ForEach(metric.sections) { section in
+                                chartSection(section)
+                            }
+
+                            metricsGrid
+                            closingNote
                         }
                     }
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: Duet.rPanel).fill(Duet.surface)
+                    )
+                    .shadow(color: Duet.shadowCard, radius: 14, x: 0, y: 2)
+                    .padding(.horizontal, 16)
                 }
-                .padding(20)
+                .padding(.vertical, 16)
             }
         }
         .onChange(of: selectedDate) { _, _ in selectedHour = nil }
@@ -153,8 +176,33 @@ struct HourlyDetailView: View {
         // non ha scelto nulla, `defaultPoint` segue già la nuova metrica.
     }
 
+    /// Indietro a sinistra, titolo in serif.
+    ///
+    /// Il mockup mostra un titolo fisso «Dettaglio orario», ma qui il titolo è
+    /// il **nome della metrica** ed è anche il selettore: il ridisegno non aveva
+    /// considerato che questa schermata ne mostra sei (pioggia, temporali,
+    /// vento, umidità, percepita, UV), con il proprio registro e i propri test.
+    /// Toglierle per far posto a un titolo fisso sarebbe stato cancellare una
+    /// funzione con la scusa dell'impaginazione. Il serif e la disposizione
+    /// restano quelli del ridisegno.
     private var header: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: 10) {
+            Button {
+                HapticManager.light()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.duetUI(16, .semibold))
+                    .foregroundColor(theme.ink.opacity(0.8))
+                    .frame(width: 38, height: 38)
+                    .background(
+                        RoundedRectangle(cornerRadius: 13)
+                            .fill(Color.white.opacity(0.8))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Chiudi")
+
             Menu {
                 Picker("Metrica", selection: $metric) {
                     ForEach(HourlyMetric.allCases) { option in
@@ -162,59 +210,104 @@ struct HourlyDetailView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: metric.systemImage)
-                        .font(.system(size: 20))
-                        .foregroundColor(coral)
+                HStack(spacing: 7) {
                     Text(metric.label)
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundColor(.black)
+                        .font(.duetDisplay(26))
+                        .foregroundColor(Duet.ink)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.gray)
+                        .font(.duetUI(12, .semibold))
+                        .foregroundColor(Duet.ink.opacity(0.4))
                 }
             }
             .accessibilityLabel("Metrica: \(metric.label)")
             .accessibilityHint("Tocca per cambiare il dato visualizzato")
 
-            Spacer()
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundColor(.gray.opacity(0.5))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    /// Pillole scorrevoli: sette giorni non stanno in larghezza senza
+    /// comprimersi fino a diventare illeggibili.
+    private var dayStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(days, id: \.self) { date in
+                    let isSelected = date == selectedDate
+                    let enabled = daysWithHours.contains(date)
+                    Button {
+                        HapticManager.selection()
+                        withAnimation(.easeInOut(duration: 0.2)) { selectedDate = date }
+                    } label: {
+                        Text(Self.pillLabel(date))
+                            .font(.duetUI(12, .bold))
+                            .foregroundColor(isSelected ? theme.ink : Duet.ink.opacity(0.5))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 13)
+                            .background(
+                                RoundedRectangle(cornerRadius: Duet.rSmall)
+                                    .fill(isSelected ? theme.hero : Duet.surface)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!enabled)
+                    .opacity(enabled ? 1 : 0.4)
+                }
             }
-            .accessibilityLabel("Chiudi")
+            .padding(.horizontal, 20)
         }
     }
 
-    private var dayStrip: some View {
-        HStack(spacing: 6) {
-            ForEach(days, id: \.self) { date in
-                let isSelected = date == selectedDate
-                let enabled = daysWithHours.contains(date)
-                Button {
-                    HapticManager.selection()
-                    withAnimation(.easeInOut(duration: 0.2)) { selectedDate = date }
-                } label: {
-                    VStack(spacing: 2) {
-                        Text(Self.weekdayNarrow(date))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(isSelected ? .white.opacity(0.9) : .gray)
-                        Text(Self.dayNumber(date))
-                            .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? .white : .black)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule().fill(isSelected ? coral : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(!enabled)
-                .opacity(enabled ? 1 : 0.4)
-            }
+    /// «Oggi» per il giorno corrente, altrimenti il giorno abbreviato.
+    private static func pillLabel(_ date: String) -> String {
+        date == todayKey ? "Oggi" : DailyRowsView.dayLabel(date)
+    }
+
+    // MARK: - Griglia delle metriche
+
+    /// I quattro valori dell'ora selezionata, sempre gli stessi quattro.
+    ///
+    /// Sono un **riepilogo**, non il grafico: restano quelli qualunque metrica
+    /// si stia guardando, così passare da «pioggia» a «vento» non fa perdere il
+    /// contesto dell'ora su cui si è fermato il dito.
+    private var metricsGrid: some View {
+        let hour = activePoint?.forecast
+
+        return LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+            spacing: 10
+        ) {
+            metricTile("Temperatura", HourlySparklineView.formatTemp(hour?.temp))
+            metricTile("Probabilità pioggia", hour?.precipitationProb.map { "\(Int($0.rounded()))%" } ?? "—")
+            metricTile("Vento", HeroText.wind(hour?.windSpeed))
+            metricTile("Umidità", hour?.humidity.map { "\(Int($0.rounded()))%" } ?? "—")
         }
+    }
+
+    private func metricTile(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.duetUI(10, .semibold))
+                .tracking(1.0)
+                .foregroundColor(Duet.ink.opacity(0.45))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Text(value)
+                .font(.duetUI(17, .bold))
+                .foregroundColor(Duet.ink)
+                .monospacedDigit()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Duet.surfaceInset))
+    }
+
+    private var closingNote: some View {
+        Text("Tocca il grafico per scorrere le ore.")
+            .font(.duetUI(11))
+            .foregroundColor(Duet.ink.opacity(0.45))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Sezione di grafico

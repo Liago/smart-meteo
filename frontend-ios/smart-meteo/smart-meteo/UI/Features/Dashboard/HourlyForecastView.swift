@@ -415,37 +415,15 @@ struct ChartPath: View {
 
     /// Aggiunge la curva morbida a un tracciato già iniziato, senza spostarsi.
     ///
-    /// Serve separata da `smoothPath` perché il bordo inferiore della banda
-    /// deve **continuare** il poligono, non aprirne uno nuovo: `Path.addPath`
-    /// porta con sé il proprio `move(to:)` e spezzerebbe la figura in due
-    /// sottotracciati aperti, che il riempimento renderebbe come due schegge
-    /// invece che come una banda.
+    /// L'interpolazione vive in `Path.appendSmoothCurve`: la usano anche la
+    /// sparkline della dashboard e il dettaglio orario, e tre copie della
+    /// stessa matematica si sarebbero disallineate al primo ritocco.
     private func appendSmoothCurve(to path: inout Path, through points: [CGPoint]) {
-        guard points.count > 1 else { return }
-
-        for i in 0..<(points.count - 1) {
-            let p1 = points[i]
-            let p2 = points[i + 1]
-            let mid = CGPoint(x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2)
-            let cp1 = CGPoint(x: (p1.x + mid.x) / 2, y: p1.y)
-            let cp2 = CGPoint(x: (mid.x + p2.x) / 2, y: p2.y)
-
-            path.addQuadCurve(to: mid, control: cp1)
-            path.addQuadCurve(to: p2, control: cp2)
-        }
+        path.appendSmoothCurve(through: points)
     }
 
-    /// Curva morbida che passa per i punti dati.
-    ///
-    /// La usano sia la linea della temperatura sia i due bordi della banda: tre
-    /// copie della stessa interpolazione si sarebbero disallineate al primo
-    /// ritocco, e una banda che non segue la curva è peggio di nessuna banda.
     private func smoothPath(through points: [CGPoint]) -> Path {
-        var path = Path()
-        guard let first = points.first else { return path }
-        path.move(to: first)
-        appendSmoothCurve(to: &path, through: points)
-        return path
+        Path.smoothCurve(through: points)
     }
 
     var body: some View {
