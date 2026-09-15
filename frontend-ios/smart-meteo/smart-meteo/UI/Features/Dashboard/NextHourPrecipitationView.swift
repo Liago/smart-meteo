@@ -8,6 +8,9 @@ import SwiftUI
 /// prescindere dal fuso della località, mentre l'ora di orologio mostrata
 /// accanto al titolo usa il fuso del dispositivo.
 struct NextHourPrecipitationView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let data: ForecastNextHour
 
     /// Quanti minuti mostrare al massimo: WeatherKit ne manda 60-75.
@@ -187,14 +190,9 @@ struct NextHourPrecipitationView: View {
         return "fra \(offset) minuti"
     }
 
-    /// mm/h in italiano, con un decimale solo quando serve: "0,4" / "6" mm/h.
+    /// L'intensità nell'unità scelta: "0,4 mm/h" oppure "0,02 in/h".
     private static func formatMmPerHour(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 1
-        let text = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
-        return "\(text) mm/h"
+        Units.precipRate(value)
     }
 
     /// Istante ISO8601 di WeatherKit, con o senza frazioni di secondo.

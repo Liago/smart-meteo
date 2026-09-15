@@ -8,6 +8,9 @@ import SwiftUI
 /// grafico che si può solo guardare costringe a stimare i valori dall'altezza
 /// della curva, che è esattamente ciò che un grafico dovrebbe risparmiare.
 struct HourlySparklineView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let hours: [HourlyForecast]
     let theme: WeatherTheme
     @Binding var scrubIndex: Int
@@ -59,7 +62,7 @@ struct HourlySparklineView: View {
             parti.append("pioggia \(Int(prob.rounded()))%")
         }
         if let wind = selected.windSpeed {
-            parti.append("vento \(Int((wind * 3.6).rounded())) km/h")
+            parti.append("vento \(Units.windSpeed(fromMs: wind))")
         }
         return parti.joined(separator: " · ")
     }
@@ -222,7 +225,6 @@ struct HourlySparklineView: View {
     }
 
     static func formatTemp(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 }

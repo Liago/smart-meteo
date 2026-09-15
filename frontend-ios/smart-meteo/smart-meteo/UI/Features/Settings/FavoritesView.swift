@@ -1,129 +1,173 @@
 import SwiftUI
 
+/// Le località salvate.
+///
+/// Era una `List` di sistema con card bianche dentro le righe — due
+/// contenitori sovrapposti, con lo sfondo crema che spariva dietro allo sfondo
+/// della lista. Ora è una `SettingsCard` come le altre: **una** card, una riga
+/// per località, e Casa in cima nel suo gruppo.
 struct FavoritesView: View {
     @EnvironmentObject var appState: AppState
     @Binding var isSidebarPresented: Bool
     @Environment(\.dismiss) var dismiss
-    
+
+    var theme: WeatherTheme = WeatherTheme.of(.clear)
+
+    private var home: SavedLocation? {
+        guard let home = appState.homeLocation,
+              appState.favoriteLocations.contains(where: { $0.id == home.id })
+        else { return nil }
+        return home
+    }
+
+    private var others: [SavedLocation] {
+        appState.favoriteLocations.filter { $0.id != appState.homeLocation?.id }
+    }
+
     var body: some View {
-        List {
+        SettingsPage(theme: theme) {
             if appState.favoriteLocations.isEmpty {
-                Text("Nessuna località preferita")
-                    .foregroundColor(.gray)
-                    .listRowBackground(Color.clear)
+                SettingsEmptyState(
+                    icon: "star",
+                    title: "Nessuna località preferita",
+                    note: "Cerca una località dalla lente in alto e toccane la stella: la ritrovi qui, e quella marcata come Casa apre l'app."
+                )
             } else {
-                // HOME SECTION
-                if let home = appState.homeLocation, appState.favoriteLocations.contains(where: { $0.id == home.id }) {
-                    Section {
-                        FavoriteRowView(
-                            location: home,
-                            appState: appState,
-                            isSidebarPresented: $isSidebarPresented,
-                            dismiss: dismiss
-                        )
-                    } header: {
-                        Text("CASA")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.gray)
+                if let home {
+                    SettingsCard("Casa") {
+                        locationRow(home)
                     }
                 }
-                
-                // OTHER LOCATIONS SECTION
-                Section {
-                    ForEach(appState.favoriteLocations.filter { $0.id != appState.homeLocation?.id }) { location in
-                        FavoriteRowView(
-                            location: location,
-                            appState: appState,
-                            isSidebarPresented: $isSidebarPresented,
-                            dismiss: dismiss
-                        )
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                if let index = appState.favoriteLocations.firstIndex(of: location) {
-                                    appState.favoriteLocations.remove(at: index)
-                                }
-                            } label: {
-                                Label("Elimina", systemImage: "trash")
-                            }
+
+                if !others.isEmpty {
+                    SettingsCard(home != nil ? "Altre località" : "Località") {
+                        ForEach(Array(others.enumerated()), id: \.element.id) { index, location in
+                            if index > 0 { SettingsSeparator() }
+                            locationRow(location)
                         }
                     }
-                } header: {
-                    Text(appState.homeLocation != nil ? "ALTRE LOCALITÀ" : "LOCALITÀ")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gray)
                 }
+
+                note
             }
         }
-        .listStyle(.plain)
-        .background(Color(red: 252/255, green: 249/255, blue: 246/255).ignoresSafeArea()) // Off-white
         .navigationTitle("Località Preferite")
         .navigationBarTitleDisplayMode(.inline)
     }
-}
 
-struct FavoriteRowView: View {
-    let location: SavedLocation
-    @ObservedObject var appState: AppState
-    @Binding var isSidebarPresented: Bool
-    var dismiss: DismissAction
-    
-    var body: some View {
-        Button(action: {
-            appState.selectLocation(coordinate: location.coordinate, name: location.name)
-            
-            // Navigate back
-            dismiss()
-            
-            // Hide sidebar overlay smoothly to reveal the dashboard
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation {
-                    isSidebarPresented = false
+    // MARK: - Riga
+
+    /// Nome, coordinate e il bottone Casa.
+    ///
+    /// Niente temperatura accanto al nome, come già nella schermata Località:
+    /// costerebbe una richiesta per preferita, e inventarla è peggio che
+    /// ometterla.
+    private func locationRow(_ location: SavedLocation) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                HapticManager.light()
+                appState.selectLocation(coordinate: location.coordinate, name: location.name)
+                dismiss()
+
+                // La sidebar si chiude dopo il pop, non insieme: chiuderle
+                // entrambe nello stesso istante fa vedere il fondale nero
+                // scorrere via sopra la dashboard che sta ancora entrando.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    withAnimation { isSidebarPresented = false }
                 }
-            }
-        }) {
-            HStack {
-                VStack(alignment: .leading) {
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(location.name)
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        
-                    Text("\(String(format: "%.4f", location.coordinate.lat)), \(String(format: "%.4f", location.coordinate.lon))")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .font(.duetUI(13.5, .bold))
+                        .foregroundColor(Duet.ink)
+                        .multilineTextAlignment(.leading)
+
+                    Text(Self.coordinates(location.coordinate))
+                        .font(.duetUI(11))
+                        .foregroundColor(Duet.ink.opacity(0.45))
+                        .monospacedDigit()
                 }
-                
-                Spacer()
-                
-                // Home Toggle Button
-                Button(action: {
-                    appState.setAsHome(location: location)
-                }) {
-                    Image(systemName: appState.isHome(location: location) ? "house.fill" : "house")
-                        .foregroundColor(appState.isHome(location: location) ? Color(red: 236/255, green: 104/255, blue: 90/255) : .gray)
-                        .font(.title3)
-                        .padding(8)
-                }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            .buttonStyle(.plain)
+
+            Button {
+                HapticManager.light()
+                appState.setAsHome(location: location)
+            } label: {
+                Image(systemName: appState.isHome(location: location) ? "house.fill" : "house")
+                    .font(.duetUI(15, .medium))
+                    .foregroundColor(
+                        appState.isHome(location: location)
+                            ? theme.accent
+                            : Duet.ink.opacity(0.25)
+                    )
+                    .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                appState.isHome(location: location)
+                    ? "\(location.name) è la località di casa"
+                    : "Imposta \(location.name) come casa"
             )
         }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
+        .padding(.vertical, 10)
+        // Lo swipe della `List` è sparito insieme alla `List`: senza questo
+        // menu la rimozione non esisterebbe più, e una schermata ristilizzata
+        // che perde una funzione è una regressione travestita.
+        .contextMenu {
+            Button {
+                appState.setAsHome(location: location)
+            } label: {
+                Label(
+                    appState.isHome(location: location) ? "È già casa" : "Imposta come casa",
+                    systemImage: "house"
+                )
+            }
+            .disabled(appState.isHome(location: location))
+
+            Button(role: .destructive) {
+                remove(location)
+            } label: {
+                Label("Rimuovi dai preferiti", systemImage: "trash")
+            }
+        }
+    }
+
+    /// La rimozione passa da `AppState`, che sincronizza anche il backend.
+    ///
+    /// Lo swipe di prima toglieva la località **solo dall'array**: spariva
+    /// dallo schermo e tornava al login successivo, perché su Supabase era
+    /// ancora lì.
+    private func remove(_ location: SavedLocation) {
+        guard let index = appState.favoriteLocations.firstIndex(where: { $0.id == location.id })
+        else { return }
+        HapticManager.medium()
+        withAnimation(Duet.section) {
+            appState.removeFavorite(at: IndexSet(integer: index))
+        }
+    }
+
+    private var note: some View {
+        Text("Tocca una località per vederne la previsione, la casetta per sceglierla come predefinita. Tieni premuto per rimuoverla.")
+            .font(.duetUI(11))
+            .foregroundColor(Duet.ink.opacity(0.45))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 4)
+    }
+
+    /// «45,4642, 9,1900» — quattro decimali, circa undici metri: abbastanza per
+    /// distinguere due omonime, non tanti da sembrare una misura.
+    static func coordinates(_ coordinate: Coordinate) -> String {
+        "\(Units.number(coordinate.lat, decimals: 4)), \(Units.number(coordinate.lon, decimals: 4))"
     }
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         FavoritesView(isSidebarPresented: .constant(true))
             .environmentObject(AppState.shared)
-            .background(Color(red: 252/255, green: 249/255, blue: 246/255))
     }
 }

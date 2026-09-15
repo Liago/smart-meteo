@@ -13,6 +13,9 @@ import SwiftUI
 /// manda solo quando c'è qualcosa da dire: senza questa regola resterebbe un
 /// riquadro vuoto per otto mesi l'anno.
 struct SnowPanelView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let snow: SnowOutlook
 
     private struct Row: Identifiable {
@@ -67,17 +70,17 @@ struct SnowPanelView: View {
         return "\(rounded < 0 ? "-" : "")\(grouped) m"
     }
 
-    /// Centimetri: sotto i dieci conservano un decimale, con la virgola.
+    /// Neve nell'unità scelta: sotto i dieci centimetri resta un decimale,
+    /// perché fra 3 e 3,5 cm ci passa la differenza fra una spolverata e una
+    /// nevicata. La soglia è in centimetri, il numero mostrato no.
     static func formatCm(_ value: Double?) -> String {
         guard let value else { return "—" }
-        if value >= 10 { return "\(Int(value.rounded())) cm" }
-        return String(format: "%.1f cm", value).replacingOccurrences(of: ".", with: ",")
+        return Units.snow(fromCm: value, decimals: value >= 10 ? 0 : 1)
     }
 
     /// Gradi interi: mezzo grado di precisione su una minima è finta.
     static func formatTemp(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 
     /// Ora dello slot, dalla chiave locale `YYYY-MM-DDTHH:00`.

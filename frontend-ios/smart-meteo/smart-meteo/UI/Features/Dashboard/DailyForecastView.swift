@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct DailyForecastView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let daily: [DailyForecast]
     let hourly: [HourlyForecast]?
     /// Apre il dettaglio precipitazioni sulla data passata (formato "yyyy-MM-dd").
@@ -118,6 +121,9 @@ struct DailyForecastView: View {
 }
 
 struct DailyRow: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let day: DailyForecast
     let isExpanded: Bool
     let hourly: [HourlyForecast]
@@ -197,19 +203,21 @@ struct DailyRow: View {
                     // Temperature Bar
                     if let min = day.tempMin, let max = day.tempMax {
                         HStack(spacing: 8) {
-                            Text("\(Int(min))°")
+                            Text(Units.temp(min))
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
-                                .frame(width: 25, alignment: .trailing)
+                                .frame(width: 30, alignment: .trailing)
                             
+                            // La barra resta sulla scala Celsius: è geometria,
+                            // non un'etichetta.
                             TemperatureBar(min: min, max: max, rangeMin: -5, rangeMax: 40)
                                 .frame(height: 6)
                                 .frame(maxWidth: .infinity)
                             
-                            Text("\(Int(max))°")
+                            Text(Units.temp(max))
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.black)
-                                .frame(width: 25, alignment: .leading)
+                                .frame(width: 30, alignment: .leading)
                         }
                     }
                     

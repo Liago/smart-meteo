@@ -165,6 +165,9 @@ struct AlertPillView: View {
 /// per cui si capisce che tempo fa **prima** di leggere la cifra, da un metro
 /// di distanza e con lo schermo di sbieco.
 struct HeroSheetView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let current: ForecastCurrent
     let today: DailyForecast?
     /// Il nowcast al minuto, quando WeatherKit copre la località.
@@ -257,6 +260,9 @@ struct HeroSheetView: View {
 /// sezione da aprire. Chi guarda il meteo di sfuggita preferisce questa; chi lo
 /// guarda per decidere qualcosa preferisce l'altra.
 struct HeroBentoView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let current: ForecastCurrent
     let today: DailyForecast?
     let astronomy: AstronomyData?
@@ -371,13 +377,12 @@ struct HeroBentoView: View {
 enum HeroText {
 
     static func temperature(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 
     static func range(_ day: DailyForecast?) -> String {
         guard let day, let hi = day.tempMax, let lo = day.tempMin else { return "—" }
-        return "\(Int(hi.rounded()))° / \(Int(lo.rounded()))°"
+        return "\(Units.temp(hi)) / \(Units.temp(lo))"
     }
 
     /// La riga discorsiva dell'hero: condizione e, quando c'è, il vento.
@@ -395,11 +400,13 @@ enum HeroText {
         case .storm: apertura = "Temporali in transito"
         }
 
+        // La soglia degli 8 km/h resta in km/h: è il confine fra «aria calma»
+        // e «si sente», e non cambia perché l'utente legge in nodi.
         guard let vento = current.windSpeed, vento * 3.6 >= 8 else {
             return "\(apertura), aria calma."
         }
         guard let direzione = current.windDirectionLabel else {
-            return "\(apertura), \(Int((vento * 3.6).rounded())) km/h di vento."
+            return "\(apertura), \(Units.windSpeed(fromMs: vento)) di vento."
         }
         return "\(apertura), brezza da \(direzione.lowercased())."
     }
@@ -407,7 +414,7 @@ enum HeroText {
     static func bentoSummary(current: ForecastCurrent, today: DailyForecast?) -> String {
         var parti = ["Percepita \(temperature(current.feelsLike))"]
         if let day = today, let hi = day.tempMax, let lo = day.tempMin {
-            parti.append("Max \(Int(hi.rounded()))° Min \(Int(lo.rounded()))°")
+            parti.append("Max \(Units.temp(hi)) Min \(Units.temp(lo))")
         }
         return parti.joined(separator: " · ")
     }
@@ -479,14 +486,14 @@ enum HeroText {
     }
 
     static func wind(_ msValue: Double?) -> String {
-        guard let msValue else { return "—" }
-        return "\(Int((msValue * 3.6).rounded())) km/h"
+        Units.windSpeed(fromMs: msValue)
     }
 
     static func windNote(_ current: ForecastCurrent) -> String {
         var parti: [String] = []
         if let gust = current.windGust {
-            parti.append("raffiche \(Int((gust * 3.6).rounded()))")
+            // Senza unità: la riga sta sotto al vento, che l'unità ce l'ha già.
+            parti.append("raffiche \(Units.windValue(fromMs: gust))")
         }
         if let direzione = current.windDirectionLabel {
             parti.append(direzione)

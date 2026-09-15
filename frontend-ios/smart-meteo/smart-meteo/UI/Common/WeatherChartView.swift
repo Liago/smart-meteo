@@ -125,6 +125,9 @@ struct WeatherChartPath: View {
 }
 
 struct WeatherChartPointView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let item: WeatherChartView.TimelineItem
     let index: Int
     let data: WeatherChartView.ChartData
@@ -154,7 +157,7 @@ struct WeatherChartPointView: View {
                         .renderingMode(.template)
                         .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
                         .font(.body)
-                    Text("\(Int(round(item.temp)))°")
+                    Text(Units.temp(item.temp))
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.black)
                 }

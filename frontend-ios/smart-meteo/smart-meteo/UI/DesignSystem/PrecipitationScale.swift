@@ -48,13 +48,12 @@ enum PrecipIntensity {
     }
 }
 
-/// Formatta i millimetri in italiano con un decimale, es. "0,5 mm".
+/// Formatta una quantità di pioggia nell'unità scelta dall'utente, es. "0,5 mm"
+/// oppure "0,02 in".
+///
+/// Le **soglie qui sopra restano in millimetri** e non si toccano: si
+/// classifica sul canonico e si mostra sul convertito, o 0,3 pollici — un
+/// temporale — finirebbe nella fascia «debole» insieme a 0,3 mm.
 func formatPrecipMm(_ mm: Double?) -> String {
-    guard let mm, mm.isFinite else { return "—" }
-    let formatter = NumberFormatter()
-    formatter.locale = Locale(identifier: "it_IT")
-    formatter.minimumFractionDigits = 1
-    formatter.maximumFractionDigits = 1
-    let value = formatter.string(from: NSNumber(value: mm)) ?? String(format: "%.1f", mm)
-    return "\(value) mm"
+    Units.precip(mm)
 }

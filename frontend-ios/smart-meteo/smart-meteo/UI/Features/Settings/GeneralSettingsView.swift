@@ -2,100 +2,113 @@ import SwiftUI
 
 /// Impostazioni generali.
 ///
-/// Ristilizzata sul linguaggio del ridisegno — e ripulita da **tre controlli
-/// che non facevano niente**. Il selettore °C/°F, quello delle unità del vento
-/// e l'interruttore «Email Alerts» erano legati a `.constant(...)`: si potevano
-/// toccare, si muovevano, e non cambiava nulla. Un comando finto è peggio di un
-/// comando assente — il primo fa credere di aver scelto qualcosa.
-///
-/// Al loro posto: le unità **dichiarate** (informazione vera), e i collegamenti
-/// alle due cose che l'utente può davvero configurare.
+/// La card «Unità» era informativa — tre righe che **dichiaravano** °C, km/h e
+/// millimetri — perché i selettori precedenti erano legati a `.constant(...)`:
+/// si muovevano e non cambiavano niente, e un comando finto è peggio di un
+/// comando assente. Ora sono comandi veri: `UnitPrefs` persiste la scelta e
+/// tutto ciò che scrive un numero passa da `Units`.
 ///
 /// Riferimento: `ios Redisign/README.md`, schermata 4.
 struct GeneralSettingsView: View {
     @StateObject private var pushService = PushNotificationService.shared
+    @ObservedObject private var units = UnitPrefs.shared
     @State private var isForYouPresented = false
 
     var theme: WeatherTheme = WeatherTheme.of(.clear)
 
     var body: some View {
-        ZStack {
-            theme.page.ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    card(title: "Personalizzazione") {
-                        row(
-                            "Sezione «Per te»",
-                            note: "Quali schede vedi in dashboard, e in che ordine"
-                        ) {
-                            isForYouPresented = true
-                        }
-
-                        separator
-
-                        NavigationLink(destination: AlertRulesView()) {
-                            rowContent(
-                                "Avvisi personali",
-                                note: "Soglie su gelate, pioggia, vento, temporali"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    card(title: "Notifiche") {
-                        HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Allerte push")
-                                    .font(.duetUI(13.5, .bold))
-                                    .foregroundColor(Duet.ink)
-
-                                Text(pushService.isAuthorized
-                                     ? "Attive. Per disattivarle, Impostazioni di iOS"
-                                     : "Tocca per consentire le notifiche")
-                                    .font(.duetUI(11))
-                                    .foregroundColor(Duet.ink.opacity(0.5))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Spacer(minLength: 8)
-
-                            Toggle("", isOn: Binding(
-                                get: { pushService.isAuthorized },
-                                set: { nuovo in
-                                    // Il consenso si revoca solo da iOS: un
-                                    // interruttore che finge di spegnerle
-                                    // lascerebbe l'utente convinto di averle
-                                    // tolte mentre continuano ad arrivare.
-                                    if nuovo { pushService.requestAuthorization() }
-                                }
-                            ))
-                            .labelsHidden()
-                            .tint(theme.accent)
-                            .disabled(pushService.isAuthorized)
-                        }
-                        .padding(.vertical, 12)
-                    }
-
-                    card(title: "Unità") {
-                        // Dichiarate, non scelte: l'app calcola e formatta tutto
-                        // in gradi Celsius e km/h. Il giorno in cui i Fahrenheit
-                        // esisteranno davvero, questa riga tornerà un comando.
-                        infoRow("Temperatura", "Gradi Celsius")
-                        separator
-                        infoRow("Vento", "km/h")
-                        separator
-                        infoRow("Precipitazioni", "Millimetri")
-                    }
-
-                    card(title: "App") {
-                        infoRow("Versione", Self.version)
-                        separator
-                        infoRow("Build", Self.build)
-                    }
+        SettingsPage(theme: theme) {
+            SettingsCard("Personalizzazione") {
+                SettingsRow(
+                    title: "Sezione «Per te»",
+                    note: "Quali schede vedi in dashboard, e in che ordine"
+                ) {
+                    isForYouPresented = true
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
+
+                SettingsSeparator()
+
+                NavigationLink(destination: AlertRulesView()) {
+                    SettingsRowContent(
+                        title: "Avvisi personali",
+                        note: "Soglie su gelate, pioggia, vento, temporali"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            SettingsCard("Notifiche") {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Allerte push")
+                            .font(.duetUI(13.5, .bold))
+                            .foregroundColor(Duet.ink)
+
+                        Text(pushService.isAuthorized
+                             ? "Attive. Per disattivarle, Impostazioni di iOS"
+                             : "Tocca per consentire le notifiche")
+                            .font(.duetUI(11))
+                            .foregroundColor(Duet.ink.opacity(0.5))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Toggle("", isOn: Binding(
+                        get: { pushService.isAuthorized },
+                        set: { nuovo in
+                            // Il consenso si revoca solo da iOS: un
+                            // interruttore che finge di spegnerle lascerebbe
+                            // l'utente convinto di averle tolte mentre
+                            // continuano ad arrivare.
+                            if nuovo { pushService.requestAuthorization() }
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(theme.accent)
+                    .disabled(pushService.isAuthorized)
+                }
+                .padding(.vertical, 12)
+            }
+
+            SettingsCard("Unità") {
+                // `Menu` e non `Picker(.segmented)`: quattro unità di vento non
+                // stanno in una barra segmentata senza abbreviarle fino a
+                // renderle indovinelli, e il valore corrente resta leggibile
+                // anche a menu chiuso.
+                unitRow(
+                    "Temperatura",
+                    selection: $units.temperature,
+                    options: TemperatureUnit.allCases,
+                    label: { "\($0.label) (\($0.short))" },
+                    short: { $0.short }
+                )
+
+                SettingsSeparator()
+
+                unitRow(
+                    "Vento",
+                    selection: $units.wind,
+                    options: WindUnit.allCases,
+                    label: { "\($0.label) (\($0.short))" },
+                    short: { $0.short }
+                )
+
+                SettingsSeparator()
+
+                unitRow(
+                    "Precipitazioni",
+                    selection: $units.precipitation,
+                    options: PrecipitationUnit.allCases,
+                    label: { "\($0.label) (\($0.short))" },
+                    short: { $0.short }
+                )
+            }
+
+            SettingsCard("App") {
+                SettingsInfoRow(title: "Versione", value: Self.version)
+                SettingsSeparator()
+                SettingsInfoRow(title: "Build", value: Self.build)
             }
         }
         .navigationTitle("Impostazioni")
@@ -105,81 +118,46 @@ struct GeneralSettingsView: View {
         }
     }
 
-    // MARK: - Mattoni
+    // MARK: - Riga di scelta
 
-    private func card<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
+    /// Etichetta a sinistra, unità corrente e chevron a destra, menu al tocco.
+    ///
+    /// Generica sui tre enum invece di tre copie: sono la stessa riga con tre
+    /// elenchi diversi, e tre copie sarebbero divergute alla prima modifica.
+    private func unitRow<Unit: Hashable & Identifiable>(
+        _ title: String,
+        selection: Binding<Unit>,
+        options: [Unit],
+        label: @escaping (Unit) -> String,
+        short: @escaping (Unit) -> String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased())
-                .font(.duetUI(10.5, .semibold))
-                .tracking(1.2)
-                .foregroundColor(Duet.ink.opacity(0.45))
-                .padding(.horizontal, 4)
-
-            VStack(spacing: 0) {
-                content()
+        Menu {
+            Picker(title, selection: selection) {
+                ForEach(options) { option in
+                    Text(label(option)).tag(option)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 24).fill(Duet.surface))
-            .shadow(color: Duet.shadowCard, radius: 10, x: 0, y: 2)
-        }
-    }
-
-    private var separator: some View {
-        Rectangle()
-            .fill(Duet.ink.opacity(0.06))
-            .frame(height: 1)
-    }
-
-    private func row(_ title: String, note: String, action: @escaping () -> Void) -> some View {
-        Button {
-            HapticManager.light()
-            action()
         } label: {
-            rowContent(title, note: note)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func rowContent(_ title: String, note: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
+            HStack {
                 Text(title)
-                    .font(.duetUI(13.5, .bold))
+                    .font(.duetUI(13))
                     .foregroundColor(Duet.ink)
-                Text(note)
-                    .font(.duetUI(11))
-                    .foregroundColor(Duet.ink.opacity(0.5))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
+
+                Spacer(minLength: 8)
+
+                Text(short(selection.wrappedValue))
+                    .font(.duetUI(13, .semibold))
+                    .foregroundColor(theme.accent)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.duetUI(10, .semibold))
+                    .foregroundColor(Duet.ink.opacity(0.3))
             }
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "chevron.right")
-                .font(.duetUI(12, .semibold))
-                .foregroundColor(Duet.ink.opacity(0.25))
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-
-    private func infoRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.duetUI(13))
-                .foregroundColor(Duet.ink)
-
-            Spacer(minLength: 8)
-
-            Text(value)
-                .font(.duetUI(13, .semibold))
-                .foregroundColor(Duet.ink.opacity(0.5))
-        }
-        .padding(.vertical, 12)
+        .accessibilityLabel("\(title): \(label(selection.wrappedValue))")
+        .accessibilityHint("Tocca per cambiare unità")
     }
 
     // MARK: - Versione

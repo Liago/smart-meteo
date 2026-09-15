@@ -12,6 +12,9 @@ import SwiftUI
 /// «non serve»: a differenza di quello sulla neve, qui il caso tranquillo **è**
 /// la risposta che si cerca.
 struct GardenPanelView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let garden: GardenOutlook
 
     private struct Row: Identifiable {
@@ -54,10 +57,9 @@ struct GardenPanelView: View {
 
     // MARK: - Formattazione
 
-    /// Millimetri con un decimale, all'italiana.
+    /// La quantità d'acqua nell'unità scelta, all'italiana.
     static func formatMm(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return String(format: "%.1f mm", value).replacingOccurrences(of: ".", with: ",")
+        Units.precip(value)
     }
 
     /// Umidità volumetrica come percentuale di volume.
@@ -71,8 +73,7 @@ struct GardenPanelView: View {
 
     /// Gradi interi: il decimale su una media del suolo è precisione finta.
     static func formatSoilTemp(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 
     /// La riga sotto al titolo: perché il consiglio è quello.

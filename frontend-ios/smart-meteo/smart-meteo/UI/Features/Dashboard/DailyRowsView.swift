@@ -7,12 +7,19 @@ import SwiftUI
 /// un giorno più caldo è visibilmente più a destra di quello sopra. Con due
 /// colonne di cifre il confronto fra giorni va fatto a mente.
 struct DailyRowsView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let days: [DailyForecast]
     let onTapDay: (String) -> Void
 
-    /// Scala fissa in gradi. Fissa e non adattata alla settimana: una scala che
-    /// si riadatta ogni giorno renderebbe incomparabili due schermate diverse,
-    /// e 18° sembrerebbe caldo a novembre e freddo ad agosto.
+    /// Scala fissa **in gradi Celsius**. Fissa e non adattata alla settimana:
+    /// una scala che si riadatta ogni giorno renderebbe incomparabili due
+    /// schermate diverse, e 18° sembrerebbe caldo a novembre e freddo ad agosto.
+    ///
+    /// Resta in Celsius anche quando l'utente legge in Fahrenheit: è la
+    /// **geometria** della barra, non un'etichetta, e convertirla insieme ai
+    /// numeri non cambierebbe nulla se non introdurre un modo di sbagliare.
     static let scaleMin: Double = -5
     static let scaleMax: Double = 40
 
@@ -102,8 +109,7 @@ struct DailyRowsView: View {
     }
 
     static func tempText(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))°"
+        Units.temp(value)
     }
 
     static func probText(_ value: Double?) -> String {

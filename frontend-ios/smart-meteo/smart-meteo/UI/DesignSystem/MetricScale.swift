@@ -102,11 +102,14 @@ enum MetricChartKind {
     case lineWithBand
 }
 
-private let msToKmh: Double = 3.6
-
 /// Dominio che parte da zero e lascia un margine sopra al valore massimo.
 private func domainFromZero(_ floor: Double) -> ([Double]) -> ClosedRange<Double> {
     { values in 0...max(floor, (values.max() ?? 0) * 1.15) }
+}
+
+/// Passo delle linee dell'asse termico, nell'unità corrente.
+private var tempTickStep: Double {
+    Units.temperatureUnit == .fahrenheit ? 10 : 5
 }
 
 /// Multipli di `step` interni al dominio, per gli assi senza soglie naturali.
@@ -138,23 +141,30 @@ extension MetricSection {
     static let precipitationMm = MetricSection(
         id: "mm",
         height: 160,
-        valueOf: { $0.precipitationMm },
+        // Il grafico è nell'unità dell'utente; le soglie, che sono in
+        // millimetri, ci vengono portate con `Units.precipitation(fromMm:)`, e
+        // la classificazione fa il viaggio inverso. Convertire in un verso solo
+        // sposterebbe le bande senza spostare i colori.
+        valueOf: { $0.precipitationMm.map(Units.precipitation(fromMm:)) },
         secondaryOf: nil,
-        colorOf: { PrecipIntensity.classify($0).color },
-        domain: domainFromZero(PrecipIntensity.Threshold.heavy * 1.25),
+        colorOf: { PrecipIntensity.classify(Units.mm(fromPrecipitation: $0)).color },
+        domain: domainFromZero(Units.precipitation(fromMm: PrecipIntensity.Threshold.heavy * 1.25)),
         // Le linee marcano i confini fra le fasce…
-        gridValues: { _ in [PrecipIntensity.Threshold.moderate, PrecipIntensity.Threshold.heavy] },
+        gridValues: { _ in
+            [PrecipIntensity.Threshold.moderate, PrecipIntensity.Threshold.heavy]
+                .map(Units.precipitation(fromMm:))
+        },
         gridLabel: { _ in nil },
         // …e le etichette stanno al centro della fascia che nominano. Una linea a
         // 0,1 mm sarebbe appiccicata alla base e illeggibile.
         bandValues: { domain in
             [
-                (PrecipIntensity.Threshold.light + PrecipIntensity.Threshold.moderate) / 2,
-                (PrecipIntensity.Threshold.moderate + PrecipIntensity.Threshold.heavy) / 2,
-                (PrecipIntensity.Threshold.heavy + domain.upperBound) / 2
+                Units.precipitation(fromMm: (PrecipIntensity.Threshold.light + PrecipIntensity.Threshold.moderate) / 2),
+                Units.precipitation(fromMm: (PrecipIntensity.Threshold.moderate + PrecipIntensity.Threshold.heavy) / 2),
+                (Units.precipitation(fromMm: PrecipIntensity.Threshold.heavy) + domain.upperBound) / 2
             ]
         },
-        bandLabel: { PrecipIntensity.classify($0).label },
+        bandLabel: { PrecipIntensity.classify(Units.mm(fromPrecipitation: $0)).label },
         headline: { h in
             guard let h else { return "Dato non disponibile" }
             let intensity = PrecipIntensity.classify(h.precipitationMm)
@@ -197,24 +207,27 @@ extension MetricSection {
     static let wind = MetricSection(
         id: "wind",
         height: 160,
-        valueOf: { $0.windSpeed.map { $0 * msToKmh } },
-        secondaryOf: { $0.windGust.map { $0 * msToKmh } },
-        colorOf: { WindScale.classify($0).color },
-        domain: domainFromZero(WindScale.Threshold.strong * 1.25),
-        gridValues: { _ in [WindScale.Threshold.moderate, WindScale.Threshold.strong] },
+        // Stessa regola delle precipitazioni: le soglie Beaufort restano in
+        // km/h, il grafico è nell'unità dell'utente.
+        valueOf: { $0.windSpeed.map(Units.wind(fromMs:)) },
+        secondaryOf: { $0.windGust.map(Units.wind(fromMs:)) },
+        colorOf: { WindScale.classify(Units.kmh(fromWind: $0)).color },
+        domain: domainFromZero(Units.wind(fromKmh: WindScale.Threshold.strong * 1.25)),
+        gridValues: { _ in
+            [WindScale.Threshold.moderate, WindScale.Threshold.strong].map(Units.wind(fromKmh:))
+        },
         gridLabel: { _ in nil },
         bandValues: { domain in
             [
-                WindScale.Threshold.moderate / 2,
-                (WindScale.Threshold.moderate + WindScale.Threshold.strong) / 2,
-                (WindScale.Threshold.strong + domain.upperBound) / 2
+                Units.wind(fromKmh: WindScale.Threshold.moderate / 2),
+                Units.wind(fromKmh: (WindScale.Threshold.moderate + WindScale.Threshold.strong) / 2),
+                (Units.wind(fromKmh: WindScale.Threshold.strong) + domain.upperBound) / 2
             ]
         },
-        bandLabel: { WindScale.classify($0).label },
+        bandLabel: { WindScale.classify(Units.kmh(fromWind: $0)).label },
         headline: { h in
             guard let h else { return "Dato non disponibile" }
-            guard let speed = h.windSpeed else { return "—" }
-            return "\(Int((speed * msToKmh).rounded())) km/h"
+            return Units.windSpeed(fromMs: h.windSpeed)
         },
         caption: { h in
             guard let h, let speed = h.windSpeed else { return "" }
@@ -222,9 +235,9 @@ extension MetricSection {
             if let deg = h.windDirection {
                 parts.append("Da \(windDegreesToDirection(deg))")
             }
-            parts.append(WindScale.classify(speed * msToKmh).label)
+            parts.append(WindScale.classify(speed * 3.6).label)
             if let gust = h.windGust {
-                parts.append("raffiche \(Int((gust * msToKmh).rounded())) km/h")
+                parts.append("raffiche \(Units.windSpeed(fromMs: gust))")
             }
             return parts.joined(separator: " · ")
         },
@@ -260,9 +273,9 @@ extension MetricSection {
     static let feelsLike = MetricSection(
         id: "feels_like",
         height: 160,
-        valueOf: { $0.feelsLike },
+        valueOf: { $0.feelsLike.map(Units.temperature(fromCelsius:)) },
         secondaryOf: nil,
-        colorOf: tempColor,
+        colorOf: { tempColor(Units.celsius(fromTemperature: $0)) },
         // A differenza delle altre metriche il fondo non è zero: barre che partono
         // da 0 °C su una giornata fra 18 e 24 °C non mostrerebbero alcuna
         // variazione, e con temperature sotto zero non avrebbero proprio senso.
@@ -270,18 +283,19 @@ extension MetricSection {
             guard let min = values.min(), let max = values.max() else { return 0...1 }
             return (min.rounded(.down) - 2)...(max.rounded(.up) + 2)
         },
-        gridValues: { niceTicks($0, step: 5) },
+        // Passo di 5 in Celsius, di 10 in Fahrenheit: cinque gradi Fahrenheit
+        // sono meno di tre Celsius, e l'asse si riempirebbe di linee.
+        gridValues: { niceTicks($0, step: tempTickStep) },
         gridLabel: { "\(Int($0))°" },
         bandValues: { _ in [] },
         bandLabel: { _ in "" },
         headline: { h in
             guard let h else { return "Dato non disponibile" }
-            guard let value = h.feelsLike else { return "—" }
-            return "\(Int(value.rounded()))°"
+            return Units.temp(h.feelsLike)
         },
         caption: { h in
             guard let h else { return "" }
-            return "Reale \(Int(h.temp.rounded()))° · \(conditionLabel(h))"
+            return "Reale \(Units.temp(h.temp)) · \(conditionLabel(h))"
         },
         emptyMessage: "Temperatura percepita non disponibile per questa località",
         flatMessage: nil
@@ -299,9 +313,9 @@ extension MetricSection {
     static let temperature = MetricSection(
         id: "temperature",
         height: 170,
-        valueOf: { $0.temp },
+        valueOf: { Units.temperature(fromCelsius: $0.temp) },
         secondaryOf: nil,
-        colorOf: tempColor,
+        colorOf: { tempColor(Units.celsius(fromTemperature: $0)) },
         // Come per la percepita il fondo non è zero: una giornata fra 18 e 24
         // gradi su un asse che parte da 0 sarebbe una linea piatta. Il dominio
         // tiene conto anche della banda, o i percentili uscirebbero dal grafico.
@@ -309,30 +323,33 @@ extension MetricSection {
             guard let min = values.min(), let max = values.max() else { return 0...1 }
             return (min.rounded(.down) - 2)...(max.rounded(.up) + 2)
         },
-        gridValues: { niceTicks($0, step: 5) },
+        gridValues: { niceTicks($0, step: tempTickStep) },
         gridLabel: { "\(Int($0))°" },
         bandValues: { _ in [] },
         bandLabel: { _ in "" },
         headline: { h in
             guard let h else { return "Dato non disponibile" }
-            return "\(Int(h.temp.rounded()))°"
+            return Units.temp(h.temp)
         },
         caption: { h in
             guard let h else { return "" }
             var parti = [conditionLabel(h)]
             if let p10 = h.tempP10, let p90 = h.tempP90 {
-                parti.append("fra \(Int(p10.rounded()))° e \(Int(p90.rounded()))°")
+                parti.append("fra \(Units.temp(p10)) e \(Units.temp(p90))")
             }
+            // Il confronto resta in gradi Celsius: la soglia «almeno un grado
+            // di differenza» in Fahrenheit sarebbe poco più di mezzo grado
+            // reale, e la percepita comparirebbe anche quando non c'è.
             if let feels = h.feelsLike, abs(feels - h.temp) >= 1 {
-                parti.append("percepita \(Int(feels.rounded()))°")
+                parti.append("percepita \(Units.temp(feels))")
             }
             return parti.joined(separator: " · ")
         },
         emptyMessage: "Temperatura oraria non disponibile per questa località",
         flatMessage: nil,
         kind: .lineWithBand,
-        bandLowOf: { $0.tempP10 },
-        bandHighOf: { $0.tempP90 }
+        bandLowOf: { $0.tempP10.map(Units.temperature(fromCelsius:)) },
+        bandHighOf: { $0.tempP90.map(Units.temperature(fromCelsius:)) }
     )
 
     // MARK: - Indice UV

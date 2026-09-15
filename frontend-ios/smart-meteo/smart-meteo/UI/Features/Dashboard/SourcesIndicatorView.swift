@@ -8,6 +8,9 @@ import SwiftUI
 /// **quanto le fonti sono d'accordo** — arrivava già nel modello Swift senza
 /// che nessuna vista lo leggesse.
 struct SourcesIndicatorView: View {
+    /// Ridisegna quando cambiano le unità: le funzioni di formattazione
+    /// leggono `UnitPrefs.shared` ma non possono osservarlo.
+    @ObservedObject private var units = UnitPrefs.shared
     let sources: [String]
     let confidence: ConfidenceIndex?
 
@@ -76,7 +79,7 @@ struct SourcesIndicatorView: View {
             // L'intervallo fra la fonte più fredda e la più calda è il modo più
             // concreto di mostrare il disaccordo: più del punteggio da solo.
             if let range = confidence.temperature, range.max - range.min >= Self.minRangeToShow {
-                Text("Temperatura prevista fra \(Int(range.min.rounded()))° e \(Int(range.max.rounded()))°")
+                Text("Temperatura prevista fra \(Units.temp(range.min)) e \(Units.temp(range.max))")
                     .font(.system(size: 11))
                     .foregroundColor(.gray)
             }
