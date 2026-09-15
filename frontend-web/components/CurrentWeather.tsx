@@ -31,7 +31,17 @@ export default function CurrentWeather({ data, locationName, sourcesCount }: Cur
 			initial={{ opacity: 0, y: 20 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.6 }}
-			className="glass p-6 sm:p-8 text-center relative overflow-hidden"
+			/*
+			  `isolate`: il contenuto qui sotto sta a `z-10` per passare sopra
+			  allo sfondo della scheda, ma senza un contesto di impilamento
+			  proprio quel 10 finisce nella radice della pagina — lo stesso
+			  livello dell'intestazione appiccicata, e a parità di z-index vince
+			  chi viene dopo nel DOM. Il risultato era il nome della località
+			  disegnato *sopra* ai suggerimenti della ricerca, che diventavano
+			  incliccabili in quel punto. Prima non si vedeva perché fra
+			  l'intestazione e questa scheda c'era sempre qualcos'altro.
+			*/
+			className="glass p-6 sm:p-8 text-center relative isolate overflow-hidden"
 			style={{ color: 'var(--color-duet-ink)' }}
 		>
 			<div className="relative z-10">

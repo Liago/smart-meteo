@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi, seedHomeLocation, startAsNewVisitor } from './fixtures/api';
+import { dashboardReady, mockApi, seedHomeLocation, startAsNewVisitor } from './fixtures/api';
 
 /**
  * Ricerca località e gestione dei preferiti.
@@ -26,7 +26,7 @@ test('digitando una città appaiono i suggerimenti', async ({ page }) => {
 
 test('selezionando un suggerimento la dashboard passa a quella località', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+	await dashboardReady(page);
 
 	await page.getByPlaceholder('Cerca una localita...').fill('Milano');
 	await page.getByRole('button', { name: 'Milano Marittima', exact: true }).click();

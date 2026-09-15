@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Intercettazione dell'API backend per gli scenari E2E.
@@ -343,4 +343,36 @@ export async function startAsNewVisitor(page: Page) {
 			},
 		});
 	});
+}
+
+/**
+ * Apre una sezione della dashboard.
+ *
+ * Dal riordino della dashboard solo la zona a colpo d'occhio — allerte,
+ * condizioni attuali, nowcast — sta fuori dalle sezioni: le ore, i giorni, gli
+ * approfondimenti e le fonti vivono ciascuno dietro la sua linguetta. Gli
+ * scenari che verificano uno di quei contenuti devono quindi aprirlo, come
+ * farebbe una persona.
+ *
+ * Il nome è cercato come prefisso perché la linguetta porta anche un contatore
+ * («Settimana 6»), che cambia con la risposta del mock.
+ */
+export async function openSection(
+	page: Page,
+	label: 'Oggi' | 'Settimana' | 'Per te' | 'Fonti'
+) {
+	await page.getByRole('tab', { name: new RegExp(`^${label}`) }).click();
+}
+
+/**
+ * Aspetta che la dashboard abbia finito di caricare, senza dipendere da una
+ * sezione in particolare.
+ *
+ * Gli scenari che verificano l'**assenza** di qualcosa hanno bisogno di un
+ * segnale del genere: `toHaveCount(0)` è vero anche su una pagina vuota, e
+ * senza un'ancora passerebbero pure se la dashboard non si fosse caricata
+ * affatto. L'orario di aggiornamento chiude la pagina in ogni sezione.
+ */
+export async function dashboardReady(page: Page) {
+	await expect(page.getByText(/^Aggiornato:/)).toBeVisible();
 }

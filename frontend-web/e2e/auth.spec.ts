@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi, seedHomeLocation } from './fixtures/api';
+import { dashboardReady, mockApi, seedHomeLocation } from './fixtures/api';
 
 /**
  * Accesso e pagine protette.
@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 test('la dashboard è accessibile senza account', async ({ page }) => {
 	await page.goto('/');
 
-	await expect(page.getByText('Fonti contribuenti')).toBeVisible();
+	await dashboardReady(page);
 	await expect(page.getByRole('link', { name: 'Accedi' })).toBeVisible();
 });
 
