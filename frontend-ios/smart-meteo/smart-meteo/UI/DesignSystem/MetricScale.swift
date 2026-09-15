@@ -7,6 +7,7 @@ import SwiftUI
 /// che dominio dare all'asse e cosa scrivere nell'intestazione. Aggiungere una
 /// metrica significa aggiungere un caso, non toccare la view.
 enum HourlyMetric: String, CaseIterable, Identifiable {
+    case temperature
     case precipitation
     case storm
     case wind
@@ -18,6 +19,7 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .temperature: return "Temperatura"
         case .precipitation: return "Precipitazioni"
         case .storm: return "Temporali"
         case .wind: return "Vento"
@@ -29,6 +31,7 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .temperature: return "thermometer"
         case .precipitation: return "drop.fill"
         case .storm: return "cloud.bolt.fill"
         case .wind: return "wind"
@@ -40,6 +43,7 @@ enum HourlyMetric: String, CaseIterable, Identifiable {
 
     var sections: [MetricSection] {
         switch self {
+        case .temperature: return [.temperature]
         case .precipitation: return [.precipitationMm, .precipitationProbability]
         // Due sezioni come per le precipitazioni: gli indici convettivi dicono
         // quanta energia c'è, la probabilità di tuono quanto è probabile che si
@@ -79,6 +83,23 @@ struct MetricSection: Identifiable {
     let emptyMessage: String
     /// Sovrapposto al grafico quando tutti i valori del giorno sono a zero.
     let flatMessage: String?
+
+    /// Come disegnare la serie.
+    ///
+    /// Le barre vanno bene per le quantità che partono da zero — millimetri,
+    /// vento, UV. La temperatura no: è un andamento continuo, e una colonna
+    /// per ora suggerisce che fra le 14 e le 15 non esista nulla. In coda alla
+    /// struct, con un default, così i costruttori già scritti restano validi.
+    var kind: MetricChartKind = .bars
+
+    /// Estremi della banda d'incertezza, quando la metrica ne ha una.
+    var bandLowOf: ((HourlyForecast) -> Double?)? = nil
+    var bandHighOf: ((HourlyForecast) -> Double?)? = nil
+}
+
+enum MetricChartKind {
+    case bars
+    case lineWithBand
 }
 
 private let msToKmh: Double = 3.6
@@ -264,6 +285,54 @@ extension MetricSection {
         },
         emptyMessage: "Temperatura percepita non disponibile per questa località",
         flatMessage: nil
+    )
+
+    // MARK: - Temperatura
+
+    /// La temperatura con la banda dell'ensemble.
+    ///
+    /// La banda è il motivo per cui questa metrica esiste separata dalla
+    /// percepita: i percentili 10 e 90 dei membri dell'ensemble dicono **quanto
+    /// è incerta** la previsione, e su un orizzonte di due giorni è
+    /// un'informazione che vale quanto il valore centrale. Una curva sottile
+    /// promette una precisione che il modello non ha.
+    static let temperature = MetricSection(
+        id: "temperature",
+        height: 170,
+        valueOf: { $0.temp },
+        secondaryOf: nil,
+        colorOf: tempColor,
+        // Come per la percepita il fondo non è zero: una giornata fra 18 e 24
+        // gradi su un asse che parte da 0 sarebbe una linea piatta. Il dominio
+        // tiene conto anche della banda, o i percentili uscirebbero dal grafico.
+        domain: { values in
+            guard let min = values.min(), let max = values.max() else { return 0...1 }
+            return (min.rounded(.down) - 2)...(max.rounded(.up) + 2)
+        },
+        gridValues: { niceTicks($0, step: 5) },
+        gridLabel: { "\(Int($0))°" },
+        bandValues: { _ in [] },
+        bandLabel: { _ in "" },
+        headline: { h in
+            guard let h else { return "Dato non disponibile" }
+            return "\(Int(h.temp.rounded()))°"
+        },
+        caption: { h in
+            guard let h else { return "" }
+            var parti = [conditionLabel(h)]
+            if let p10 = h.tempP10, let p90 = h.tempP90 {
+                parti.append("fra \(Int(p10.rounded()))° e \(Int(p90.rounded()))°")
+            }
+            if let feels = h.feelsLike, abs(feels - h.temp) >= 1 {
+                parti.append("percepita \(Int(feels.rounded()))°")
+            }
+            return parti.joined(separator: " · ")
+        },
+        emptyMessage: "Temperatura oraria non disponibile per questa località",
+        flatMessage: nil,
+        kind: .lineWithBand,
+        bandLowOf: { $0.tempP10 },
+        bandHighOf: { $0.tempP90 }
     )
 
     // MARK: - Indice UV

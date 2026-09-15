@@ -39,6 +39,7 @@ struct DashboardView: View {
     /// Wrapper Identifiable: serve a `.sheet(item:)` perché la data va passata al foglio.
     private struct PrecipTarget: Identifiable {
         let id: String // "yyyy-MM-dd"
+        var metric: HourlyMetric = .precipitation
     }
 
     enum DashboardSection: Hashable {
@@ -126,7 +127,8 @@ struct DashboardView: View {
                 hourly: currentForecast?.hourly ?? [],
                 daily: currentForecast?.daily,
                 theme: theme,
-                initialDate: target.id
+                initialDate: target.id,
+                initialMetric: target.metric
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -256,7 +258,12 @@ struct DashboardView: View {
                     theme: theme,
                     scrubIndex: $scrubIndex,
                     onOpenDetail: {
-                        precipTarget = PrecipTarget(id: HourlyForecastView.openingDate(for: forecast.hourly ?? []))
+                        // Dalla curva oraria si arriva per la temperatura:
+                        // è quella che si stava guardando.
+                        precipTarget = PrecipTarget(
+                            id: HourlyForecastView.openingDate(for: forecast.hourly ?? []),
+                            metric: .temperature
+                        )
                     }
                 )
             } else {
