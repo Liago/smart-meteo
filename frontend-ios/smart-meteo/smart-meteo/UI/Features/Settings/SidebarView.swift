@@ -100,7 +100,7 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showingLogin) {
-            LoginView()
+            LoginView(theme: theme)
         }
     }
 
@@ -145,7 +145,7 @@ struct SidebarView: View {
             HStack(spacing: 8) {
                 Image(systemName: "person.crop.circle.badge.plus")
                     .font(.duetUI(15, .semibold))
-                Text("Accedi o registrati")
+                Text("Accedi")
                     .font(.duetUI(14, .bold))
             }
             .foregroundColor(.white)
