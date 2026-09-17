@@ -103,8 +103,16 @@ enum MetricChartKind {
 }
 
 /// Dominio che parte da zero e lascia un margine sopra al valore massimo.
-private func domainFromZero(_ floor: Double) -> ([Double]) -> ClosedRange<Double> {
-    { values in 0...max(floor, (values.max() ?? 0) * 1.15) }
+///
+/// Il minimo garantito dell'asse si valuta **a ogni disegno**, non una volta
+/// sola: le sezioni sono `static let`, quindi inizializzate una volta per
+/// processo, e un minimo calcolato lì dentro resterebbe congelato nell'unità in
+/// vigore al primo accesso. Chi fosse passato ai nodi dopo aver aperto il
+/// dettaglio si sarebbe ritrovato un asse alto 50 **nodi** — le soglie sono in
+/// km/h — con le barre schiacciate in fondo e le etichette di fascia, che
+/// invece si convertono a ogni chiamata, alla quota sbagliata.
+private func domainFromZero(_ floor: @autoclosure @escaping () -> Double) -> ([Double]) -> ClosedRange<Double> {
+    { values in 0...max(floor(), (values.max() ?? 0) * 1.15) }
 }
 
 /// Passo delle linee dell'asse termico, nell'unità corrente.
@@ -132,6 +140,38 @@ private func conditionLabel(_ h: HourlyForecast) -> String {
     let code = Int(h.conditionCode) ?? WeatherDescriptionEngine.normalizedToWMO(h.conditionCode)
     let noun = WeatherDescriptionEngine.conditionLabel(for: code)
     return noun.prefix(1).uppercased() + noun.dropFirst()
+}
+
+// MARK: - Geometria delle barre
+
+extension MetricSection {
+
+    /// Estremi verticali della barra di un valore, **dentro il dominio dell'asse**.
+    ///
+    /// `BarMark(x:y:)` ancora la colonna a **zero**, non al fondo dell'asse, e
+    /// Swift Charts non ritaglia i segni all'area del grafico. Sulla percepita —
+    /// l'unica metrica a barre il cui dominio non parte da zero, perché una
+    /// giornata fra 18 e 24 gradi su un asse che parte da 0 sarebbe una fila di
+    /// barre tutte uguali — le colonne partivano quindi da 0 °C, cioè da un paio
+    /// di centinaia di punti sotto il bordo inferiore, e venivano disegnate sopra
+    /// le tessere di riepilogo e la nota in fondo alla scheda. Il difetto non è
+    /// nel dominio: è nell'aver dato per scontato che il fondo dell'asse fosse
+    /// zero. Il web non lo ha mai avuto perché il suo SVG disegna da `baselineY`,
+    /// cioè dal fondo del dominio, e la baseline lì è sempre stata esplicita.
+    ///
+    /// Il valore viene **limitato** al dominio, come sul web: un dato fuori scala
+    /// (un'umidità al 105% da una fonte sciatta) accorcia la barra fino al bordo
+    /// invece di uscire dal grafico. Il colore continua a venire dal valore vero,
+    /// perché la classificazione non è geometria.
+    func barBounds(for value: Double, in domain: ClosedRange<Double>) -> (start: Double, end: Double) {
+        (start: domain.lowerBound, end: clamped(value, in: domain))
+    }
+
+    /// Un valore riportato dentro il dominio, per i segni che barre non sono —
+    /// la tacca della raffica.
+    func clamped(_ value: Double, in domain: ClosedRange<Double>) -> Double {
+        min(max(value, domain.lowerBound), domain.upperBound)
+    }
 }
 
 extension MetricSection {

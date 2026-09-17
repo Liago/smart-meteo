@@ -32,6 +32,7 @@ Poi `⌘U`.
 | `SeaPanelViewTests` | Soglie dello stato del mare, avviso di peggioramento, rosa a 8 punti |
 | `SolarPanelViewTests` | Potenza dell'impianto, resa specifica → kWh, assunzioni |
 | `ActivitiesAndGardenTests` | Frasi degli indici lifestyle e motivo del consiglio sull'orto |
+| `MetricScaleTests` | La geometria delle barre del dettaglio orario: il fondo dell'asse non è zero, e i valori fuori scala restano dentro il grafico |
 | `UnitsTests` | Conversioni °C/°F, km-h/m-s/mph/nodi, mm/pollici — e che **le soglie non seguano l'unità di lettura** |
 | `TestSupport` | Decodifica da JSON e date relative a «oggi» |
 
