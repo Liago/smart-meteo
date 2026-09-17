@@ -460,77 +460,17 @@ private struct MoonData {
     let moonset: String?
 }
 
-/// Calculates the moon's synodic age (days since last new moon) for a given date.
-/// Returns a value from 0 to ~29.53.
-private func moonAge(for date: Date) -> Double {
-    let calendar = Calendar.current
-    let year = Double(calendar.component(.year, from: date))
-    let month = Double(calendar.component(.month, from: date))
-    let day = Double(calendar.component(.day, from: date))
-    let hour = Double(calendar.component(.hour, from: date))
-
-    var y = year
-    var m = month
-    if m < 3 {
-        y -= 1
-        m += 12
-    }
-    m += 1
-
-    let c = 365.25 * y
-    let e = 30.6 * m
-    let jd = c + e + day + (hour / 24.0) - 694039.09
-    let synodicMonth = 29.5305882
-    let age = jd.truncatingRemainder(dividingBy: synodicMonth)
-    return age < 0 ? age + synodicMonth : age
-}
-
+/// Fase, illuminazione e distanza dalla luna piena: il calcolo sta in
+/// `MoonPhase`, condiviso con la scheda «Luna» della dashboard ridisegnata.
 private func computeMoonData(astronomy: AstronomyData?) -> MoonData {
-    let age = moonAge(for: Date())
-    let synodicMonth = 29.5305882
-
-    // Illumination: use backend value if available, otherwise calculate
-    let illumination: Int
-    if let backendIllum = astronomy?.moonIllumination {
-        illumination = backendIllum
-    } else {
-        illumination = Int(round((1 - cos(age / synodicMonth * 2 * .pi)) / 2 * 100))
-    }
-
-    // Days to next full moon (age ≈ 14.76 at full)
-    let fullMoonAge = synodicMonth / 2.0
-    let daysToFull: Int
-    if age <= fullMoonAge {
-        daysToFull = Int(round(fullMoonAge - age))
-    } else {
-        daysToFull = Int(round(synodicMonth - age + fullMoonAge))
-    }
-
-    // Phase name and SF Symbol icon
-    let phase: Int = {
-        let p = Int(round(age / synodicMonth * 8)) % 8
-        return p
-    }()
-
-    let (name, icon): (String, String) = {
-        switch phase {
-        case 0: return ("Luna Nuova", "moonphase.new.moon")
-        case 1: return ("Luna Crescente", "moonphase.waxing.crescent")
-        case 2: return ("Primo Quarto", "moonphase.first.quarter")
-        case 3: return ("Gibbosa Crescente", "moonphase.waxing.gibbous")
-        case 4: return ("Luna Piena", "moonphase.full.moon")
-        case 5: return ("Gibbosa Calante", "moonphase.waning.gibbous")
-        case 6: return ("Ultimo Quarto", "moonphase.last.quarter")
-        case 7: return ("Luna Calante", "moonphase.waning.crescent")
-        default: return ("Luna Nuova", "moonphase.new.moon")
-        }
-    }()
+    let age = MoonPhase.age(on: Date())
+    let phase = MoonPhase.resolve(astronomy?.moonPhase)
 
     return MoonData(
-        phaseName: name,
-        phaseIcon: icon,
-        illumination: illumination,
-        daysToFullMoon: daysToFull,
+        phaseName: phase.label,
+        phaseIcon: phase.symbol,
+        illumination: astronomy?.moonIllumination ?? MoonPhase.illumination(age: age),
+        daysToFullMoon: MoonPhase.daysToFull(age: age),
         moonrise: astronomy?.moonrise,
         moonset: astronomy?.moonset
     )

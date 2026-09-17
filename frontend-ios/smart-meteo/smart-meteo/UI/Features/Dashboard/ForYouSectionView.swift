@@ -8,6 +8,15 @@ import SwiftUI
 enum ForYouPrefs {
     static let enabledKey = "smart-meteo-foryou-enabled"
     static let orderKey = "smart-meteo-foryou-order"
+    /// Le schede che l'utente ha già avuto davanti nelle impostazioni.
+    ///
+    /// Serve al caso simmetrico di `order`: una scheda nuova e accesa di
+    /// default deve accendersi anche per chi ha già salvato le sue scelte,
+    /// altrimenti la lista salvata — che non la nomina — la terrebbe spenta
+    /// per sempre, e la scheda «Luna» sarebbe arrivata invisibile a chiunque
+    /// avesse mai toccato un interruttore. Una scheda è spenta per scelta solo
+    /// se l'utente l'ha *vista* e lasciata spenta.
+    static let knownKey = "smart-meteo-foryou-known"
 
     static var defaultEnabledRaw: String {
         raw(ForYouKey.allCases.filter(\.onByDefault))
@@ -33,6 +42,14 @@ enum ForYouPrefs {
     static func order(_ raw: String) -> [ForYouKey] {
         let salvate = keys(raw)
         return salvate + ForYouKey.allCases.filter { !salvate.contains($0) }
+    }
+
+    /// Le schede accese: quelle salvate, più le nuove accese di default che
+    /// l'utente non ha ancora visto.
+    static func enabled(_ raw: String, known: String) -> Set<ForYouKey> {
+        let viste = Set(keys(known))
+        let nuove = ForYouKey.allCases.filter { $0.onByDefault && !viste.contains($0) }
+        return Set(keys(raw)).union(nuove)
     }
 }
 

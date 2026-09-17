@@ -36,6 +36,7 @@ struct DashboardView: View {
     // Preferenze
     @AppStorage(ForYouPrefs.enabledKey) private var enabledRaw: String = ForYouPrefs.defaultEnabledRaw
     @AppStorage(ForYouPrefs.orderKey) private var orderRaw: String = ForYouPrefs.defaultOrderRaw
+    @AppStorage(ForYouPrefs.knownKey) private var knownRaw: String = ""
     @AppStorage(DashboardPrefs.heroVariantKey) private var heroVariantRaw: String = HeroVariant.sheet.rawValue
     @AppStorage("smart-meteo-pv-kwp") private var plantKwp: Double = 0
 
@@ -308,7 +309,7 @@ struct DashboardView: View {
         let cards = ForYouBuilder.cards(
             forecast: forecast,
             order: ForYouPrefs.order(orderRaw),
-            enabled: Set(ForYouPrefs.keys(enabledRaw)),
+            enabled: ForYouPrefs.enabled(enabledRaw, known: knownRaw),
             plantKwp: plantKwp > 0 ? plantKwp : nil
         )
 

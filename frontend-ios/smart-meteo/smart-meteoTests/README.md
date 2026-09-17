@@ -33,6 +33,7 @@ Poi `⌘U`.
 | `SolarPanelViewTests` | Potenza dell'impianto, resa specifica → kWh, assunzioni |
 | `ActivitiesAndGardenTests` | Frasi degli indici lifestyle e motivo del consiglio sull'orto |
 | `UnitsTests` | Conversioni °C/°F, km-h/m-s/mph/nodi, mm/pollici — e che **le soglie non seguano l'unità di lettura** |
+| `MoonPhaseTests` | La fase da date note (piena 1/10/2020, nuova 14/12/2020), i nomi italiani e inglesi del backend, la scheda «Luna» e l'accensione delle schede nuove |
 | `TestSupport` | Decodifica da JSON e date relative a «oggi» |
 
 ## Due criteri, per chi aggiunge prove

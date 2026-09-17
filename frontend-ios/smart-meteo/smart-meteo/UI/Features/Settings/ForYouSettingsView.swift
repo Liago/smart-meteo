@@ -15,10 +15,11 @@ struct ForYouSettingsView: View {
 
     @AppStorage(ForYouPrefs.enabledKey) private var enabledRaw: String = ForYouPrefs.defaultEnabledRaw
     @AppStorage(ForYouPrefs.orderKey) private var orderRaw: String = ForYouPrefs.defaultOrderRaw
+    @AppStorage(ForYouPrefs.knownKey) private var knownRaw: String = ""
     @AppStorage(DashboardPrefs.heroVariantKey) private var heroVariantRaw: String = HeroVariant.sheet.rawValue
 
     private var order: [ForYouKey] { ForYouPrefs.order(orderRaw) }
-    private var enabled: Set<ForYouKey> { Set(ForYouPrefs.keys(enabledRaw)) }
+    private var enabled: Set<ForYouKey> { ForYouPrefs.enabled(enabledRaw, known: knownRaw) }
 
     var body: some View {
         NavigationStack {
@@ -97,6 +98,9 @@ struct ForYouSettingsView: View {
                 // inserimento: così l'elenco salvato resta leggibile e
                 // riordinarlo non cambia quali sono accese.
                 enabledRaw = ForYouPrefs.raw(order.filter { attive.contains($0) })
+                // Da qui in poi le schede spente lo sono per scelta: l'elenco
+                // salvato è completo e le nuove non si accendono più da sole.
+                knownRaw = ForYouPrefs.raw(ForYouKey.allCases)
             }
         )
     }
@@ -108,6 +112,7 @@ struct ForYouSettingsView: View {
         // Anche le accese vanno riscritte nel nuovo ordine, o la griglia
         // seguirebbe l'ordine vecchio.
         enabledRaw = ForYouPrefs.raw(nuovo.filter { enabled.contains($0) })
+        knownRaw = ForYouPrefs.raw(ForYouKey.allCases)
         HapticManager.light()
     }
 }

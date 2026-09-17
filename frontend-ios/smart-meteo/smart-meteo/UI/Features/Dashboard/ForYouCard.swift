@@ -24,6 +24,7 @@ enum ForYouKey: String, CaseIterable, Identifiable, Codable {
     case garden
     case solar
     case sky
+    case moon
     case activities
     case pollen
     case sea
@@ -37,6 +38,7 @@ enum ForYouKey: String, CaseIterable, Identifiable, Codable {
         case .garden: return "Orto"
         case .solar: return "Solare"
         case .sky: return "Cielo"
+        case .moon: return "Luna"
         case .activities: return "Attività"
         case .pollen: return "Pollini"
         case .sea: return "Mare"
@@ -50,6 +52,7 @@ enum ForYouKey: String, CaseIterable, Identifiable, Codable {
         case .garden: return "Devo innaffiare? Posso seminare?"
         case .solar: return "Quanto produce l'impianto"
         case .sky: return "Tramonti e cielo notturno"
+        case .moon: return "Fase, sorgere e tramonto"
         case .activities: return "Corsa, bici, bucato"
         case .pollen: return "Specie e picco giornaliero"
         case .sea: return "Acqua, onda e mare lungo"
@@ -62,6 +65,7 @@ enum ForYouKey: String, CaseIterable, Identifiable, Codable {
         case .garden: return Color(hex: "E4F0E3")
         case .solar: return Color(hex: "FBEED2")
         case .sky: return Color(hex: "E4E6F4")
+        case .moon: return Color(hex: "ECEAF0")
         case .activities: return Color(hex: "DFEFEF")
         case .pollen: return Color(hex: "F6E3D6")
         case .sea: return Color(hex: "DCECF2")
@@ -74,6 +78,7 @@ enum ForYouKey: String, CaseIterable, Identifiable, Codable {
         case .garden: return Color(hex: "2F7D43")
         case .solar: return Color(hex: "9A6A1E")
         case .sky: return Color(hex: "4C5C93")
+        case .moon: return Color(hex: "5B5670")
         case .activities: return Color(hex: "2F7D7D")
         case .pollen: return Color(hex: "A2603C")
         case .sea: return Color(hex: "2E6E8E")
@@ -139,6 +144,7 @@ enum ForYouBuilder {
         case .garden: return forecast.garden.map(gardenCard)
         case .solar: return forecast.solar.flatMap { solarCard($0, plantKwp: plantKwp) }
         case .sky: return forecast.sky.flatMap(skyCard)
+        case .moon: return moonCard(forecast.astronomy)
         case .activities: return forecast.activities.flatMap(activitiesCard)
         case .pollen: return forecast.pollen.flatMap(pollenCard)
         case .sea: return forecast.sea.map(seaCard)
@@ -287,6 +293,62 @@ enum ForYouBuilder {
             rows: rows,
             note: "I tramonti migliori nascono da nuvole alte con l'orizzonte libero."
         )
+    }
+
+    // MARK: Luna
+
+    /// La scheda che il ridisegno aveva perso: il vecchio pannello del meteo
+    /// corrente mostrava fase, illuminazione, sorgere, tramonto e distanza
+    /// dalla luna piena, e nessuna delle quattro sezioni nuove li aveva
+    /// raccolti. Non dipende da un blocco opzionale del backend — la fase si
+    /// calcola anche senza `astronomy` — quindi, a differenza del mare o della
+    /// neve, la scheda c'è ogni notte: la luna non è mai «niente da dire».
+    static func moonCard(_ astronomy: AstronomyData?, now: Date = Date()) -> ForYouCard {
+        let age = MoonPhase.age(on: now)
+        let phase = MoonPhase.resolve(astronomy?.moonPhase, on: now)
+        let illumination = astronomy?.moonIllumination ?? MoonPhase.illumination(age: age)
+        let daysToFull = MoonPhase.daysToFull(age: age)
+
+        var rows: [ForYouRow] = [
+            ForYouRow(label: "Illuminazione", hint: nil, value: "\(illumination)%"),
+        ]
+        if let sorge = HeroText.hour(astronomy?.moonrise) {
+            rows.append(ForYouRow(label: "Sorge", hint: nil, value: sorge))
+        }
+        if let tramonta = HeroText.hour(astronomy?.moonset) {
+            rows.append(ForYouRow(label: "Tramonta", hint: nil, value: tramonta))
+        }
+        rows.append(ForYouRow(
+            label: "Luna piena",
+            hint: nil,
+            value: fullMoonDistance(daysToFull)
+        ))
+
+        return ForYouCard(
+            key: .moon,
+            headline: phase.label,
+            detail: moonDetail(illumination: illumination, daysToFull: daysToFull),
+            rows: rows,
+            note: "Sotto il 30% di luna le stelle deboli si vedono; sopra l'80% restano pianeti e stelle luminose."
+        )
+    }
+
+    /// «Illuminata al 35% · piena fra 6 giorni».
+    static func moonDetail(illumination: Int, daysToFull: Int) -> String {
+        let luce = "Illuminata al \(illumination)%"
+        switch daysToFull {
+        case 0: return "\(luce) · piena stanotte"
+        case 1: return "\(luce) · piena domani"
+        default: return "\(luce) · piena fra \(daysToFull) giorni"
+        }
+    }
+
+    static func fullMoonDistance(_ days: Int) -> String {
+        switch days {
+        case 0: return "Stanotte"
+        case 1: return "Domani"
+        default: return "Fra \(days) giorni"
+        }
     }
 
     // MARK: Attività

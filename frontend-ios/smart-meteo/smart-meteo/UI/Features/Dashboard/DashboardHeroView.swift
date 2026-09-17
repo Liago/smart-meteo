@@ -159,11 +159,17 @@ struct AlertPillView: View {
 
 // MARK: - Hero, variante «Foglio»
 
-/// La condizione a tinta piena, con la temperatura in serif.
+/// La condizione a tinta piena, con la temperatura grande.
 ///
 /// Il glifo grande dietro al numero non è decorazione gratuita: è la ragione
 /// per cui si capisce che tempo fa **prima** di leggere la cifra, da un metro
 /// di distanza e con lo schermo di sbieco.
+///
+/// L'hero è tutto in SF Pro, con la temperatura in peso leggero. L'handoff
+/// la voleva in serif, e così era stata fatta: ma il numero in New York sopra
+/// etichette e valori in SF Pro leggeva come due font presi a caso più che
+/// come una scelta, e la cosa è stata segnalata come difetto. Il serif resta
+/// dove sta da solo — i titoli delle sezioni, i fogli secondari.
 struct HeroSheetView: View {
     /// Ridisegna quando cambiano le unità: le funzioni di formattazione
     /// leggono `UnitPrefs.shared` ma non possono osservarlo.
@@ -198,14 +204,15 @@ struct HeroSheetView: View {
                     .foregroundColor(theme.ink.opacity(0.65))
 
                 Text(HeroText.temperature(current.temperature))
-                    .font(.duetDisplay(92))
-                    .tracking(-2.8)
+                    .font(.duetUI(92, .light))
+                    .tracking(-3.5)
                     .foregroundColor(theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
 
                 Text(HeroText.narrative(current: current, condition: condition))
-                    .font(.duetDisplay(21))
+                    .font(.duetUI(19, .medium))
+                    .tracking(-0.2)
                     .foregroundColor(theme.ink.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 250, alignment: .leading)
@@ -318,8 +325,8 @@ struct HeroBentoView: View {
                     .foregroundColor(theme.ink.opacity(0.65))
 
                 Text(HeroText.temperature(current.temperature))
-                    .font(.duetDisplay(66))
-                    .tracking(-2)
+                    .font(.duetUI(66, .light))
+                    .tracking(-2.5)
                     .foregroundColor(theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -408,7 +415,9 @@ enum HeroText {
         guard let direzione = current.windDirectionLabel else {
             return "\(apertura), \(Units.windSpeed(fromMs: vento)) di vento."
         }
-        return "\(apertura), brezza da \(direzione.lowercased())."
+        // La sigla resta maiuscola: «SSW» è un punto cardinale, «ssw» una
+        // parola che non esiste.
+        return "\(apertura), brezza da \(direzione.uppercased())."
     }
 
     static func bentoSummary(current: ForecastCurrent, today: DailyForecast?) -> String {
