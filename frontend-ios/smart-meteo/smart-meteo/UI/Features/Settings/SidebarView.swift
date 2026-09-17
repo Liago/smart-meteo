@@ -162,14 +162,15 @@ struct SidebarView: View {
     ///
     /// Erano «v1.0.2» e «Build 2024.11.20» scritte a mano: sbagliate dalla
     /// prima build successiva, e in due punti diversi dell'app — quindi
-    /// sbagliate in due modi diversi.
+    /// sbagliate in due modi diversi. Ora entrambe leggono `AppInfo`, che
+    /// legge il bundle, che nasce da `version.json`.
     private var footer: some View {
         VStack(spacing: 2) {
-            Text("Smart Meteo \(GeneralSettingsView.version)")
+            Text("Smart Meteo \(AppInfo.version)")
                 .font(.duetUI(10.5, .semibold))
                 .foregroundColor(Duet.ink.opacity(0.4))
 
-            Text("Build \(GeneralSettingsView.build)")
+            Text("Build \(AppInfo.build)")
                 .font(.duetUI(10))
                 .foregroundColor(Duet.ink.opacity(0.28))
         }

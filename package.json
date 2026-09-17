@@ -1,13 +1,19 @@
 {
   "name": "smart-meteo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Smart Meteo - Previsioni aggregate da 5 fonti meteo",
   "scripts": {
     "dev:backend": "cd backend && npx ts-node server.ts",
     "dev:frontend": "cd frontend-web && npm run dev",
     "test": "cd frontend-web && npm test",
-    "install:all": "cd backend && npm install && cd ../frontend-web && npm install"
+    "install:all": "cd backend && npm install && cd ../frontend-web && npm install",
+    "version:show": "node scripts/version.mjs show",
+    "version:sync": "node scripts/version.mjs sync",
+    "version:check": "node scripts/version.mjs check",
+    "version:bump": "node scripts/version.mjs bump",
+    "version:build": "node scripts/version.mjs build",
+    "version:set": "node scripts/version.mjs set"
   },
   "dependencies": {
     "@parse/node-apn": "^7.1.0",

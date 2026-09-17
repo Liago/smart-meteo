@@ -19,6 +19,7 @@ import HourlyDetail from '@/components/HourlyDetail';
 import Modal from '@/components/ui/Modal';
 import MetricSelect from '@/components/ui/MetricSelect';
 import SegmentedTabs from '@/components/ui/SegmentedTabs';
+import AppVersion from '@/components/AppVersion';
 import type { MetricId } from '@/lib/metrics';
 import { availableTabs } from '@/lib/dashboard';
 import { useDashboardTab } from '@/lib/useDashboardTab';
@@ -393,9 +394,11 @@ export default function Home() {
 							)}
 						</Modal>
 
-						{/* Timestamp */}
+						{/* Timestamp e versione: le due informazioni diagnostiche, insieme */}
 						<p className="text-center text-xs" style={{ color: 'var(--color-duet-faint)' }}>
 							Aggiornato: {new Date(data.generated_at).toLocaleString('it-IT')}
+							<span className="mx-2" aria-hidden="true">·</span>
+							<AppVersion />
 						</p>
 					</>
 				)}

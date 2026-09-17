@@ -7,6 +7,7 @@ import sourcesRouter from './routes/sources';
 import accuracyRouter from './routes/accuracy';
 import { alertsRouter } from './routes/alerts';
 import { requireAuth } from './middleware/auth';
+import { APP_BUILD, APP_VERSION, APP_VERSION_FULL } from './version';
 
 dotenv.config();
 
@@ -60,9 +61,15 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.get('/', (req: Request, res: Response) => {
 	res.json({
 		service: 'Smart Meteo API',
-		version: 'v1',
+		// `api` è il contratto degli endpoint, `version` quella del software:
+		// erano la stessa stringa «v1», e chi riceveva una risposta sbagliata
+		// non aveva modo di dire quale build l'avesse prodotta.
+		api: 'v1',
+		version: APP_VERSION,
+		build: APP_BUILD,
 		endpoints: [
 			'GET /api/health',
+			'GET /api/version',
 			'GET /api/forecast?lat=&lon=',
 			'GET /api/sources',
 			'PATCH /api/sources/:id',
@@ -77,7 +84,34 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.get('/api/health', (req: Request, res: Response) => {
-	res.json({ status: 'ok', timestamp: new Date() });
+	res.json({
+		status: 'ok',
+		timestamp: new Date(),
+		version: APP_VERSION,
+		build: APP_BUILD,
+	});
+});
+
+/**
+ * Versione del backend in esecuzione.
+ *
+ * Endpoint a sé oltre che campo di `/api/health` perché risponde a una domanda
+ * diversa: «il servizio è vivo?» si chiede a un monitor ogni minuto, «quale
+ * build sta girando?» si chiede una volta, dopo un deploy, per sapere se è
+ * andato a buon fine. Netlify tiene in caldo la funzione precedente per
+ * qualche minuto dopo il rilascio, quindi è proprio il caso in cui serve
+ * poterlo chiedere.
+ *
+ * Nessuna autenticazione: è la stessa versione che il client scrive in fondo
+ * alla dashboard, e un numero di build non è un'informazione riservata.
+ */
+app.get('/api/version', (req: Request, res: Response) => {
+	res.json({
+		service: 'smart-meteo-backend',
+		version: APP_VERSION,
+		build: APP_BUILD,
+		full: APP_VERSION_FULL,
+	});
 });
 
 app.use('/api/sources', sourcesRouter);
