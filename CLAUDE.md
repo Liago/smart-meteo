@@ -57,6 +57,7 @@ smart-meteo/
 │   │   ├── alertRules.ts       # Personal threshold metrics + pure evaluation
 │   │   └── alertGeo.ts         # Italian regions, alert relevance + dedup
 │   ├── scripts/                # verify*.ts - pure-function checks run by npm test
+│   ├── version.ts              # GENERATO da version.json - non modificare a mano
 │   ├── app.ts                  # Express app setup (CORS, routes)
 │   ├── server.ts               # Dev server entry point
 │   └── types.ts                # TypeScript interfaces
@@ -94,6 +95,7 @@ smart-meteo/
 │   │   ├── SearchBar.tsx        # Location search + saved/home locations
 │   │   ├── SourcesIndicator.tsx # Active sources display
 │   │   ├── AuthButton.tsx       # Login/logout
+│   │   ├── AppVersion.tsx       # Versione + build in fondo alla dashboard
 │   │   ├── SkeletonLoader.tsx   # Loading placeholders
 │   │   └── ErrorFallback.tsx    # Error display
 │   ├── lib/
@@ -104,6 +106,7 @@ smart-meteo/
 │   │   ├── hooks.ts            # SWR hooks (useForecast, useSources)
 │   │   ├── useLocations.ts     # Location management (localStorage + Supabase sync)
 │   │   ├── weather-utils.ts    # Condition labels/icons/gradients, WMO code mapping
+│   │   ├── version.ts          # GENERATO da version.json - non modificare a mano
 │   │   └── supabase/
 │   │       ├── client.ts       # Browser Supabase client
 │   │       ├── server.ts       # SSR Supabase client
@@ -131,6 +134,7 @@ smart-meteo/
 │           │   └── AuthService.swift       # Authentication
 │           ├── Core/
 │           │   ├── Config/AppConfig.swift  # App configuration
+│           │   ├── Config/AppInfo.swift    # Versione/build dal bundle
 │           │   ├── Location/LocationManager.swift  # Device GPS
 │           │   ├── Network/APIService.swift        # HTTP client
 │           │   ├── Networking/SupabaseClient.swift  # Supabase integration
@@ -189,7 +193,12 @@ smart-meteo/
 │       └── api.ts              # serverless-http wrapper for Express
 ├── supabase/
 │   └── migrations/             # 24 migration files (001-024)
+├── scripts/
+│   └── version.mjs             # Versioning: version.json -> tutti i derivati
+├── version.json                # SORGENTE DI VERITÀ della versione (SemVer + build)
+├── CHANGELOG.md                # Keep a Changelog
 └── docs/                       # Implementation plans (PHASE_1-3, BACKEND_DB_INTEGRATION)
+                                #  + VERSIONING.md (il meccanismo e le sue regole)
 ```
 
 ## Tech Stack
@@ -222,6 +231,13 @@ cd frontend-web && npm run test:watch
 # Lint frontend
 cd frontend-web && npm run lint
 
+# Versione (sorgente di verità: version.json in radice)
+npm run version:show           # 1.1.0 (build 2)
+npm run version:bump -- minor  # major|minor|patch; incrementa anche la build
+npm run version:build          # solo build +1 (stesso rilascio, nuovo archivio)
+npm run version:sync           # riscrive i file derivati
+npm run version:check          # fallisce se un derivato è fuori sincrono
+
 # Build frontend
 cd frontend-web && npm run build
 ```
@@ -250,7 +266,8 @@ cd frontend-web && npm run build
 - `GET /api/forecast?lat=<lat>&lon=<lon>` - Smart aggregated forecast
 - `GET /api/sources` - List weather sources with status/weights
 - `PATCH /api/sources/:id` - Enable/disable a weather source (auth required)
-- `GET /api/health` - Backend health check
+- `GET /api/health` - Backend health check (include `version` e `build`)
+- `GET /api/version` - Versione, build e forma completa (`1.1.0+2`) del backend in esecuzione
 - `POST /api/alerts/subscribe` / `POST /api/alerts/unsubscribe` - Device push registration
 - `GET /api/alerts/active?lat=&lon=` - Active alerts for an area
 - `POST /api/alerts/poll` - Alert polling, guarded by the `X-Cron-Secret` header
@@ -264,13 +281,13 @@ cd frontend-web && npm run build
 
 ## Testing
 
-- Web tests are in `frontend-web/__tests__/` (17 suites: api, components, weather-utils,
+- Web tests are in `frontend-web/__tests__/` (18 suites: api, components, weather-utils,
   air-quality, narrative, hourly-detail, forecast-details, next-hour, pollen, snow, storm,
-  garden, solar, sky, sea, activities, dashboard), `npm test` from the repo root. `hourly-detail` pins the clock with fake
+  garden, solar, sky, sea, activities, dashboard, version), `npm test` from the repo root. `hourly-detail` pins the clock with fake
   timers: since the day strip drops past days, a suite with dates hardcoded in the past would
   have started failing on a calendar date rather than on a code change
 - Framework: Jest 30 + React Testing Library + ts-jest, jsdom environment
-- Backend tests: `cd backend && npm test` - **602 tests in 28 suites** (Jest + ts-jest,
+- Backend tests: `cd backend && npm test` - **611 tests in 29 suites** (Jest + ts-jest,
   node environment). `__tests__/utils/` for the pure aggregation functions,
   `__tests__/connectors/` for the 9 providers (axios-mock-adapter, fixtures as builders
   in `__tests__/fixtures/providers.ts`), `__tests__/engine/` for the aggregation with
@@ -338,6 +355,8 @@ cd frontend-web && npm run build
 - **The web dashboard is a short at-a-glance block plus four sections, not thirteen stacked cards**: the page used to be one column five screens tall in which the current weather, eight niche insight panels, the hourly curve, the seven days and the sources all carried the same visual weight — so the two things an app like this is opened for, the next hours and the next days, sat *below* the pollen and the photovoltaic yield, with no way to jump between them. Now alerts, current conditions, the minute-by-minute nowcast and sun/wind stay above and outside the sections (if it rains in twelve minutes, knowing it must not cost a click), and everything else lives behind a segmented control: Oggi, Settimana, Per te, Fonti. The open section is **in the URL hash**, so it survives a reload and is shareable, and `useDashboardTab` reads it through `useSyncExternalStore` rather than mirroring it into state — one source of truth means back/forward work, there is no hydration mismatch on the server render, and a section that disappears when the location changes (the sea inland) falls back on its own instead of needing an effect
 - **A tab that opens an empty section is worse than a missing tab**: the first is only discovered by clicking it. `availableTabs` derives the sections from the response using the *same* visibility conditions the panels apply to themselves, and the count on each tab comes from the same list the grid renders — if the two definitions drifted apart the badge would promise five cards and the grid would show four
 - **The "Per te" cards are ordered by how much they matter today, not by a fixed order in the JSX** (`frontend-web/lib/dashboard.ts`): a fixed order is wrong by construction — it put the sea above a hard frost in January and the pollen below the photovoltaic panel in July — and the defect is invisible on screen, because a plausible card is still plausible in the wrong place. Each card scores 0-100 for *urgency to the reader*, not for how good the day is: a severe frost tonight (98) beats any sunset, unbreathable air (95) beats a rough sea, and the photovoltaic card is pinned low (22) because it answers a planning question for whoever owns a plant, not a "should I change my plans" one. Two deliberate asymmetries: the sea scores **higher when it worsens** than when it stays rough all day, because the calm morning that turns rough at five is exactly the case people get wrong; and the lifestyle indices count at both extremes — a great day is news and so is a day where nothing works, while a mediocre one can sit lower. Ties break on a fixed list rather than on whatever `sort` does with equal keys, or the grid would reshuffle between renders
+- **La versione ha una sorgente sola e tutto il resto è derivato** (`version.json` + `scripts/version.mjs`): il progetto dichiarava una versione in nove posti — tre `package.json`, tre `package-lock.json`, il `project.pbxproj` e due moduli TypeScript — e in nessuno la dichiarava davvero, perché è rimasta a **1.0 (1) per centoquattordici commit**, dal primo all'ultimo. Il difetto non si vede: un numero fermo è comunque un numero plausibile, e se ne accorge solo chi deve legare una segnalazione a un rilascio, cioè nel momento peggiore. Ora `npm run version:bump -- minor` scrive `version.json` e riversa tutto il resto in un colpo solo. Tre scelte da non disfare: **la build non si azzera mai** — è monotona per tutta la vita dell'app, perché App Store Connect rifiuta un `CFBundleVersion` già caricato e azzerarla a ogni `minor` lo fa scoprire a metà di un upload; **niente incremento automatico dentro Xcode** (una fase di build con `agvtool` sporca il diff a ogni ⌘R e fa divergere la build iOS da quelle di backend e web, che sono lo *stesso* rilascio); e i due moduli TypeScript sono **generati e versionati**, non letti a runtime da `version.json` — il backend gira impacchettato da esbuild e il web come bundle Next, e in nessuno dei due quel file esiste sul disco al momento della richiesta. Su iOS non c'è nulla da scrivere a mano: `GENERATE_INFOPLIST_FILE = YES`, quindi `MARKETING_VERSION` e `CURRENT_PROJECT_VERSION` *diventano* `CFBundleShortVersionString` e `CFBundleVersion`, e sono **quattro** blocchi (app e widget × Debug e Release) che devono muoversi insieme, o l'archivio viene rifiutato per un widget rimasto indietro. Dettagli e procedura di rilascio in `docs/VERSIONING.md`
+- **`version:check` gira dentro le suite, non solo a mano**: un meccanismo di sincronizzazione volontario si rompe sempre allo stesso modo — qualcuno corregge il file derivato invece della sorgente — e si rompe in silenzio. Il controllo è in `backend/__tests__/version.test.ts` e in `frontend-web/__tests__/version.test.tsx`, e **delega allo script vero** invece di riscriverne il confronto: una seconda implementazione sarebbe una seconda cosa da tenere allineata, e passerebbe mentre `sync` scrive qualcos'altro — esattamente il difetto che il test esiste per escludere. Anche i `package-lock.json` sono fra i derivati, benché generati da npm: al primo `npm install` npm li riallinea da solo al `package.json`, quindi ignorarli significherebbe lasciare tre file che cambiano da soli nel commit di qualcun altro, in mezzo a modifiche che non c'entrano
 - **Aggregation rules that are not a plain mean** live in `backend/utils/`: circular mean for wind direction, max for gusts, wet-fraction-gated mean for mm, weighted standard deviation for the confidence score. All pure functions with their own test suites
 - **Supabase RLS** is enabled on all database tables for row-level security
 - **SWR** is used for client-side data fetching with 5-minute refresh intervals
@@ -387,6 +406,7 @@ WeatherCondition   // 'clear' | 'cloudy' | 'rain' | 'snow' | 'storm' | 'fog' | '
 
 ## Recent Implementations
 
+- **Versioning, per la prima volta** (2026-09-17, tutte e tre le piattaforme): l'app dichiarava `1.0 build 1` dal primo commit al centoquattordicesimo, coprendo con lo stesso numero il ridisegno iOS, nove connettori, le allerte personali e la riorganizzazione della dashboard web. Il problema non era «bisogna alzare il numero» ma che non esisteva **un posto** dove alzarlo: nove file lo dichiaravano, ognuno per conto proprio. Ora `version.json` in radice è la sorgente e `scripts/version.mjs` riversa; `npm run version:check` rende il disallineamento un test rosso invece di una versione falsa in produzione. Il backend espone `GET /api/version` e dichiara `version`/`build` su `/api/health` — dopo un rilascio è l'unico modo di distinguere il deploy andato a buon fine dalla funzione Netlify precedente ancora in caldo — e la risposta di `GET /` separa finalmente `api` (il contratto, `v1`) da `version` (la build che sta rispondendo), che erano lo stesso campo. Il web scrive la versione in fondo alla dashboard, accanto all'orario di aggiornamento; iOS le due proprietà statiche che stavano in `GeneralSettingsView` diventano `Core/Config/AppInfo.swift`, perché `SidebarView` importava una schermata di impostazioni per leggere un dato che non appartiene a nessuna delle due. Primo rilascio così numerato: **1.1.0 (build 2)**, con `CHANGELOG.md` e `docs/VERSIONING.md`.
 - **Web dashboard reorganised into sections** (2026-09-15): the reported problem was the user experience of the main page, and it was an information-architecture problem rather than a styling one — thirteen equally-weighted cards in one column, with the hourly curve and the seven days at the bottom, below eight niche panels. Now a short at-a-glance block stays outside the sections and the rest lives behind an accessible segmented control (`ui/SegmentedTabs.tsx`: real `tablist` semantics, arrow-key navigation, roving tabindex, one shared indicator that moves), with the open section in the URL hash. Inside "Per te" the eight panels are ordered by a relevance score computed from the response instead of by their order in the JSX. The panels themselves were not touched: the ranking decides *where* they go, never *whether* they appear, so each one keeps its own `if (!sea) return null`. One pre-existing bug surfaced on the way and was fixed: `CurrentWeather`'s inner `relative z-10` had no stacking context of its own, so it landed in the page root at the same level as the sticky header and — being later in the DOM — painted **over** the search suggestions, which became unclickable where they overlapped. It had never shown because until now there was always another card between the header and the hero; `isolate` on the card confines it. New `dashboard` Jest suite (25 tests) and six E2E scenarios for the navigation itself.
 - **Yesterday removed from the week** (2026-09-15, iOS + web + widgets): reported from a screenshot showing «Lun» above «Oggi» on a Tuesday. One root cause, four wrong consumers of `daily`, each failing differently and none of them visibly — including the dashboard hero, whose max/min came from `daily.first` and so showed **yesterday's** figures in the biggest type on the screen. Now everything picks by date: new `DailyWindowTests` on iOS next to the hourly-window ones (same bug, other array) and a new `forecast-details` suite on the web, which had no coverage at all for that panel.
 - **Units, for real** (2026-09-15, iOS): the three unit rows became working pickers, and the four sidebar screens were brought onto the settings screen's language. Doing the first meant touching every place the app writes a temperature, a wind speed or a millimetre — about twenty sites across the dashboard, the hourly detail, the seven panels and the narrative engine — all now routed through `Units`, with the thresholds deliberately left in their canonical units. Two bugs surfaced on the way: `WeatherDescriptionEngine` was comparing **m/s against km/h thresholds**, so the day summary only mentioned wind above 43 km/h, called a gale «moderate» and printed gusts divided by 3.6 with «km/h» next to them; and the favourites' swipe-to-delete never told the backend. A new `UnitsTests` suite covers the conversions and, more importantly, that the bands do **not** follow the reading unit.

@@ -108,6 +108,7 @@ jest.mock('../../services/accuracy', () => {
 });
 
 import { app } from '../../app';
+import { APP_BUILD, APP_VERSION } from '../../version';
 
 beforeEach(() => {
 	authUser = { id: 'user-1' };
@@ -130,6 +131,15 @@ describe('GET /', () => {
 		expect(res.body.endpoints).toContain('GET /api/forecast?lat=&lon=');
 		expect(res.body.endpoints).toContain('GET /api/accuracy');
 	});
+
+	it('distingue la versione dell API da quella del software', async () => {
+		const res = await request(app).get('/');
+		// `api` è il contratto (v1, stabile fra i rilasci), `version` la build
+		// che sta rispondendo: erano lo stesso campo, e una risposta sbagliata
+		// non era attribuibile a un rilascio.
+		expect(res.body.api).toBe('v1');
+		expect(res.body.version).toBe(APP_VERSION);
+	});
 });
 
 describe('GET /api/health', () => {
@@ -138,6 +148,35 @@ describe('GET /api/health', () => {
 		expect(res.status).toBe(200);
 		expect(res.body.status).toBe('ok');
 		expect(res.body.timestamp).toBeTruthy();
+	});
+
+	it('dichiara versione e build della funzione in esecuzione', async () => {
+		const res = await request(app).get('/api/health');
+		expect(res.body.version).toBe(APP_VERSION);
+		expect(res.body.build).toBe(APP_BUILD);
+	});
+});
+
+describe('GET /api/version', () => {
+	/**
+	 * Il caso che questo endpoint esiste per servire: dopo un rilascio,
+	 * distinguere «il deploy è andato» da «Netlify sta ancora servendo la
+	 * funzione precedente». Senza, la differenza non è osservabile.
+	 */
+	it('espone versione, build e forma completa', async () => {
+		const res = await request(app).get('/api/version');
+
+		expect(res.status).toBe(200);
+		expect(res.body.service).toBe('smart-meteo-backend');
+		expect(res.body.version).toBe(APP_VERSION);
+		expect(res.body.build).toBe(APP_BUILD);
+		expect(res.body.full).toBe(`${APP_VERSION}+${APP_BUILD}`);
+	});
+
+	it('è pubblico: nessun token richiesto', async () => {
+		authUser = null;
+		const res = await request(app).get('/api/version');
+		expect(res.status).toBe(200);
 	});
 });
 

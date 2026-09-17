@@ -47,8 +47,31 @@ export async function toggleSource(id: string, active: boolean): Promise<{ sourc
 	);
 }
 
-export async function getHealth(): Promise<{ status: string; timestamp: string }> {
+export async function getHealth(): Promise<{
+	status: string;
+	timestamp: string;
+	version: string;
+	build: number;
+}> {
 	return fetchJSON(`${API_BASE}/api/health`);
+}
+
+/**
+ * Versione del backend interrogato.
+ *
+ * Web e backend hanno lo stesso `version.json` ma due deploy indipendenti
+ * (Vercel e Netlify): possono essere disallineati per qualche minuto dopo un
+ * rilascio, o per mesi se uno dei due fallisce in silenzio. Il client
+ * dichiara la propria versione da `lib/version.ts`; questa serve a leggere
+ * quella dell'altro lato quando le due non tornano.
+ */
+export async function getVersion(): Promise<{
+	service: string;
+	version: string;
+	build: number;
+	full: string;
+}> {
+	return fetchJSON(`${API_BASE}/api/version`);
 }
 
 export async function getActiveAlerts(lat: number, lon: number): Promise<{ alerts: WeatherAlert[] }> {

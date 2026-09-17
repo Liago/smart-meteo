@@ -106,9 +106,9 @@ struct GeneralSettingsView: View {
             }
 
             SettingsCard("App") {
-                SettingsInfoRow(title: "Versione", value: Self.version)
+                SettingsInfoRow(title: "Versione", value: AppInfo.version)
                 SettingsSeparator()
-                SettingsInfoRow(title: "Build", value: Self.build)
+                SettingsInfoRow(title: "Build", value: AppInfo.build)
             }
         }
         .navigationTitle("Impostazioni")
@@ -158,22 +158,6 @@ struct GeneralSettingsView: View {
         }
         .accessibilityLabel("\(title): \(label(selection.wrappedValue))")
         .accessibilityHint("Tocca per cambiare unità")
-    }
-
-    // MARK: - Versione
-
-    /// Letta dal bundle, non scritta a mano.
-    ///
-    /// Prima erano due stringhe fisse («1.0.2», «2024.11.20»): diventano
-    /// sbagliate alla prima build e nessuno se ne accorge, perché nessuno
-    /// guarda la schermata «App info» finché non deve segnalare un problema —
-    /// che è esattamente il momento in cui quel numero deve essere giusto.
-    static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-    }
-
-    static var build: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
     }
 }
 
