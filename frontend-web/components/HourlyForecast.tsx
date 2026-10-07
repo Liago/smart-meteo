@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { HourlyForecast, AstronomyData } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import WeatherIcon from './WeatherIcon';
 
 interface HourlyForecastProps {
@@ -17,269 +17,299 @@ interface HourlyForecastProps {
 // Discriminator type for the items in our timeline
 type TimelineItem =
 	| { type: 'weather'; time: number; data: HourlyForecast }
-	| { type: 'sun'; time: number; data: { label: string; icon: string } };
+	| { type: 'sun'; time: number; data: { label: string } };
+
+/** Larghezza minima di una colonna: sotto, orario e percentuale si toccano. */
+const MIN_COLUMN = 64;
+/** Altezza della fascia del grafico, fra la riga delle icone e quella degli orari. */
+const CHART_HEIGHT = 96;
+const PAD_TOP = 10;
+const PAD_BOTTOM = 8;
+
+/**
+ * Larghezza disponibile del contenitore.
+ *
+ * Le colonne si allargano fino a riempirlo invece di restare a larghezza fissa
+ * con un vuoto a destra: con dodici ore su uno schermo largo il grafico deve
+ * occupare la scheda, e scorrere solo quando davvero non ci sta.
+ */
+function useContainerWidth(el: HTMLElement | null): number {
+	const [width, setWidth] = useState(0);
+	useEffect(() => {
+		if (!el) return;
+		const measure = () => setWidth(el.clientWidth);
+		measure();
+		// jsdom non implementa ResizeObserver: la misura iniziale basta.
+		if (typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [el]);
+	return width;
+}
+
+/** Minuti dalla mezzanotte di un istante, nell'ora del browser. */
+const minutesOfDay = (t: number) => {
+	const d = new Date(t);
+	return d.getHours() * 60 + d.getMinutes();
+};
 
 export default function HourlyForecast({ hourly, astronomy, mode = 'next-12', title = 'Andamento orario', onPrecipitationClick }: HourlyForecastProps) {
-	const chartData = useMemo(() => {
-		// 1. Merge and sort events
+	// Ref a callback: il contenitore compare solo quando c'è un grafico da
+	// disegnare, e un ref a oggetto non farebbe ripartire la misura.
+	const [container, setContainer] = useState<HTMLDivElement | null>(null);
+	const containerWidth = useContainerWidth(container);
+	const uid = useId().replace(/:/g, '');
+
+	const items = useMemo(() => {
 		const events: TimelineItem[] = hourly.map(h => ({
 			type: 'weather',
 			time: new Date(h.time).getTime(),
 			data: h
 		}));
 
-		if (astronomy) {
-			const addAstroEvent = (timeStr: string | undefined, label: string, icon: string) => {
+		if (astronomy && hourly.length > 0) {
+			const first = new Date(hourly[0].time).getTime();
+			const last = new Date(hourly[hourly.length - 1].time).getTime();
+			const addAstroEvent = (timeStr: string | undefined, label: string) => {
 				if (!timeStr) return;
 				const time = new Date(timeStr).getTime();
-				// Only add if it's within the range of our hourly data (with some buffer)
-				if (hourly.length > 0) {
-					const first = new Date(hourly[0].time).getTime();
-					const last = new Date(hourly[hourly.length - 1].time).getTime();
-					if (time >= first - 3600000 && time <= last + 3600000) {
-						events.push({
-							type: 'sun',
-							time,
-							data: { label, icon }
-						});
-					}
+				if (time >= first - 3600000 && time <= last + 3600000) {
+					events.push({ type: 'sun', time, data: { label } });
 				}
 			};
-
-			addAstroEvent(astronomy.sunrise, 'Alba', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
-			addAstroEvent(astronomy.sunset, 'Tramonto', 'M17.293 13.293A8 8 0 016.707 2.707 8.001 8.001 0 1010 18h.005c.022 0 .045-.002.067-.006a8 8 0 007.221-4.701z');
+			addAstroEvent(astronomy.sunrise, 'Alba');
+			addAstroEvent(astronomy.sunset, 'Tramonto');
 		}
 
 		events.sort((a, b) => a.time - b.time);
 
-		// 2. Prepare data for the chart
-		let filtered = events;
-
 		if (mode === 'next-12') {
-			// Filter for next 12 hours approx
 			const now = new Date();
 			now.setMinutes(0, 0, 0);
 			const start = now.getTime();
-			const end = start + 12 * 3600 * 1000; // 12 hours
-			filtered = events.filter(e => e.time >= start && e.time <= end);
-		} else {
-			// Exact mode: show all provided data within the start/end of the hourly array
-			// ensuring we respect the provided hourly range
-			if (hourly.length > 0) {
-				const start = new Date(hourly[0].time).getTime();
-				const end = new Date(hourly[hourly.length - 1].time).getTime();
-				filtered = events.filter(e => e.time >= start && e.time <= end);
-			}
+			const end = start + 12 * 3600 * 1000;
+			return events.filter(e => e.time >= start && e.time <= end);
 		}
+		if (hourly.length > 0) {
+			const start = new Date(hourly[0].time).getTime();
+			const end = new Date(hourly[hourly.length - 1].time).getTime();
+			return events.filter(e => e.time >= start && e.time <= end);
+		}
+		return events;
+	}, [hourly, astronomy, mode]);
 
-		// 3. Calculate Geometry
-		if (filtered.length < 2) return null;
+	const chart = useMemo(() => {
+		if (items.length < 2) return null;
 
-		// Get min/max temps for scaling Y-axis. Interpolate temp for 'sun' events
-		// based on neighbors for a smoother curve interacting with sun markers.
-		const weatherItems = filtered.filter(e => e.type === 'weather') as Array<{ type: 'weather', time: number, data: HourlyForecast }>;
+		const weatherItems = items.filter((e): e is Extract<TimelineItem, { type: 'weather' }> => e.type === 'weather');
 
-		const getTempAtTime = (t: number) => {
-			const before = weatherItems.filter(w => w.time <= t).pop();
-			const after = weatherItems.find(w => w.time > t);
-			if (!before && !after) return 0;
-			if (!before) return after!.data.temp;
-			if (!after) return before.data.temp;
-
+		// Temperatura sui marcatori di alba e tramonto: interpolata dai vicini,
+		// così la curva passa dal marcatore invece di fare un gradino.
+		const interpolate = (t: number, pick: (h: HourlyForecast) => number | null | undefined): number | null => {
+			const before = weatherItems.filter(w => w.time <= t && pick(w.data) != null).pop();
+			const after = weatherItems.find(w => w.time > t && pick(w.data) != null);
+			if (!before && !after) return null;
+			if (!before) return pick(after!.data)!;
+			if (!after) return pick(before.data)!;
 			const ratio = (t - before.time) / (after.time - before.time);
-			return before.data.temp + (after.data.temp - before.data.temp) * ratio;
+			return pick(before.data)! + (pick(after.data)! - pick(before.data)!) * ratio;
 		};
 
-		const itemsWithTemp = filtered.map(item => {
-			const temp = item.type === 'weather' ? item.data.temp : getTempAtTime(item.time);
-			return { ...item, temp };
-		});
+		const withTemp = items.map(item => ({
+			...item,
+			temp: item.type === 'weather' ? item.data.temp : interpolate(item.time, h => h.temp) ?? 0,
+		}));
 
 		// La scala verticale deve contenere anche la banda, altrimenti il 90°
 		// percentile finirebbe fuori dal riquadro nelle ore più incerte.
-		const temps = itemsWithTemp.map(i => i.temp);
+		const temps = withTemp.map(i => i.temp);
 		const bandValues = weatherItems.flatMap(w =>
 			[w.data.temp_p10, w.data.temp_p90].filter((v): v is number => v != null)
 		);
-		const minTemp = Math.min(...temps, ...bandValues) - 2;
-		const maxTemp = Math.max(...temps, ...bandValues) + 2;
-		const tempRange = maxTemp - minTemp || 1;
+		const minTemp = Math.min(...temps, ...bandValues) - 1;
+		const maxTemp = Math.max(...temps, ...bandValues) + 1;
+		const range = maxTemp - minTemp || 1;
 
-		const minSpacing = 76;
-		const width = Math.max(filtered.length * minSpacing, 300);
-		const height = 150;
-		const paddingX = 24;
-		const paddingTop = 24;
-		const paddingBottom = 20;
+		const column = Math.max(MIN_COLUMN, containerWidth > 0 ? containerWidth / withTemp.length : MIN_COLUMN);
+		const width = column * withTemp.length;
+		const usable = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+		const yFor = (temp: number) => CHART_HEIGHT - PAD_BOTTOM - ((temp - minTemp) / range) * usable;
 
-		const points = itemsWithTemp.map((item, index) => {
-			const x = paddingX + (index / Math.max(itemsWithTemp.length - 1, 1)) * (width - 2 * paddingX);
-			const usableHeight = height - paddingTop - paddingBottom;
-			const y = height - paddingBottom - ((item.temp - minTemp) / tempRange) * usableHeight;
-			return { x, y, ...item };
-		});
+		const points = withTemp.map((item, index) => ({
+			...item,
+			x: column * index + column / 2,
+			y: yFor(item.temp),
+		}));
 
-		// Smoothed path (simple midpoint cubic bezier)
-		let pathD = `M ${points[0].x} ${points[0].y}`;
-		for (let i = 0; i < points.length - 1; i++) {
-			const curr = points[i];
-			const next = points[i + 1];
-			const midX = (curr.x + next.x) / 2;
-			pathD += ` C ${midX} ${curr.y}, ${midX} ${next.y}, ${next.x} ${next.y}`;
-		}
-		const areaD = `${pathD} L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
+		const trace = (pts: { x: number; y: number }[], start: boolean) => {
+			let d = start ? `M ${pts[0].x} ${pts[0].y}` : ` L ${pts[0].x} ${pts[0].y}`;
+			for (let i = 0; i < pts.length - 1; i++) {
+				const midX = (pts[i].x + pts[i + 1].x) / 2;
+				d += ` C ${midX} ${pts[i].y}, ${midX} ${pts[i + 1].y}, ${pts[i + 1].x} ${pts[i + 1].y}`;
+			}
+			return d;
+		};
+
+		const pathD = trace(points, true);
+		const areaD = `${pathD} L ${points[points.length - 1].x} ${CHART_HEIGHT} L ${points[0].x} ${CHART_HEIGHT} Z`;
 
 		// Banda di incertezza: percorso chiuso che segue il 90° percentile
 		// all'andata e il 10° al ritorno. Si disegna solo se TUTTI i punti hanno
 		// la banda — un tratto interrotto suggerirebbe una certezza che non c'è
 		// nelle ore scoperte dall'ensemble.
-		const yFor = (temp: number) => {
-			const usableHeight = height - paddingTop - paddingBottom;
-			return height - paddingBottom - ((temp - minTemp) / tempRange) * usableHeight;
-		};
-
-		// Sui marcatori di alba e tramonto la banda va interpolata dai vicini,
-		// come già si fa per la temperatura: quei punti non hanno dati orari, e
-		// senza interpolazione la banda risulterebbe incompleta — quindi mai
-		// disegnata — in tutte le finestre che contengono un evento solare.
-		const bandAtTime = (t: number, key: 'temp_p10' | 'temp_p90'): number | null => {
-			const before = weatherItems.filter(w => w.time <= t && w.data[key] != null).pop();
-			const after = weatherItems.find(w => w.time > t && w.data[key] != null);
-			if (!before && !after) return null;
-			if (!before) return after!.data[key]!;
-			if (!after) return before.data[key]!;
-
-			const ratio = (t - before.time) / (after.time - before.time);
-			return before.data[key]! + (after.data[key]! - before.data[key]!) * ratio;
-		};
-
 		const bandPoints = points.map((p) => {
-			const low = p.type === 'weather' ? p.data.temp_p10 ?? null : bandAtTime(p.time, 'temp_p10');
-			const high = p.type === 'weather' ? p.data.temp_p90 ?? null : bandAtTime(p.time, 'temp_p90');
+			const low = p.type === 'weather' ? p.data.temp_p10 ?? null : interpolate(p.time, h => h.temp_p10);
+			const high = p.type === 'weather' ? p.data.temp_p90 ?? null : interpolate(p.time, h => h.temp_p90);
 			return low != null && high != null ? { x: p.x, low, high } : null;
 		});
-
 		let bandD: string | null = null;
 		const covered = bandPoints.filter((b): b is { x: number; low: number; high: number } => b !== null);
 		if (covered.length >= 2 && covered.length === bandPoints.length) {
 			const upper = covered.map((b) => ({ x: b.x, y: yFor(b.high) }));
 			const lower = [...covered].reverse().map((b) => ({ x: b.x, y: yFor(b.low) }));
-			const trace = (pts: { x: number; y: number }[], start: boolean) => {
-				let d = start ? `M ${pts[0].x} ${pts[0].y}` : ` L ${pts[0].x} ${pts[0].y}`;
-				for (let i = 0; i < pts.length - 1; i++) {
-					const midX = (pts[i].x + pts[i + 1].x) / 2;
-					d += ` C ${midX} ${pts[i].y}, ${midX} ${pts[i + 1].y}, ${pts[i + 1].x} ${pts[i + 1].y}`;
-				}
-				return d;
-			};
 			bandD = `${trace(upper, true)}${trace(lower, false)} Z`;
 		}
 
-		return { width, height, points, pathD, areaD, bandD, gridY1: Math.round(height * 0.32), gridY2: Math.round(height * 0.68) };
-	}, [hourly, astronomy, mode]);
+		return { width, column, points, pathD, areaD, bandD };
+	}, [items, containerWidth]);
 
-	if (!chartData) return null;
+	const formatHour = (t: number) =>
+		new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
-	const formatHour = (iso: number) => {
-		const d = new Date(iso);
-		return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+	/*
+	  Notte: fra il tramonto e l'alba, confrontati sull'ora del giorno. Le
+	  previsioni coprono al massimo mezza giornata in avanti, quindi gli orari
+	  di oggi bastano anche per le ore di domattina.
+	*/
+	const sunrise = astronomy?.sunrise ? minutesOfDay(new Date(astronomy.sunrise).getTime()) : null;
+	const sunset = astronomy?.sunset ? minutesOfDay(new Date(astronomy.sunset).getTime()) : null;
+	const isNight = (t: number) => {
+		if (sunrise == null || sunset == null) return false;
+		const m = minutesOfDay(t);
+		return m < sunrise || m >= sunset;
 	};
 
+	if (!chart) return null;
+
 	return (
-		<div className="glass p-6" style={{ color: 'var(--color-duet-ink)' }}>
-			{title && (
-				<h3 className="text-[13px] font-semibold uppercase tracking-wide mb-4" style={{ color: 'var(--color-duet-muted)' }}>{title}</h3>
-			)}
+		<section className="glass p-5" style={{ color: 'var(--color-duet-ink)' }} aria-label={title || 'Andamento orario'}>
+			{title && <h3 className="card-label mb-3">{title}</h3>}
 
-			<div className="overflow-x-auto pb-1">
-				<svg
-					width={chartData.width}
-					height={chartData.height}
-					viewBox={`0 0 ${chartData.width} ${chartData.height}`}
-					preserveAspectRatio="none"
-					style={{ display: 'block', minWidth: '100%' }}
-				>
-					<line x1="0" y1={chartData.gridY1} x2={chartData.width} y2={chartData.gridY1} stroke="var(--color-duet-border)" strokeWidth="1" />
-					<line x1="0" y1={chartData.gridY2} x2={chartData.width} y2={chartData.gridY2} stroke="var(--color-duet-border)" strokeWidth="1" />
-					<path d={chartData.areaD} fill="var(--color-duet-accent-soft)" />
-					{/* Banda 10°-90° percentile fra i membri dell'ensemble: quanto la
-					    previsione è incerta, non solo quale valore è più probabile. */}
-					{chartData.bandD && (
-						<path
-							d={chartData.bandD}
-							fill="var(--color-duet-accent)"
-							opacity={0.16}
-							aria-hidden="true"
+			<div ref={setContainer} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
+				<div className="relative" style={{ width: chart.width }}>
+					{/* Grafico dietro le colonne: le colonne restano cliccabili per intero */}
+					<svg
+						width={chart.width}
+						height={CHART_HEIGHT}
+						viewBox={`0 0 ${chart.width} ${CHART_HEIGHT}`}
+						className="pointer-events-none absolute left-0"
+						style={{ top: 38 }}
+						aria-hidden="true"
+					>
+						<defs>
+							<linearGradient id={`area-${uid}`} x1="0" y1="0" x2="0" y2="1">
+								<stop offset="0%" stopColor="#3b82f6" stopOpacity="0.55" />
+								<stop offset="100%" stopColor="#3b82f6" stopOpacity="0.04" />
+							</linearGradient>
+							<filter id={`glow-${uid}`} x="-50%" y="-50%" width="200%" height="200%">
+								<feGaussianBlur stdDeviation="2.5" result="blur" />
+								<feMerge>
+									<feMergeNode in="blur" />
+									<feMergeNode in="SourceGraphic" />
+								</feMerge>
+							</filter>
+						</defs>
+						<path d={chart.areaD} fill={`url(#area-${uid})`} />
+						{/* Banda 10°-90° percentile fra i membri dell'ensemble: quanto la
+						    previsione è incerta, non solo quale valore è più probabile. */}
+						{chart.bandD && (
+							<path d={chart.bandD} fill="#93c5fd" opacity={0.18} aria-hidden="true" />
+						)}
+						<motion.path
+							d={chart.pathD}
+							fill="none"
+							stroke="#60a5fa"
+							strokeWidth="2.5"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							initial={{ pathLength: 0, opacity: 0 }}
+							animate={{ pathLength: 1, opacity: 1 }}
+							transition={{ duration: 1.2, ease: 'easeInOut' }}
 						/>
-					)}
-					<motion.path
-						d={chartData.pathD}
-						fill="none"
-						stroke="var(--color-duet-accent)"
-						strokeWidth="2.5"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						initial={{ pathLength: 0, opacity: 0 }}
-						animate={{ pathLength: 1, opacity: 1 }}
-						transition={{ duration: 1.2, ease: 'easeInOut' }}
-					/>
-					{chartData.points.map((p, i) => (
-						<circle
-							key={i}
-							cx={p.x}
-							cy={p.y}
-							r={p.type === 'sun' ? 4 : 3.5}
-							fill={p.type === 'sun' ? '#f7b228' : '#fff'}
-							stroke="var(--color-duet-accent)"
-							strokeWidth="2"
-						/>
-					))}
-				</svg>
-
-				<div className="flex gap-0 pt-3.5 mt-1" style={{ borderTop: '1px solid var(--color-duet-border)', width: chartData.width }}>
-					{chartData.points.map((p, i) => {
-						const label = (
-							<>
-								{p.type === 'weather' ? (
-									<WeatherIcon code={p.data.condition_code} className="w-5 h-5 mx-auto" />
-								) : (
-									<span className="text-[18px] leading-none">{p.data.label === 'Alba' ? '🌅' : '🌇'}</span>
-								)}
-								<span className="font-bold text-sm mt-1 block" style={{ color: 'var(--color-duet-ink)' }}>
-									{p.type === 'weather' ? `${Math.round(p.temp)}°` : p.data.label}
-								</span>
-								<span className="text-xs" style={{ color: 'var(--color-duet-muted)' }}>{formatHour(p.time)}</span>
-								{p.type === 'weather' && p.data.precipitation_prob !== null && p.data.precipitation_prob > 0 && (
-									<span className="inline-flex items-center gap-0.5 text-[11px] font-semibold mt-0.5" style={{ color: 'var(--color-duet-accent)' }}>
-										{Math.round(p.data.precipitation_prob)}%
-									</span>
-								)}
-							</>
-						);
-
-						if (!onPrecipitationClick || p.type !== 'weather') {
-							return (
-								<div key={i} className="flex-none flex flex-col items-center gap-0.5 text-center" style={{ width: 76 }}>
-									{label}
-								</div>
-							);
-						}
-
-						return (
-							<button
+						{chart.points.map((p, i) => (
+							<circle
 								key={i}
-								type="button"
-								onClick={() => onPrecipitationClick(p.data.time)}
-								aria-label={`Dettaglio precipitazioni delle ${formatHour(p.time)}`}
-								className="dt-row flex-none flex flex-col items-center gap-0.5 text-center rounded-lg py-1 transition-colors cursor-pointer"
-								style={{ width: 76 }}
+								cx={p.x}
+								cy={p.y}
+								r={4}
+								fill={p.type === 'sun' ? '#fbbf24' : '#dbeafe'}
+								stroke={p.type === 'sun' ? '#fde68a' : '#60a5fa'}
+								strokeWidth="1.5"
+								filter={`url(#glow-${uid})`}
 							>
-								{label}
-							</button>
-						);
-					})}
+								<title>{`${formatHour(p.time)} · ${Math.round(p.temp)}°`}</title>
+							</circle>
+						))}
+					</svg>
+
+					<div className="relative flex">
+						{chart.points.map((p, i) => {
+							const content = (
+								<>
+									<span className="flex h-7 items-center justify-center" style={{ color: 'var(--color-duet-ink-soft)' }}>
+										{p.type === 'weather' ? (
+											<WeatherIcon code={p.data.condition_code} isNight={isNight(p.time)} className="h-5 w-5" />
+										) : (
+											<span className="text-[18px] leading-none" aria-hidden="true">{p.data.label === 'Alba' ? '🌅' : '🌇'}</span>
+										)}
+									</span>
+									<span style={{ height: CHART_HEIGHT + 8 }} aria-hidden="true" />
+									<span className="w-full pt-2.5 text-sm font-semibold tabular-nums" style={{ borderTop: '1px solid var(--color-duet-border)', color: 'var(--color-duet-ink)' }}>
+										{formatHour(p.time)}
+									</span>
+									{p.type === 'weather' ? (
+										<span className="text-[13px] font-semibold tabular-nums" style={{ color: 'var(--color-duet-accent-ink)' }}>
+											{p.data.precipitation_prob != null ? `${Math.round(p.data.precipitation_prob)}%` : '–'}
+										</span>
+									) : (
+										<span className="text-[13px] font-semibold" style={{ color: 'var(--color-duet-amber-ink)' }}>{p.data.label}</span>
+									)}
+								</>
+							);
+
+							const temp = `${Math.round(p.temp)}°`;
+
+							if (!onPrecipitationClick || p.type !== 'weather') {
+								return (
+									<div
+										key={i}
+										className="flex flex-none flex-col items-center gap-0.5 py-1 text-center"
+										style={{ width: chart.column }}
+										title={p.type === 'weather' ? `${formatHour(p.time)} · ${temp}` : undefined}
+									>
+										{content}
+									</div>
+								);
+							}
+
+							return (
+								<button
+									key={i}
+									type="button"
+									onClick={() => onPrecipitationClick(p.data.time)}
+									aria-label={`Dettaglio precipitazioni delle ${formatHour(p.time)}, ${temp}`}
+									title={`${formatHour(p.time)} · ${temp}`}
+									className="dt-row flex flex-none cursor-pointer flex-col items-center gap-0.5 py-1 text-center"
+									style={{ width: chart.column }}
+								>
+									{content}
+								</button>
+							);
+						})}
+					</div>
 				</div>
 			</div>
-		</div>
+		</section>
 	);
 }

@@ -30,7 +30,7 @@ test('mostra la temperatura corrente e la condizione', async ({ page }) => {
 	await page.goto('/');
 
 	await expect(page.getByText('24', { exact: false }).first()).toBeVisible();
-	await expect(page.getByText('Umidita', { exact: false })).toBeVisible();
+	await expect(page.getByText('Umidità', { exact: false })).toBeVisible();
 	await expect(page.getByText('Vento', { exact: false }).first()).toBeVisible();
 });
 

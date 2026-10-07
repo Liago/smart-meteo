@@ -91,12 +91,11 @@ export default function SegmentedTabs<T extends string>({
 			*/
 			className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 			/*
-			  Pista grigia, segmento attivo bianco: il fondo della pagina è già
-			  grigio, quindi una pista dello stesso colore renderebbe invisibile
-			  il controllo e visibile solo la pillola, che da sola non si legge
-			  come «ce ne sono altre tre».
+			  Pista scura con bordo, segmento attivo blu pieno: sul blu notte una
+			  pista senza bordo sparirebbe nel fondo e resterebbe visibile solo
+			  la pillola, che da sola non si legge come «ce ne sono altre tre».
 			*/
-			style={{ background: 'var(--color-duet-border)' }}
+			style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border)' }}
 		>
 			{items.map((item) => {
 				const selected = item.id === value;
@@ -113,7 +112,7 @@ export default function SegmentedTabs<T extends string>({
 						tabIndex={selected ? 0 : -1}
 						onClick={() => onChange(item.id)}
 						className="relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors"
-						style={{ color: selected ? 'var(--color-duet-ink)' : 'var(--color-duet-muted)' }}
+						style={{ color: selected ? '#ffffff' : 'var(--color-duet-ink-soft)' }}
 					>
 						{selected && (
 							<motion.span
@@ -121,8 +120,8 @@ export default function SegmentedTabs<T extends string>({
 								transition={{ type: 'spring', stiffness: 400, damping: 34 }}
 								className="absolute inset-0 rounded-full"
 								style={{
-									background: 'var(--color-duet-surface)',
-									boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+									background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
+									boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
 								}}
 								aria-hidden="true"
 							/>
@@ -132,7 +131,7 @@ export default function SegmentedTabs<T extends string>({
 							<span
 								className="relative text-xs font-semibold tabular-nums"
 								style={{
-									color: selected ? 'var(--color-duet-accent)' : 'var(--color-duet-faint)',
+									color: selected ? 'rgba(255, 255, 255, 0.85)' : 'var(--color-duet-muted)',
 								}}
 							>
 								{item.count}

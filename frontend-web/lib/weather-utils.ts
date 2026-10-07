@@ -150,11 +150,11 @@ export function getUvLabel(uv: number): string {
 }
 
 export function getUvColor(uv: number): string {
-	if (uv <= 2) return 'text-green-600';
-	if (uv <= 5) return 'text-yellow-600';
-	if (uv <= 7) return 'text-orange-600';
-	if (uv <= 10) return 'text-red-600';
-	return 'text-purple-600';
+	if (uv <= 2) return 'text-green-400';
+	if (uv <= 5) return 'text-yellow-400';
+	if (uv <= 7) return 'text-orange-400';
+	if (uv <= 10) return 'text-red-400';
+	return 'text-purple-400';
 }
 
 // --- Precipitazioni (quantità in mm) ---

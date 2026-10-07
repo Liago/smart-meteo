@@ -152,15 +152,30 @@ export default function WeatherAlerts({ alerts }: WeatherAlertsProps) {
 	);
 }
 
-/** Badge compatto per l'header che mostra il conteggio allerte attive */
-export function AlertBadge({ count, onClick }: { count: number; onClick?: () => void }) {
+/**
+ * Badge compatto per l'header che mostra il conteggio allerte attive.
+ *
+ * Con `onClick` diventa l'interruttore dell'elenco completo: `expanded` ne
+ * dichiara lo stato agli screen reader, che altrimenti sentirebbero solo un
+ * numero.
+ */
+export function AlertBadge({ count, onClick, expanded }: { count: number; onClick?: () => void; expanded?: boolean }) {
 	if (count === 0) return null;
 
 	return (
 		<button
+			type="button"
 			onClick={onClick}
-			className="dt-icon-btn relative inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full text-[13px] font-semibold transition-all"
-			style={{ background: 'var(--color-duet-amber-bg)', color: 'var(--color-duet-amber-strong)', border: '1px solid var(--color-duet-amber-border)' }}
+			aria-expanded={onClick ? !!expanded : undefined}
+			aria-controls={onClick ? 'dashboard-alerts' : undefined}
+			aria-label={`${count} ${count === 1 ? 'allerta attiva' : 'allerte attive'}`}
+			title={expanded ? 'Nascondi le allerte' : 'Mostra le allerte'}
+			className="relative inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-all hover:brightness-125 active:scale-95"
+			style={{
+				background: expanded ? 'rgba(250, 204, 21, 0.22)' : 'var(--color-duet-amber-bg)',
+				color: 'var(--color-duet-amber-strong)',
+				border: '1px solid var(--color-duet-amber-border)',
+			}}
 		>
 			<Shield className="w-3.5 h-3.5" />
 			{count}
