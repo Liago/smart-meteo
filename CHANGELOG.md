@@ -13,6 +13,32 @@ piattaforme: backend, web e iOS. Come si cambia: `docs/VERSIONING.md`.
 
 ## [Non rilasciato]
 
+### Corretto
+
+- **iOS, dettaglio orario: le barre uscivano dal grafico** sulla metrica
+  «Percepita». `BarMark(x:y:)` ancora la colonna a **zero**, non al fondo
+  dell'asse, e Swift Charts non ritaglia i segni all'area del grafico: la
+  percepita è l'unica metrica a barre il cui dominio non parte da zero — una
+  giornata fra 18 e 24 gradi su un asse da 0 sarebbe una fila di barre quasi
+  identiche — quindi le colonne partivano da 0 °C, circa duecento punti sotto
+  il bordo inferiore, e venivano disegnate sopra le tessere di riepilogo e la
+  nota in fondo alla scheda. Ora la barra parte dal fondo del dominio, come ha
+  sempre fatto l'SVG del web (`baselineY`), i valori fuori scala vengono
+  limitati al dominio invece di uscire dal riquadro, e l'area del grafico è
+  ritagliata come rete di sicurezza.
+- **iOS: il minimo dell'asse seguiva l'unità solo al primo disegno.** Le
+  sezioni sono `static let`, inizializzate una volta per processo: il minimo
+  garantito di millimetri, vento e UV restava congelato nell'unità in vigore al
+  primo accesso al dettaglio orario, mentre le etichette di fascia si
+  convertivano a ogni disegno. Chi passava ai nodi si ritrovava un asse alto
+  50 **nodi** con le barre schiacciate in fondo e le fasce alla quota
+  sbagliata. Ora il minimo si valuta a ogni disegno.
+
+### Aggiunto
+
+- `MetricScaleTests` su iOS: geometria delle barre (fondo dell'asse, valori
+  fuori scala, dominio della percepita) e minimo dell'asse che segue l'unità.
+
 ## [1.1.0] — 2026-09-17 (build 2)
 
 Primo rilascio con un meccanismo di versioning: la versione dichiarata era

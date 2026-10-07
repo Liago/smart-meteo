@@ -399,9 +399,16 @@ struct HourlyDetailView: View {
                                     .interpolationMethod(.catmullRom)
                                 }
                             } else if let value = p.forecast.flatMap(section.valueOf) {
+                                // La barra parte dal **fondo dell'asse**, non da
+                                // zero: `BarMark(x:y:)` ancora a zero, e sulla
+                                // percepita — dominio 16…26 su una giornata fra
+                                // 18 e 24 gradi — le colonne uscivano dal
+                                // grafico e finivano sopra le tessere sotto.
+                                let bounds = section.barBounds(for: value, in: domain)
                                 BarMark(
                                     x: .value("Ora", p.hour),
-                                    y: .value(section.id, value),
+                                    yStart: .value(section.id, bounds.start),
+                                    yEnd: .value(section.id, bounds.end),
                                     width: .fixed(9)
                                 )
                                 .foregroundStyle(section.colorOf(value))
@@ -416,7 +423,7 @@ struct HourlyDetailView: View {
                                secondary > primary {
                                 RectangleMark(
                                     x: .value("Ora", p.hour),
-                                    y: .value(section.id, secondary),
+                                    y: .value(section.id, section.clamped(secondary, in: domain)),
                                     width: .fixed(9),
                                     height: .fixed(2)
                                 )
@@ -431,6 +438,13 @@ struct HourlyDetailView: View {
                     }
                     .chartXScale(domain: 0...23)
                     .chartYScale(domain: domain)
+                    // Rete di sicurezza, non la correzione: Swift Charts disegna
+                    // volentieri fuori dall'area del grafico, quindi un segno
+                    // fuori dominio sporcherebbe il resto della scheda invece di
+                    // essere tagliato. La correzione è che i segni stiano nel
+                    // dominio; questo fa sì che un errore futuro resti dentro il
+                    // grafico, dove si vede, e non sopra il testo.
+                    .chartPlotStyle { plot in plot.clipped() }
                     .chartYAxis {
                         AxisMarks(values: section.gridValues(domain)) { value in
                             AxisGridLine()
