@@ -22,13 +22,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
 	width: 'device-width',
 	initialScale: 1,
-	// systemBlue: la stessa tinta dell'accento HIG, letta dalla UI (barra di stato,
-	// splash PWA) invece del vecchio blu "Duet". Il colore reale si adatta al tema
-	// dell'utente via CSS (var(--color-duet-accent)); qui serve un valore statico.
-	themeColor: [
-		{ media: '(prefers-color-scheme: light)', color: '#007aff' },
-		{ media: '(prefers-color-scheme: dark)', color: '#0a84ff' },
-	],
+	// Il blu notte del fondo pagina: la dashboard ha un tema solo, scuro, e la
+	// barra di stato (e lo splash della PWA) devono continuarlo, non staccarsene.
+	themeColor: '#0a1120',
+	colorScheme: 'dark',
 };
 
 export default function RootLayout({

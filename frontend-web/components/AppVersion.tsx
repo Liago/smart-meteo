@@ -11,14 +11,14 @@ import { APP_BUILD, APP_VERSION } from '@/lib/version';
  *
  * Deliberatamente in fondo e in piccolo, accanto all'orario di aggiornamento:
  * è informazione diagnostica, non meteo, e la dashboard risponde prima a chi
- * vuole sapere se piove.
+ * vuole sapere se piove. Il design del revamp scrive solo la versione; la
+ * build resta nel `title`, a un passaggio del mouse per chi deve copiarla in
+ * una segnalazione.
  */
 export default function AppVersion() {
 	return (
 		<span title={`Smart Meteo ${APP_VERSION} (build ${APP_BUILD})`}>
 			Smart Meteo v{APP_VERSION}
-			{' · '}
-			build {APP_BUILD}
 		</span>
 	);
 }

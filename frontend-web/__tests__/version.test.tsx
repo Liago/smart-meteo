@@ -36,11 +36,9 @@ describe('lib/version', () => {
 });
 
 describe('AppVersion', () => {
-	it('scrive versione e build', () => {
+	it('scrive la versione', () => {
 		render(<AppVersion />);
-		expect(screen.getByText(/Smart Meteo v/)).toHaveTextContent(
-			`Smart Meteo v${APP_VERSION} · build ${APP_BUILD}`
-		);
+		expect(screen.getByText(/Smart Meteo v/)).toHaveTextContent(`Smart Meteo v${APP_VERSION}`);
 	});
 
 	it('mette la coppia completa nel title, per chi deve copiarla in una segnalazione', () => {

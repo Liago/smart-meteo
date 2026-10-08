@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 test('digitando una città appaiono i suggerimenti', async ({ page }) => {
 	await page.goto('/');
 
-	await page.getByPlaceholder('Cerca una localita...').fill('Milano');
+	await page.getByPlaceholder('Cerca una località...').fill('Milano');
 
 	// Il componente mostra solo la prima parte di `display_name`: "Milano",
 	// non "Milano, Lombardia, Italia".
@@ -28,7 +28,7 @@ test('selezionando un suggerimento la dashboard passa a quella località', async
 	await page.goto('/');
 	await dashboardReady(page);
 
-	await page.getByPlaceholder('Cerca una localita...').fill('Milano');
+	await page.getByPlaceholder('Cerca una località...').fill('Milano');
 	await page.getByRole('button', { name: 'Milano Marittima', exact: true }).click();
 
 	// Il nome mostrato nella dashboard è quello scelto, non più quello di casa.
@@ -38,7 +38,7 @@ test('selezionando un suggerimento la dashboard passa a quella località', async
 test('la ricerca si può svuotare', async ({ page }) => {
 	await page.goto('/');
 
-	const campo = page.getByPlaceholder('Cerca una localita...');
+	const campo = page.getByPlaceholder('Cerca una località...');
 	await campo.fill('Milano');
 	await expect(page.getByRole('button', { name: 'Milano Marittima', exact: true })).toBeVisible();
 
@@ -52,7 +52,7 @@ test('una ricerca senza risultati non lascia suggerimenti a schermo', async ({ p
 	await page.route(/nominatim\.openstreetmap\.org/, (route) => route.fulfill({ json: [] }));
 	await page.goto('/');
 
-	await page.getByPlaceholder('Cerca una localita...').fill('asdfghjkl');
+	await page.getByPlaceholder('Cerca una località...').fill('asdfghjkl');
 
 	await expect(page.getByRole('listbox')).toHaveCount(0);
 });

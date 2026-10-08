@@ -132,11 +132,11 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 
 	return (
 		<div ref={containerRef} className="relative w-full">
-			{/* Campo di ricerca in stile UISearchBar: rettangolo pieno (non bordato),
-			    angoli morbidi, nessun bordo — solo un anello d'accento al focus. */}
+			{/* Campo di ricerca a tutta larghezza, bordato: sul blu notte un campo
+			    senza bordo si confonderebbe con l'intestazione. Anello d'accento al focus. */}
 			<div
-				className="dt-input flex items-center gap-2.5 h-[38px] px-3 rounded-[10px]"
-				style={{ background: 'var(--color-duet-bg)', border: '0.5px solid transparent' }}
+				className="dt-input flex items-center gap-2.5 h-11 px-3.5 rounded-xl"
+				style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)' }}
 			>
 				<svg className="w-[17px] h-[17px] shrink-0" fill="none" stroke="var(--color-duet-muted)" viewBox="0 0 24 24">
 					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -146,7 +146,7 @@ export default function SearchBar({ onLocationSelect, isLoading, savedLocations 
 					value={query}
 					onChange={(e) => handleSearch(e.target.value)}
 					onFocus={() => setShowResults(true)}
-					placeholder="Cerca una localita..."
+					placeholder="Cerca una località..."
 					className="flex-1 bg-transparent outline-none text-[15px]"
 					style={{ color: 'var(--color-duet-ink)' }}
 				/>

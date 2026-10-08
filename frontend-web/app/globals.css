@@ -1,55 +1,63 @@
 @import "tailwindcss";
 
 /*
-  Design system: Apple Human Interface Guidelines.
-  I nomi dei token (--color-duet-*) restano invariati rispetto al vecchio
-  sistema "Duet": decine di componenti li leggono via var(--color-duet-*)
-  in inline style, quindi ridefinirli qui basta a propagare la nuova
-  identità visiva ovunque, senza toccare ogni file. I valori sono le
-  System Colors di iOS/macOS (label, secondaryLabel, systemBlue, i
-  livelli di background raggruppato, i separator) in light e dark mode.
+  Design system: tema "Notte" (revamp 2026-10).
+
+  Un solo tema, scuro e blu notte, come da design di riferimento: la
+  dashboard non segue più `prefers-color-scheme`. I nomi dei token
+  (--color-duet-*) restano invariati — decine di componenti li leggono via
+  var(--color-duet-*) in inline style, quindi ridefinirli qui basta a
+  propagare la nuova identità ovunque, login e gestione fonti comprese.
+
+  Tre livelli di superficie, dal fondo verso l'alto:
+  - bg:        la pagina, quasi nero con una punta di blu;
+  - surface:   le schede (Sole & Vento, Luna, Andamento orario…);
+  - surface-2: i riquadri dentro le schede (le sei tessere del meteo
+               attuale, la posizione), un gradino più chiari, così che la
+               gerarchia si legga senza bisogno di ombre.
 */
 @theme inline {
-  --color-duet-bg: #f2f2f7;              /* systemGroupedBackground */
-  --color-duet-surface: #ffffff;         /* secondarySystemGroupedBackground */
-  --color-duet-border: rgba(60, 60, 67, 0.13);   /* separator, attenuato per i bordi carta */
-  --color-duet-border-strong: rgba(60, 60, 67, 0.29); /* separator */
-  --color-duet-ink: #000000;             /* label */
-  --color-duet-ink-soft: rgba(60, 60, 67, 0.78);
-  --color-duet-muted: rgba(60, 60, 67, 0.6);     /* secondaryLabel */
-  --color-duet-faint: rgba(60, 60, 67, 0.3);     /* tertiaryLabel */
-  --color-duet-accent: #007aff;          /* systemBlue */
-  --color-duet-accent-hover: #0062cc;    /* systemBlue, stato premuto */
-  --color-duet-accent-soft: rgba(0, 122, 255, 0.12);
-  --color-duet-accent-border: rgba(0, 122, 255, 0.28);
-  --color-duet-amber-bg: rgba(255, 204, 0, 0.16);
-  --color-duet-amber-border: rgba(255, 204, 0, 0.45);
-  --color-duet-amber-ink: #7a5900;
-  --color-duet-amber-strong: #8a6400;
-  /* Badge pieno (non un tint): stessa saturazione in entrambi i temi,
-     perché il testo sopra resta sempre scuro — systemYellow è troppo
-     chiaro per il testo bianco che usano gli altri badge di severity. */
+  --color-duet-bg: #0a1120;
+  --color-duet-surface: #121b2e;
+  --color-duet-surface-2: #182339;
+  --color-duet-border: rgba(148, 163, 184, 0.14);
+  --color-duet-border-strong: rgba(148, 163, 184, 0.3);
+  --color-duet-ink: #f1f5f9;
+  --color-duet-ink-soft: rgba(226, 232, 240, 0.86);
+  --color-duet-muted: #94a3b8;
+  --color-duet-faint: #64748b;
+  --color-duet-accent: #3b82f6;
+  --color-duet-accent-hover: #60a5fa;
+  --color-duet-accent-ink: #60a5fa;      /* accento come testo: più chiaro, per il contrasto sul blu notte */
+  --color-duet-accent-soft: rgba(59, 130, 246, 0.16);
+  --color-duet-accent-border: rgba(59, 130, 246, 0.42);
+  --color-duet-amber-bg: rgba(250, 204, 21, 0.12);
+  --color-duet-amber-border: rgba(250, 204, 21, 0.42);
+  --color-duet-amber-ink: #facc15;
+  --color-duet-amber-strong: #facc15;
+  /* Badge pieno (non un tint): il testo sopra resta sempre scuro. */
   --color-duet-amber-badge: #f0b400;
   --color-duet-amber-badge-ink: #3d2c00;
-  --color-duet-green-bg: rgba(52, 199, 89, 0.14);
-  --color-duet-green-ink: #1c7a3e;
-  --color-duet-green: #34c759;           /* systemGreen */
-  --color-duet-red: #ff3b30;             /* systemRed */
-  --color-duet-red-bg: rgba(255, 59, 48, 0.12);
-  --color-duet-red-border: rgba(255, 59, 48, 0.35);
-  --color-duet-red-ink: #b52620;
-  --color-duet-orange: #ff9500;          /* systemOrange */
-  --color-duet-orange-bg: rgba(255, 149, 0, 0.14);
-  --color-duet-orange-border: rgba(255, 149, 0, 0.4);
-  --color-duet-orange-ink: #8a4b00;
+  --color-duet-green-bg: rgba(34, 197, 94, 0.16);
+  --color-duet-green-ink: #4ade80;
+  --color-duet-green: #22c55e;
+  --color-duet-red: #ef4444;
+  --color-duet-red-bg: rgba(239, 68, 68, 0.16);
+  --color-duet-red-border: rgba(239, 68, 68, 0.42);
+  --color-duet-red-ink: #f87171;
+  --color-duet-orange: #f59e0b;
+  --color-duet-orange-bg: rgba(245, 158, 11, 0.16);
+  --color-duet-orange-border: rgba(245, 158, 11, 0.42);
+  --color-duet-orange-ink: #fbbf24;
+  --color-duet-sun: #fbbf24;
 
-  /* Materiali: vetro smerigliato vero (blur + saturate), non solo opacità */
-  --color-material-thin: rgba(255, 255, 255, 0.65);
-  --color-material-regular: rgba(255, 255, 255, 0.82);
-  --color-material-thick: rgba(255, 255, 255, 0.94);
+  /* Materiali: vetro smerigliato (blur + saturate) sul blu notte */
+  --color-material-thin: rgba(18, 27, 46, 0.6);
+  --color-material-regular: rgba(18, 27, 46, 0.82);
+  --color-material-thick: rgba(12, 19, 34, 0.92);
 
-  --color-glass-bg: rgba(255, 255, 255, 0.12);
-  --color-glass-border: rgba(255, 255, 255, 0.2);
+  --color-glass-bg: rgba(255, 255, 255, 0.06);
+  --color-glass-border: rgba(255, 255, 255, 0.12);
   --color-glass-bg-dark: rgba(0, 0, 0, 0.25);
   --color-glass-border-dark: rgba(255, 255, 255, 0.1);
 
@@ -61,48 +69,9 @@
   --color-weather-fog: #94a3b8;
 
   /* Stack di sistema: sui dispositivi Apple risolve a San Francisco,
-     lo stesso font della HIG, senza scaricare un web font. */
+     senza scaricare un web font. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
-}
-
-/* Dark mode: stessi token, valori delle System Colors in variante scura.
-   Segue solo l'impostazione di sistema (prefers-color-scheme), come da HIG:
-   nessun toggle manuale nell'interfaccia. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-duet-bg: #000000;              /* systemGroupedBackground (dark) */
-    --color-duet-surface: #1c1c1e;         /* secondarySystemGroupedBackground (dark) */
-    --color-duet-border: rgba(255, 255, 255, 0.1);
-    --color-duet-border-strong: rgba(84, 84, 88, 0.65);
-    --color-duet-ink: #ffffff;
-    --color-duet-ink-soft: rgba(235, 235, 245, 0.82);
-    --color-duet-muted: rgba(235, 235, 245, 0.6);
-    --color-duet-faint: rgba(235, 235, 245, 0.3);
-    --color-duet-accent: #0a84ff;
-    --color-duet-accent-hover: #409cff;
-    --color-duet-accent-soft: rgba(10, 132, 255, 0.2);
-    --color-duet-accent-border: rgba(10, 132, 255, 0.36);
-    --color-duet-amber-bg: rgba(255, 214, 10, 0.16);
-    --color-duet-amber-border: rgba(255, 214, 10, 0.4);
-    --color-duet-amber-ink: #ffd60a;
-    --color-duet-amber-strong: #ffd60a;
-    --color-duet-green-bg: rgba(48, 209, 88, 0.18);
-    --color-duet-green-ink: #30d158;
-    --color-duet-green: #30d158;
-    --color-duet-red: #ff453a;
-    --color-duet-red-bg: rgba(255, 69, 58, 0.18);
-    --color-duet-red-border: rgba(255, 69, 58, 0.4);
-    --color-duet-red-ink: #ff6961;
-    --color-duet-orange: #ff9f0a;
-    --color-duet-orange-bg: rgba(255, 159, 10, 0.18);
-    --color-duet-orange-border: rgba(255, 159, 10, 0.42);
-    --color-duet-orange-ink: #ffb454;
-
-    --color-material-thin: rgba(28, 28, 30, 0.6);
-    --color-material-regular: rgba(28, 28, 30, 0.78);
-    --color-material-thick: rgba(28, 28, 30, 0.92);
-  }
+    "Inter", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 *,
@@ -112,7 +81,7 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
@@ -153,27 +122,56 @@ a:hover { color: var(--color-duet-accent-hover); }
 .hig-caption-2 { font-size: 0.6875rem; line-height: 0.8125rem; font-weight: 500; }
 
 /*
-  Superfici "carta": nomi .glass/.glass-strong/.glass-dark invariati (usati in
-  ~20 componenti) ma reimplementati come vere Material HIG — sfondo
-  semitrasparente + backdrop blur/saturate, non solo un riquadro pieno. Angoli
-  ampi e continui in stile iOS, ombra bassa e diffusa invece del bordo netto.
+  Superfici: nomi .glass/.glass-strong/.glass-dark invariati (usati in ~20
+  componenti). Sul blu notte la gerarchia la fa il bordo sottile e il
+  gradino di colore, non l'ombra: un'ombra scura su fondo scuro non si vede.
 */
 .glass {
-  background: var(--color-material-regular);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 0.5px solid var(--color-duet-border);
-  border-radius: 1.125rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(180deg, rgba(24, 35, 57, 0.92), rgba(18, 27, 46, 0.92));
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--color-duet-border);
+  border-radius: 1.25rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Riquadro dentro una scheda: un gradino più chiaro della scheda stessa. */
+.tile {
+  background: var(--color-duet-surface-2);
+  border: 1px solid var(--color-duet-border);
+  border-radius: 1rem;
+}
+
+/* Etichetta di sezione delle schede: «SOLE & VENTO», «LUNA», «DOMANI»… */
+.card-label {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-duet-ink-soft);
+}
+
+/* Quadratino che ospita un'icona nelle tessere e nella giornata. */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 0.5rem;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid var(--color-duet-border);
+  color: var(--color-duet-accent-ink);
 }
 
 .glass-strong {
   background: var(--color-material-thick);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border: 0.5px solid var(--color-duet-border);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid var(--color-duet-border);
   border-radius: 1.375rem;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Sheet iOS: angoli superiori arrotondati e piatti in basso sotto `sm`
@@ -193,7 +191,7 @@ a:hover { color: var(--color-duet-accent-hover); }
   background: var(--color-material-thin);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 0.5px solid var(--color-duet-border);
+  border: 1px solid var(--color-duet-border);
   border-radius: 1.125rem;
 }
 
@@ -204,7 +202,7 @@ a:hover { color: var(--color-duet-accent-hover); }
 .dt-icon-btn:hover { background: var(--color-duet-accent-soft); color: var(--color-duet-accent); }
 .dt-icon-btn:active { transform: scale(0.92); }
 .dt-row { transition: background .12s ease; border-radius: 0.625rem; }
-.dt-row:hover { background: var(--color-duet-bg); }
+.dt-row:hover { background: rgba(148, 163, 184, 0.08); }
 .dt-row:active { transform: scale(0.99); }
 .dt-secondary { transition: background .15s ease, border-color .15s ease, transform .15s cubic-bezier(.2,.8,.2,1); }
 .dt-secondary:hover:not(:disabled) { background: var(--color-duet-accent-soft); border-color: var(--color-duet-accent); }
@@ -214,7 +212,7 @@ a:hover { color: var(--color-duet-accent-hover); }
 .dt-primary:active:not(:disabled) { transform: scale(0.97); }
 .dt-input:focus-within { border-color: var(--color-duet-accent); box-shadow: 0 0 0 3px var(--color-duet-accent-soft); }
 
-/* Animated background (kept for the pre-Duet dark theme; unused on the light dashboard) */
+/* Animated background (non usato dalla dashboard) */
 .weather-bg {
   position: fixed;
   inset: 0;

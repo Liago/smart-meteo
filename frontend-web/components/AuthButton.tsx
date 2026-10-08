@@ -40,19 +40,19 @@ export default function AuthButton() {
 	};
 
 	if (loading) {
-		return <div className="h-9 w-20 rounded-[10px] animate-pulse" style={{ background: 'var(--color-duet-bg)' }}></div>;
+		return <div className="h-8 w-20 rounded-lg animate-pulse" style={{ background: 'var(--color-duet-surface-2)' }}></div>;
 	}
 
 	if (user) {
 		return (
 			<div className="flex items-center gap-3">
-				<span className="text-sm hidden sm:block" style={{ color: 'var(--color-duet-ink-soft)' }}>
+				<span className="hidden max-w-[220px] truncate text-sm md:block" style={{ color: 'var(--color-duet-ink-soft)' }}>
 					{user.email}
 				</span>
 				<button
 					onClick={handleSignOut}
-					className="dt-secondary px-3 py-1.5 text-xs font-semibold rounded-[10px] transition-colors"
-					style={{ background: 'var(--color-duet-surface)', border: '1px solid var(--color-duet-border-strong)', color: 'var(--color-duet-accent)' }}
+					className="dt-secondary rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors"
+					style={{ background: 'transparent', border: '1px solid var(--color-duet-accent)', color: 'var(--color-duet-accent-ink)' }}
 				>
 					Logout
 				</button>
@@ -63,8 +63,8 @@ export default function AuthButton() {
 	return (
 		<Link
 			href="/login"
-			className="dt-primary px-4 py-2 text-sm font-semibold text-white rounded-[10px] transition-colors"
-			style={{ background: 'var(--color-duet-accent)' }}
+			className="dt-primary rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors"
+			style={{ background: 'var(--color-duet-accent)', color: '#ffffff' }}
 		>
 			Accedi
 		</Link>

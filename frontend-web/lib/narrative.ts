@@ -509,6 +509,8 @@ export interface DayNarrative {
 	parts: NarrativePart[];
 	advice: NarrativeAdvice[];
 	tomorrow: string | null;
+	/** Codice condizione del giorno raccontato in `tomorrow`, per l'icona della scheda. */
+	tomorrowCode: string | number | null;
 }
 
 /**
@@ -562,5 +564,6 @@ export function buildDayNarrative(input: {
 		parts: narrativeParts,
 		advice: buildAdvice({ current, today, parts }),
 		tomorrow: buildTomorrow(today, daily[1], hourly),
+		tomorrowCode: daily[1]?.condition_code ?? null,
 	};
 }
